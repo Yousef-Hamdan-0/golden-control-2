@@ -31,6 +31,11 @@ export const NAVIGATION: NavItem[] = [
     ],
   },
   {
+    label: "إدارة العملاء",
+    href: "/customers",
+    icon: "users",
+  },
+  {
     label: "إدارة الفنيين",
     icon: "wrench",
     children: [

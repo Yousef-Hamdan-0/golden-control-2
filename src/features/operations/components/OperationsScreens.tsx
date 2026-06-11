@@ -31,7 +31,7 @@ type Priority = "low" | "medium" | "high" | "emergency";
 type InvoiceType = "external" | "internal";
 type PaymentStatus = "paid" | "partial" | "unpaid";
 
-interface Order {
+export interface Order {
   id: string;
   type: OrderType;
   client: string;
@@ -649,6 +649,7 @@ export function MaintenanceOrderModal({
   const [draft, setDraft] = useState<MaintenanceOrderDraft>(
     initialOrder ? orderToDraft(initialOrder) : EMPTY_MAINTENANCE_ORDER,
   );
+  const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
   const isEdit = Boolean(initialOrder);
 
   function updateDevice(index: number, patch: Partial<DeviceDraft>) {
@@ -675,18 +676,21 @@ export function MaintenanceOrderModal({
   }
 
   function handleSubmit() {
-    onSave?.(draftToOrder(draft, initialOrder));
-    onClose();
+    const order = draftToOrder(draft, initialOrder);
+    onSave?.(order);
+    if (isEdit) onClose();
+    else setCreatedOrder(order);
   }
 
   return (
-    <Modal
-      title={isEdit ? "تعديل طلب صيانة" : "إنشاء طلب صيانة"}
-      description="أدخل بيانات الطلب، العميل، الأجهزة، العطل، وموعد الزيارة."
-      onClose={onClose}
-      widthClassName="max-w-5xl"
-    >
-      <form className="space-y-6 p-5" onSubmit={(event) => event.preventDefault()}>
+    <>
+      <Modal
+        title={isEdit ? "تعديل طلب صيانة" : "إنشاء طلب صيانة"}
+        description="أدخل بيانات الطلب، العميل، الأجهزة، العطل، وموعد الزيارة."
+        onClose={onClose}
+        widthClassName="max-w-5xl"
+      >
+        <form className="space-y-6 p-5" onSubmit={(event) => event.preventDefault()}>
         <section className="space-y-3">
           <h3 className="font-heading text-base font-bold text-gold">موقع الطلب</h3>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -915,7 +919,144 @@ export function MaintenanceOrderModal({
             {isEdit ? "حفظ التعديل" : "إنشاء الطلب"}
           </Button>
         </div>
-      </form>
+        </form>
+      </Modal>
+      {createdOrder ? (
+        <OrderPdfActionsModal
+          order={createdOrder}
+          onClose={() => {
+            setCreatedOrder(null);
+            onClose();
+          }}
+        />
+      ) : null}
+    </>
+  );
+}
+
+function escapePdfText(value: string): string {
+  return value
+    .replace(/[^\x20-\x7E]/g, "?")
+    .replace(/\\/g, "\\\\")
+    .replace(/\(/g, "\\(")
+    .replace(/\)/g, "\\)");
+}
+
+function buildSimplePdf(order: Order): Blob {
+  const lines = [
+    "Golden Control - Maintenance Order",
+    `Order: ${order.id}`,
+    `Client: ${escapePdfText(order.client)}`,
+    `Phone: ${order.phone}`,
+    `Device: ${escapePdfText(order.device)}`,
+    `Brand: ${escapePdfText(order.brand)}`,
+    `Technician: ${escapePdfText(order.technician)}`,
+    `Visit: ${order.visitDate}`,
+    `Priority: ${order.priority}`,
+  ];
+
+  const content = [
+    "BT",
+    "/F1 18 Tf",
+    "50 780 Td",
+    `(${escapePdfText(lines[0])}) Tj`,
+    "/F1 12 Tf",
+    ...lines.slice(1).map((line) => `0 -28 Td (${escapePdfText(line)}) Tj`),
+    "ET",
+  ].join("\n");
+
+  const objects = [
+    "1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n",
+    "2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj\n",
+    "3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj\n",
+    "4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj\n",
+    `5 0 obj << /Length ${content.length} >> stream\n${content}\nendstream endobj\n`,
+  ];
+  let pdf = "%PDF-1.4\n";
+  const offsets = [0];
+  objects.forEach((object) => {
+    offsets.push(pdf.length);
+    pdf += object;
+  });
+  const xrefStart = pdf.length;
+  pdf += `xref\n0 ${objects.length + 1}\n`;
+  pdf += "0000000000 65535 f \n";
+  offsets.slice(1).forEach((offset) => {
+    pdf += `${String(offset).padStart(10, "0")} 00000 n \n`;
+  });
+  pdf += `trailer << /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`;
+
+  return new Blob([pdf], { type: "application/pdf" });
+}
+
+function downloadOrderPdf(order: Order) {
+  const url = URL.createObjectURL(buildSimplePdf(order));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${order.id}.pdf`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function printOrderPdf(order: Order) {
+  const printWindow = window.open("", "_blank", "width=900,height=700");
+  if (!printWindow) return;
+  printWindow.document.write(`
+    <html dir="rtl" lang="ar">
+      <head>
+        <title>${order.id}</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 32px; color: #1a1a1a; }
+          h1 { color: #8a6b2f; }
+          table { width: 100%; border-collapse: collapse; margin-top: 24px; }
+          td { border: 1px solid #e7dfcf; padding: 12px; }
+          td:first-child { width: 180px; font-weight: 700; background: #f6f1e7; }
+        </style>
+      </head>
+      <body>
+        <h1>طلب صيانة ${order.id}</h1>
+        <table>
+          <tr><td>العميل</td><td>${order.client}</td></tr>
+          <tr><td>الهاتف</td><td dir="ltr">${order.phone}</td></tr>
+          <tr><td>الجهاز</td><td>${order.device}</td></tr>
+          <tr><td>الماركة</td><td>${order.brand}</td></tr>
+          <tr><td>الفني</td><td>${order.technician}</td></tr>
+          <tr><td>موعد الزيارة</td><td>${order.visitDate}</td></tr>
+          <tr><td>العنوان</td><td>${order.address}</td></tr>
+        </table>
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.print();
+}
+
+function OrderPdfActionsModal({ order, onClose }: { order: Order; onClose: () => void }) {
+  return (
+    <Modal
+      title="تم إنشاء الطلب"
+      description={`تم إنشاء الطلب ${order.id}. يمكنك تنزيل ملف PDF أو طباعته الآن.`}
+      onClose={onClose}
+      widthClassName="max-w-xl"
+    >
+      <div className="space-y-4 p-5">
+        <div className="rounded-md border border-border bg-surface-2 p-4 text-sm text-content-muted">
+          <div className="font-semibold text-content">{order.client}</div>
+          <div className="mt-1" dir="ltr">{order.phone}</div>
+          <div className="mt-1">{order.device}</div>
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-3 border-t border-border pt-4">
+          <Button type="button" variant="outline" onClick={() => downloadOrderPdf(order)}>
+            تنزيل PDF
+          </Button>
+          <Button type="button" onClick={() => printOrderPdf(order)}>
+            طباعة PDF
+          </Button>
+        </div>
+      </div>
     </Modal>
   );
 }
@@ -1130,6 +1271,7 @@ export function OrdersScreen() {
   );
 
   const completed = orders.filter((order) => order.status === "completed").length;
+  const incompleted = orders.filter((order) => order.status === "incompleted").length;
   const pulled = orders.filter((order) => order.status === "pull-to-center").length;
   const hasDateFilter = Boolean(dateFilter.from || dateFilter.to);
 
@@ -1170,6 +1312,7 @@ export function OrdersScreen() {
         cards={[
           { label: "إجمالي الطلبات", value: String(orders.length), icon: "clipboard" },
           { label: "مكتملة", value: String(completed), icon: "shield", tone: "success" },
+          { label: "غير مكتملة", value: String(incompleted), icon: "alert", tone: "danger" },
           { label: "مسحوبة للمركز", value: String(pulled), icon: "box", tone: "info" },
         ]}
       />
