@@ -95,6 +95,31 @@ export function Sidebar() {
         {NAVIGATION.filter((i) => i.href !== "/dashboard").map((item) => {
           const active = groupActive(pathname, searchParams, item);
           const isOpen = open === item.label;
+          const isLeafLink = typeof item.href === "string" && !item.children?.length;
+
+          if (isLeafLink) {
+            const href = item.href as string;
+            return (
+              <div key={item.label} className="mb-0.5">
+                <Link
+                  href={href}
+                  className={cn(
+                    "group relative flex w-full items-center justify-end gap-3 rounded-md px-4 py-2.5 text-right text-sm transition",
+                    active
+                      ? "border border-border bg-surface-2 font-semibold text-gold shadow-card"
+                      : "text-content hover:bg-gold-soft",
+                  )}
+                >
+                  {active && (
+                    <span className="absolute right-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full bg-gold" />
+                  )}
+                  <span>{item.label}</span>
+                  {item.icon && <Icon name={item.icon} className="text-content-muted" />}
+                </Link>
+              </div>
+            );
+          }
+
           return (
             <div key={item.label} className="mb-0.5">
               <button
