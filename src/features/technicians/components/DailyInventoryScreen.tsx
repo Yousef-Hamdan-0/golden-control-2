@@ -1,0 +1,100 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { Spinner } from "@/components/ui/Spinner";
+import { Icon } from "@/lib/icons";
+import { DailyInventoryCard } from "@/features/technicians/components/DailyInventoryCard";
+import { useDailyInventoryQuery } from "@/features/technicians/hooks/use-daily-inventory";
+
+export function DailyInventoryScreen() {
+  const router = useRouter();
+  const [page, setPage] = useState(1);
+  const { data, isLoading, isError, refetch } = useDailyInventoryQuery(page);
+
+  const total = data?.total ?? 0;
+  const pageSize = data?.pageSize ?? 6;
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+  const start = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const end = Math.min(page * pageSize, total);
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <Button onClick={() => router.push("/technicians/inventory/new")}>
+          <Icon name="plus" size={18} />
+          إنشاء مخزون
+        </Button>
+        <div className="text-right">
+          <h2 className="font-heading text-xl font-bold text-gold">المخزون اليومي</h2>
+          <p className="mt-1 max-w-md text-sm text-content-muted">
+            مراقبة وتسجيل الأدوات والمهمات الخاصة بفرق الصيانة الميدانية.
+          </p>
+        </div>
+      </div>
+
+      {/* Grid */}
+      {isLoading ? (
+        <div className="flex justify-center py-20">
+          <Spinner />
+        </div>
+      ) : isError ? (
+        <Card className="p-6 text-center text-sm text-danger">
+          تعذّر تحميل المخزون.{" "}
+          <button onClick={() => refetch()} className="underline">
+            إعادة المحاولة
+          </button>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {data?.items.map((entry) => (
+            <DailyInventoryCard key={entry.id} entry={entry} />
+          ))}
+        </div>
+      )}
+
+      {/* Pagination */}
+      <div className="flex items-center justify-between gap-3 text-sm text-content-muted">
+        <div className="flex items-center gap-1">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 w-8 px-0"
+            disabled={page <= 1}
+            onClick={() => setPage(page - 1)}
+            aria-label="السابق"
+          >
+            <Icon name="chevron-right" size={16} />
+          </Button>
+          {Array.from({ length: pages }).map((_, i) => (
+            <Button
+              key={i}
+              size="sm"
+              variant={i + 1 === page ? "primary" : "outline"}
+              className="h-8 w-8 px-0"
+              onClick={() => setPage(i + 1)}
+            >
+              {i + 1}
+            </Button>
+          ))}
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 w-8 px-0"
+            disabled={page >= pages}
+            onClick={() => setPage(page + 1)}
+            aria-label="التالي"
+          >
+            <Icon name="chevron-left" size={16} />
+          </Button>
+        </div>
+        <span>
+          عرض {start}-{end} من أصل {total} فني
+        </span>
+      </div>
+    </div>
+  );
+}

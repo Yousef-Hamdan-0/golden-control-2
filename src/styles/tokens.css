@@ -1,0 +1,70 @@
+/* Golden Control — design tokens.
+   Single source of truth for color. Mirrors design.md.
+   Imported once in app/globals.css. */
+
+:root {
+  /* Light mode */
+  --bg: #faf8f3;
+  --surface: #ffffff;
+  --surface-2: #f6f1e7;
+
+  --primary: #b08d3c;
+  --primary-2: #c6a24a;
+  --primary-3: #8a6b2f;
+
+  --gold: #b08d3c;
+  --gold-hover: #c6a24a;
+  --gold-active: #8a6b2f;
+  --gold-soft: rgba(176, 141, 60, 0.12);
+
+  /* RGB channels for Tailwind <alpha-value> support (e.g. ring-gold/40) */
+  --gold-rgb: 176 141 60;
+  --danger-rgb: 179 64 58;
+
+  --text: #1a1a1a;
+  --text-muted: #6b6b6b;
+
+  --border: #e7dfcf;
+
+  /* Status (muted, per design.md) */
+  --success: #2f7d54;
+  --success-soft: rgba(47, 125, 84, 0.12);
+  --danger: #b3403a;
+  --danger-soft: rgba(179, 64, 58, 0.12);
+  --info: #3b6fb3;
+  --info-soft: rgba(59, 111, 179, 0.12);
+
+  /* Fonts (wire up via next/font in layout.tsx; fallbacks below) */
+  --font-heading: "Tajawal";
+  --font-body: "Cairo";
+}
+
+.dark {
+  --bg: #0b0b0c;
+  --surface: #121214;
+  --surface-2: #1a1a1d;
+
+  --primary: #b08d3c;
+  --primary-2: #c6a24a;
+  --primary-3: #8a6b2f;
+
+  --gold: #b08d3c;
+  --gold-hover: #c6a24a;
+  --gold-active: #8a6b2f;
+  --gold-soft: rgba(176, 141, 60, 0.16);
+
+  --gold-rgb: 176 141 60;
+  --danger-rgb: 216 100 93;
+
+  --text: #f5f5f5;
+  --text-muted: #a1a1a1;
+
+  --border: #2a2418;
+
+  --success: #4cae7e;
+  --success-soft: rgba(76, 174, 126, 0.16);
+  --danger: #d8645d;
+  --danger-soft: rgba(216, 100, 93, 0.16);
+  --info: #6ea0e0;
+  --info-soft: rgba(110, 160, 224, 0.16);
+}
