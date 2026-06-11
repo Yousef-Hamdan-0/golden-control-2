@@ -1,8 +1,8 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { ThemeProvider } from "next-themes";
 import { QueryProvider } from "@/providers/QueryProvider";
+import { ThemeProvider } from "@/providers/ThemeProvider";
 
 /**
  * Compose app-wide providers. In the full app this also wraps Auth + Socket
@@ -10,7 +10,7 @@ import { QueryProvider } from "@/providers/QueryProvider";
  */
 export function AppProviders({ children }: { children: ReactNode }) {
   return (
-    <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
+    <ThemeProvider>
       <QueryProvider>{children}</QueryProvider>
     </ThemeProvider>
   );

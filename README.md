@@ -1,88 +1,151 @@
-# Golden Control — first implementation slice
+# Golden Control — لوحة تحكم مركز الصيانة
 
-This is a working vertical slice you can drop into your existing Next.js project:
-the **design foundation + app shell + full User Management feature + 404**, all on
-mock data and wired through the architecture's layers (model → repo → service →
-query hook → component). Swap the mock repository for real Axios calls later and
-nothing above it changes.
+تطبيق عربي RTL لإدارة مركز صيانة الأجهزة الكهربائية، مبني باستخدام:
 
-## What's included
+- Next.js 14 App Router
+- TypeScript
+- Tailwind CSS
+- next-themes
+- TanStack Query
+- Zod
+- React Hook Form
+- mock repositories قابلة للاستبدال لاحقًا بـ API حقيقي
 
-```
-tailwind.config.ts                      gold tokens, RTL fonts, dark mode
+---
+
+## ما الموجود حاليًا؟
+
+تم دمج مراحل العمل السابقة مع الـ slice الموجودة في `golden-control 2`.
+
+### واجهات المصادقة
+
+- `/login` صفحة تسجيل الدخول.
+- `/forgot-password` شاشة استعادة كلمة المرور.
+- `/reset-password` شاشة إعادة تعيين كلمة المرور.
+- تسجيل دخول وهمي يحفظ الجلسة في `sessionStorage` أو `localStorage` عند تفعيل "تذكرني".
+
+### لوحة ما بعد تسجيل الدخول
+
+- `/dashboard` صفحة "نظرة عامة".
+- Sidebar يمين.
+- Topbar.
+- بطاقات ملخص طلبات الصيانة.
+- بطاقات الفواتير.
+- بطاقة الأداء المالي.
+- جدول آخر الطلبات المحدثة.
+
+### إدارة المستخدمين
+
+المسارات:
+
+- `/settings/users`
+- `/settings/users/new`
+- `/settings/users/[userId]`
+- `/settings/users/[userId]/edit`
+
+الموجود:
+
+- جدول مستخدمين.
+- فلاتر حسب الدور والحالة.
+- بطاقات KPI.
+- إنشاء مستخدم.
+- عرض ملف مستخدم.
+- تعديل مستخدم.
+- حذف مستخدم من mock repository.
+
+### إدارة الفنيين والمخزون اليومي
+
+المسارات:
+
+- `/technicians/inventory`
+- `/technicians/inventory/new`
+
+الموجود:
+
+- عرض المخزون اليومي للفنيين.
+- إنشاء مخزون يومي.
+- pagination.
+- mock data للفنيين والمخزون.
+
+---
+
+## بنية الملفات المهمة
+
+```text
 src/
-├─ styles/tokens.css                     light/dark CSS variables (design.md)
-├─ app/
-│  ├─ globals.css                        imports tokens + Tailwind + RTL base
-│  ├─ not-found.tsx                       404 (screenshot 7)
-│  └─ (dashboard)/
-│     ├─ layout.tsx                       providers + Shell
-│     ├─ settings/users/
-│     │  ├─ page.tsx                      list  (screenshot 1)
-│     │  ├─ new/page.tsx                  create (screenshot 4)
-│     │  └─ [userId]/
-│     │     ├─ page.tsx                   profile view (screenshot 5)
-│     │     └─ edit/page.tsx              edit (screenshot 6)
-│     └─ technicians/inventory/
-│        ├─ page.tsx                      daily-inventory grid (screenshot 2)
-│        └─ new/page.tsx                  create inventory (screenshot 3)
-├─ config/        constants.ts, navigation.ts
-├─ lib/           icons.tsx, utils/cn.ts, format/currency.ts, auth/current-user.ts
-├─ models/        auth/user.model.ts, users/*.schema.ts, technician/daily-inventory.model.ts
-├─ mocks/         users.mock.ts, daily-inventory.mock.ts
-├─ repositories/  user.repository.ts, technician.repository.ts   (MOCK — replace with Axios)
-├─ services/      user.service.ts, technician.service.ts
-├─ hooks/         query-keys.ts
-├─ providers/     AppProviders.tsx, QueryProvider.tsx
-├─ components/
-│  ├─ ui/         Button, Card, Badge, Input, Select, Textarea, Spinner
-│  └─ layout/     Sidebar, Topbar, Shell, PageHeader
-└─ features/
-   ├─ users/         components/* + hooks/* + index.ts
-   └─ technicians/   daily-inventory grid + create form + hooks + index.ts
+├── app/
+│   ├── (auth)/
+│   ├── (dashboard)/
+│   ├── dashboard/
+│   ├── layout.tsx
+│   ├── page.tsx
+│   └── globals.css
+├── components/
+│   ├── feedback/
+│   ├── layout/
+│   └── ui/
+├── config/
+├── features/
+│   ├── auth/
+│   ├── dashboard/
+│   ├── technicians/
+│   └── users/
+├── hooks/
+├── lib/
+├── mocks/
+├── models/
+├── providers/
+├── repositories/
+├── services/
+└── styles/
 ```
 
-## Dependencies
+---
 
-Already in your stack: `@tanstack/react-query`, `zod`, `next-themes`, `tailwindcss`.
-This slice also uses:
+## تشغيل المشروع
+
+من داخل مجلد المشروع:
 
 ```bash
-npm i react-hook-form @hookform/resolvers clsx tailwind-merge
+npm install
+npm run dev
 ```
 
-(No MUI or icon library — icons are inline SVG in `src/lib/icons.tsx`. Swap to
-MUI/lucide later where you want richer behavior, per design.md's
-"MUI for behavior, Tailwind for skin".)
+ثم افتح:
 
-## Wiring it up
-
-1. **Path alias** — ensure `tsconfig.json` has `"@/*": ["./src/*"]`.
-2. **Tailwind** — replace `tailwind.config.ts`; make sure `content` covers `./src/**`.
-3. **Global CSS** — import `src/app/globals.css` in your root `app/layout.tsx`.
-4. **Root layout** — set Arabic + RTL and wire the fonts, e.g.:
-   ```tsx
-   import { Tajawal, Cairo } from "next/font/google";
-   const heading = Tajawal({ subsets:["arabic"], weight:["500","700"], variable:"--font-heading" });
-   const body = Cairo({ subsets:["arabic"], weight:["400","600"], variable:"--font-body" });
-   // <html lang="ar" dir="rtl" className={`${heading.variable} ${body.variable}`}>
-   ```
-   (`AppProviders` here already includes ThemeProvider + QueryProvider for the
-   dashboard group; if you prefer, lift it to the root layout instead.)
-5. Visit **`/settings/users`**.
-
-## Notes / next steps
-
-- The repository is **mock + in-memory** (create/edit/delete persist for the
-  session, with simulated latency and Zod parsing at the boundary). Replace each
-  method body with an Axios call + `UserSchema.parse(...)` to go live.
-- Auth is mocked (`lib/auth/current-user.ts`). When NextAuth lands, hydrate the
-  topbar/profile and add the session guard in `(dashboard)/layout.tsx` + middleware.
-- Delete confirmation currently uses `window.confirm`; replace with the
-  `ConfirmDialog` component when built (design.md requires a modal for destructive
-  actions).
-- The list refetch interval / socket bridge isn't on this screen (User Management
-  isn't a 5-min auto-refresh screen); those land with Dashboard/Inventory/Finance.
-- Currency is **Syrian Lira (ل.س)** everywhere via `lib/format/currency.ts`. No JOD.
-- Password is **Admin-only**: set on create, changed on edit; no self-service reset.
+```text
+http://localhost:3000
 ```
+
+إذا كان المنفذ مستخدمًا، سيختار Next منفذًا آخر مثل `3001` أو `3002`.
+
+---
+
+## أوامر التحقق
+
+```bash
+./node_modules/.bin/tsc --noEmit --incremental false
+npm run lint
+npm run build
+```
+
+---
+
+## ملاحظات تقنية
+
+- البيانات الحالية mock داخل `src/mocks`.
+- طبقة البيانات تتبع الفكرة المعمارية:
+  `models → repositories → services → hooks → components`.
+- يمكن استبدال mock repositories لاحقًا بـ Axios/API بدون تغيير واجهات الشاشة.
+- `AppProviders` يوفّر ThemeProvider و QueryProvider على مستوى الجذر.
+- تصميم الألوان والخطوط يعتمد على `src/styles/tokens.css` و `tailwind.config.ts`.
+
+---
+
+## الخطوات القادمة المقترحة
+
+- ربط تسجيل الدخول بـ NextAuth أو Backend حقيقي.
+- إضافة middleware لحماية مسارات dashboard.
+- استبدال mock repositories بطبقة API حقيقية.
+- فصل صفحة dashboard إلى مكونات أصغر إذا توسعت أكثر.
+- إضافة تأكيد modal بدل `window.confirm` في حذف المستخدم.

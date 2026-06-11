@@ -1,64 +1,63 @@
 "use client";
 
-import { useTheme } from "next-themes";
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Icon } from "@/lib/icons";
-import { CURRENT_USER } from "@/lib/auth/current-user";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 function todayLabel(): string {
-  return new Intl.DateTimeFormat("ar", {
-    weekday: "long",
+  const date = new Intl.DateTimeFormat("ar-u-nu-latn", {
     day: "numeric",
     month: "long",
     year: "numeric",
   }).format(new Date());
+
+  return `اليوم، ${date}`;
+}
+
+function routeTitle(pathname: string, fallback: string): string {
+  if (pathname.startsWith("/settings/users")) return "إدارة المستخدمين";
+  if (pathname.startsWith("/settings/center")) return "الإعدادات";
+  if (pathname.startsWith("/technicians/inventory")) return "المخزون اليومي";
+  if (pathname.startsWith("/technicians/performance")) return "أداء الفنيين";
+  if (pathname.startsWith("/orders")) return "إدارة الطلبات";
+  if (pathname.startsWith("/inventory")) return "إدارة المخزون";
+  if (pathname.startsWith("/invoices")) return "إدارة الفواتير";
+  if (pathname.startsWith("/finance/reports")) return "التقارير والإحصائيات";
+  if (pathname.startsWith("/finance")) return "الإدارة المالية";
+  if (pathname.startsWith("/dashboard")) return "نظرة عامة";
+  return fallback;
 }
 
 export function Topbar({ title }: { title: string }) {
-  const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  const isDark = mounted && theme === "dark";
+  const pathname = usePathname();
+  const currentTitle = routeTitle(pathname, title);
 
   return (
-    <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-border bg-surface px-6">
-      {/* Start (right in RTL): profile + settings + theme */}
-      <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2">
-          <div className="flex h-10 w-10 items-center justify-center rounded-md bg-surface-2 text-content-muted">
-            <Icon name="users" size={18} />
-          </div>
-          <div className="leading-tight">
-            <div className="text-sm font-semibold text-content">{CURRENT_USER.fullName}</div>
-            <div className="text-xs text-content-muted">{CURRENT_USER.jobTitle}</div>
-          </div>
-        </div>
-        <button
-          type="button"
+    <header className="sticky top-0 z-20 h-16 border-b border-border bg-surface relative">
+      <div className="absolute right-4 top-1/2 flex -translate-y-1/2 items-center gap-2 lg:right-6">
+        <Link
+          href="/settings/center"
           aria-label="الإعدادات"
-          className="rounded-md p-2 text-content-muted hover:bg-surface-2"
+          title="الإعدادات"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-sm text-content transition hover:bg-gold-soft hover:text-gold"
         >
           <Icon name="gear" />
-        </button>
-        <button
-          type="button"
-          aria-label="تبديل الوضع الليلي"
-          onClick={() => setTheme(isDark ? "light" : "dark")}
-          className="rounded-md p-2 text-content-muted hover:bg-surface-2"
-        >
-          <Icon name={isDark ? "sun" : "moon"} />
-        </button>
+        </Link>
+        <ThemeToggle className="rounded-sm text-content hover:bg-gold-soft hover:text-gold" />
       </div>
 
-      {/* Center: page title */}
-      <h1 className="absolute left-1/2 -translate-x-1/2 font-heading text-base font-bold text-content">
-        {title}
+      <h1 className="pointer-events-none absolute left-1/2 top-1/2 max-w-[44vw] -translate-x-1/2 -translate-y-1/2 truncate text-center font-heading text-[22px] font-bold text-content">
+        {currentTitle}
       </h1>
 
-      {/* End (left in RTL): date */}
-      <div className="flex items-center gap-2 text-sm text-content-muted">
-        <span>{todayLabel()}</span>
-        <Icon name="calendar" size={18} />
+      <div
+        dir="ltr"
+        className="absolute left-4 top-1/2 hidden -translate-y-1/2 items-center gap-3 text-sm text-content-muted md:flex lg:left-8"
+      >
+        <span dir="rtl">{todayLabel()}</span>
+        <Icon name="calendar" size={16} />
+        <span className="h-6 w-px bg-border" aria-hidden="true" />
       </div>
     </header>
   );

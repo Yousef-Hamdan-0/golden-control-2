@@ -24,16 +24,16 @@ export function DailyInventoryScreen() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <Button onClick={() => router.push("/technicians/inventory/new")}>
-          <Icon name="plus" size={18} />
-          إنشاء مخزون
-        </Button>
         <div className="text-right">
           <h2 className="font-heading text-xl font-bold text-gold">المخزون اليومي</h2>
           <p className="mt-1 max-w-md text-sm text-content-muted">
             مراقبة وتسجيل الأدوات والمهمات الخاصة بفرق الصيانة الميدانية.
           </p>
         </div>
+        <Button onClick={() => router.push("/technicians/inventory/new")}>
+          <Icon name="plus" size={18} />
+          إنشاء مخزون
+        </Button>
       </div>
 
       {/* Grid */}

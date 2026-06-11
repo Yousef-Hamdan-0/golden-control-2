@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import { AppProviders } from "@/providers/AppProviders";
 import { Shell } from "@/components/layout/Shell";
 
 /**
@@ -8,9 +7,5 @@ import { Shell } from "@/components/layout/Shell";
  * unauthenticated users (defense-in-depth alongside middleware.ts).
  */
 export default function DashboardLayout({ children }: { children: ReactNode }) {
-  return (
-    <AppProviders>
-      <Shell>{children}</Shell>
-    </AppProviders>
-  );
+  return <Shell>{children}</Shell>;
 }

@@ -36,10 +36,6 @@ export function UserManagementScreen() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <Button onClick={() => router.push("/settings/users/new")}>
-          <Icon name="plus" size={18} />
-          مستخدم جديد
-        </Button>
         <div className="flex flex-1 items-center justify-end gap-6">
           <UserFilters
             role={role}
@@ -49,6 +45,10 @@ export function UserManagementScreen() {
           />
           <h2 className="font-heading text-xl font-bold text-gold">إدارة المستخدمين</h2>
         </div>
+        <Button onClick={() => router.push("/settings/users/new")}>
+          <Icon name="plus" size={18} />
+          مستخدم جديد
+        </Button>
       </div>
 
       {/* Table */}

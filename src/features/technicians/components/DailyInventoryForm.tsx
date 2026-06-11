@@ -80,12 +80,12 @@ export function DailyInventoryForm() {
         </div>
       </Card>
 
-      <div className="flex items-center gap-3">
-        <Button type="submit" disabled={create.isPending}>
-          حفظ وإضافة للمخزون
-        </Button>
+      <div className="flex items-center justify-end gap-3">
         <Button type="button" variant="outline" onClick={back}>
           إلغاء
+        </Button>
+        <Button type="submit" disabled={create.isPending}>
+          حفظ وإضافة للمخزون
         </Button>
       </div>
     </form>

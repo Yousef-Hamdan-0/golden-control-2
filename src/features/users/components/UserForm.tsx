@@ -178,13 +178,13 @@ export function UserForm(props: Props) {
         </div>
       </Card>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center justify-end gap-3">
+        <Button type="button" variant="outline" onClick={props.onCancel}>
+          إلغاء
+        </Button>
         <Button type="submit" disabled={props.submitting}>
           {isEdit ? "حفظ التعديلات" : "إنشاء مستخدم"}
           {!isEdit && <Icon name="arrow-left" size={18} />}
-        </Button>
-        <Button type="button" variant="outline" onClick={props.onCancel}>
-          إلغاء
         </Button>
       </div>
     </form>

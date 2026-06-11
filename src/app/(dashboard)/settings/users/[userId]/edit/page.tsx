@@ -1,17 +1,15 @@
 "use client";
 
-import { useRouter, useParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Spinner } from "@/components/ui/Spinner";
 import { UserForm } from "@/features/users";
 import { useUserQuery } from "@/features/users/hooks/use-users-query";
 import { useUserMutations } from "@/features/users/hooks/use-user-mutations";
 
-export default function EditUserPage() {
+export default function EditUserPage({ params }: { params: { userId: string } }) {
+  const userId = decodeURIComponent(params.userId);
   const router = useRouter();
-  const params = useParams();
-  const rawId = Array.isArray(params?.userId) ? params?.userId[0] : params?.userId;
-  const userId = rawId ? decodeURIComponent(rawId) : "";
   const { data: user, isLoading } = useUserQuery(userId);
   const { update } = useUserMutations();
 
