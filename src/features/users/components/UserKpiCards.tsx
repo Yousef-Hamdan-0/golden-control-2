@@ -40,14 +40,14 @@ export function UserKpiCards() {
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
       {stats.map((s) => (
         <Card key={s.label} className="flex items-center justify-between gap-3 p-4">
-          <div className={cn("flex h-11 w-11 items-center justify-center rounded-md", s.tint)}>
-            <Icon name={s.icon} />
-          </div>
           <div className="text-right">
             <div className="text-2xl font-bold text-content">
               {isLoading ? "—" : s.value}
             </div>
             <div className="text-xs text-content-muted">{s.label}</div>
+          </div>
+          <div className={cn("flex h-11 w-11 items-center justify-center rounded-md", s.tint)}>
+            <Icon name={s.icon} />
           </div>
         </Card>
       ))}

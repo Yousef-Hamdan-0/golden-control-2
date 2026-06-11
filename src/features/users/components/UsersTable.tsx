@@ -121,8 +121,8 @@ export function UsersTable({ users, isLoading, total, page, pageSize, onPage }: 
           users.map((u) => (
             <div key={u.id} className="space-y-2 p-4">
               <div className="flex items-center justify-between">
-                <StatusBadge status={u.status} />
                 <span className="font-medium text-gold">{u.id}</span>
+                <StatusBadge status={u.status} />
               </div>
               <div className="text-right text-content">{u.fullName}</div>
               <div className="text-right text-sm text-content-muted">{u.email}</div>
@@ -130,8 +130,8 @@ export function UsersTable({ users, isLoading, total, page, pageSize, onPage }: 
                 {u.phone}
               </div>
               <div className="flex items-center justify-between pt-1">
-                <RowActions user={u} />
                 <Badge tone="neutral">{ROLE_LABELS_AR[u.role]}</Badge>
+                <RowActions user={u} />
               </div>
             </div>
           ))}
@@ -139,6 +139,9 @@ export function UsersTable({ users, isLoading, total, page, pageSize, onPage }: 
 
       {/* Pagination */}
       <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-3 text-sm text-content-muted">
+        <span>
+          عرض {start}-{end} من أصل {total} مستخدم
+        </span>
         <div className="flex items-center gap-1">
           <Button
             variant="outline"
@@ -175,9 +178,6 @@ export function UsersTable({ users, isLoading, total, page, pageSize, onPage }: 
             <Icon name="chevron-left" size={16} />
           </Button>
         </div>
-        <span>
-          عرض {start}-{end} من أصل {total} مستخدم
-        </span>
       </div>
     </Card>
   );

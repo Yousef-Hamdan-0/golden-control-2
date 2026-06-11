@@ -81,11 +81,11 @@ export function UserForm(props: Props) {
     >
       <Card>
         <CardHeader className="flex items-center justify-between">
-          <span className="text-xs text-content-muted">* جميع الحقول مطلوبة</span>
           <span className="flex items-center gap-2 text-sm font-semibold text-content">
-            بيانات الحساب الجديد
             <Icon name="users" size={16} className="text-gold" />
+            بيانات الحساب الجديد
           </span>
+          <span className="text-xs text-content-muted">* جميع الحقول مطلوبة</span>
         </CardHeader>
 
         <div className="space-y-8 p-6">

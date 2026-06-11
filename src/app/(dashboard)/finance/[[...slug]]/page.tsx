@@ -1,9 +1,10 @@
 import { FinanceScreen } from "@/features/operations/components/OperationsScreens";
 
-export default function FinancePage({
+export default async function FinancePage({
   params,
 }: {
-  params: { slug?: string[] };
+  params: any;
 }) {
-  return <FinanceScreen section={params.slug} />;
+  const { slug } = (await params) as { slug?: string[] };
+  return <FinanceScreen section={slug} />;
 }

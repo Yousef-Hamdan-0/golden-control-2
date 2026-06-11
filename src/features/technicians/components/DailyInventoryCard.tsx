@@ -18,9 +18,9 @@ function formatCreated(iso: string): string {
 
 function SectionTitle({ children }: { children: string }) {
   return (
-    <div className="flex items-center justify-end gap-2 text-sm font-semibold text-gold">
-      <span>{children}</span>
+    <div className="flex items-center gap-2 text-sm font-semibold text-gold">
       <Icon name="wrench" size={15} />
+      <span>{children}</span>
     </div>
   );
 }
@@ -29,19 +29,19 @@ export function DailyInventoryCard({ entry }: { entry: DailyInventory }) {
   return (
     <Card className="flex flex-col overflow-hidden">
       {/* Header: technician */}
-      <div className="border-b border-border bg-surface-2 px-4 py-3 text-center">
+      <div className="border-b border-border bg-surface-2 px-4 py-3 text-right">
         <div className="text-sm font-bold text-content">{entry.technicianName}</div>
-        <div className="mt-0.5 flex items-center justify-center gap-1 text-xs text-content-muted" dir="ltr">
-          {entry.technicianPhone}
+        <div className="mt-0.5 flex items-center gap-1 text-xs text-content-muted">
           <Icon name="phone" size={13} />
+          <span dir="ltr">{entry.technicianPhone}</span>
         </div>
       </div>
 
       <div className="space-y-4 p-4">
         {/* Created time */}
-        <div className="flex items-center justify-end gap-1.5 text-xs text-content-muted">
-          <span>وقت الإنشاء {formatCreated(entry.createdAt)}</span>
+        <div className="flex items-center gap-1.5 text-xs text-content-muted">
           <Icon name="clock" size={14} />
+          <span>وقت الإنشاء {formatCreated(entry.createdAt)}</span>
         </div>
 
         {/* Tools */}
@@ -52,10 +52,10 @@ export function DailyInventoryCard({ entry }: { entry: DailyInventory }) {
 
         {/* Notes */}
         {entry.notes && (
-          <div className="rounded-md bg-surface-2 p-3 text-right">
-            <div className="mb-1 flex items-center justify-end gap-2 text-sm font-semibold text-gold">
-              <span>ملاحظات</span>
+          <div className="rounded-md bg-surface-2 p-3">
+            <div className="mb-1 flex items-center gap-2 text-sm font-semibold text-gold">
               <Icon name="file" size={14} />
+              <span>ملاحظات</span>
             </div>
             <p className="text-sm leading-relaxed text-content-muted">{entry.notes}</p>
           </div>
@@ -67,9 +67,9 @@ export function DailyInventoryCard({ entry }: { entry: DailyInventory }) {
             <SectionTitle>الأدوات المستخدمة</SectionTitle>
             <ul className="space-y-1 text-sm">
               {entry.usedTools.map((t, i) => (
-                <li key={i} className="flex items-center justify-between text-content-muted">
-                  <span className="tabular-nums">{t.qty}</span>
+                <li key={i} className="flex items-center justify-between gap-3 text-content-muted">
                   <span>{t.name}</span>
+                  <span className="tabular-nums" dir="ltr">{t.qty}</span>
                 </li>
               ))}
             </ul>

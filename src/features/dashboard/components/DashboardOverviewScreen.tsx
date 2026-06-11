@@ -93,12 +93,12 @@ function NewCustomersCard() {
   return (
     <Card className="p-4">
       <div className="flex items-start justify-between">
-        <div className="rounded-md bg-gold-soft p-2 text-gold">
-          <Icon name="users" />
-        </div>
         <div className="text-right">
           <h2 className="font-heading text-base font-bold text-content">العملاء الجدد</h2>
           <p className="mt-2 font-heading text-2xl font-bold text-gold-active">12</p>
+        </div>
+        <div className="rounded-md bg-gold-soft p-2 text-gold">
+          <Icon name="users" />
         </div>
       </div>
 
@@ -121,15 +121,17 @@ function NewCustomersCard() {
 function InvoiceCard({ title }: { title: string }) {
   return (
     <Card className="flex items-center justify-between p-4">
-      <div className="rounded-sm bg-surface-2 p-3 text-gold-active">
-        <Icon name="file" size={28} />
-      </div>
-      <div className="text-right">
-        <h3 className="font-heading text-base font-bold text-content">{title}</h3>
-        <p className="mt-1 text-sm text-content-muted">
-          <span className="font-heading text-2xl font-bold text-content">42</span>
-          فاتورة صادرة
-        </p>
+      <div className="flex min-w-0 items-center gap-3">
+        <div className="rounded-sm bg-surface-2 p-3 text-gold-active">
+          <Icon name="file" size={28} />
+        </div>
+        <div className="text-right">
+          <h3 className="font-heading text-base font-bold text-content">{title}</h3>
+          <p className="mt-1 text-sm text-content-muted">
+            <span className="font-heading text-2xl font-bold text-content">42</span>
+            فاتورة صادرة
+          </p>
+        </div>
       </div>
       <p className="text-xs font-bold text-success">12% ↑</p>
     </Card>
@@ -140,13 +142,13 @@ function OrderSummaryCard() {
   return (
     <Card className="p-4">
       <div className="flex items-center justify-between">
-        <span className="rounded-sm bg-surface-2 px-2 py-1 text-xs text-gold-active">
-          اليوم
-        </span>
         <h2 className="flex items-center gap-2 font-heading text-lg font-bold text-content">
           <Icon name="wrench" className="text-gold-active" />
           ملخص طلبات الصيانة
         </h2>
+        <span className="rounded-sm bg-surface-2 px-2 py-1 text-xs text-gold-active">
+          اليوم
+        </span>
       </div>
 
       <div className="mt-8 grid grid-cols-2 gap-x-6 gap-y-9 sm:grid-cols-4">
@@ -176,11 +178,11 @@ function FinanceCard() {
   return (
     <Card className="p-4">
       <div className="mb-4 flex items-center justify-between">
-        <p className="text-xs text-content-muted">42 فاتورة صادرة</p>
         <h2 className="flex items-center gap-2 font-heading text-lg font-bold text-content">
           <Icon name="wallet" className="text-gold-active" />
           الأداء المالي
         </h2>
+        <p className="text-xs text-content-muted">42 فاتورة صادرة</p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -231,6 +233,12 @@ function OrderModal({
     >
       <Card className="max-h-[90vh] w-full max-w-2xl overflow-y-auto">
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
+          <div className="text-right">
+            <h3 id="recent-order-modal-title" className="font-heading text-lg font-bold text-content">
+              {isEdit ? "تعديل الطلب" : "تفاصيل الطلب"}
+            </h3>
+            <p className="text-sm text-content-muted">#{order.id}</p>
+          </div>
           <button
             type="button"
             onClick={onClose}
@@ -238,12 +246,6 @@ function OrderModal({
           >
             إغلاق
           </button>
-          <div className="text-right">
-            <h3 id="recent-order-modal-title" className="font-heading text-lg font-bold text-content">
-              {isEdit ? "تعديل الطلب" : "تفاصيل الطلب"}
-            </h3>
-            <p className="text-sm text-content-muted">#{order.id}</p>
-          </div>
         </div>
 
         <div className="grid gap-4 p-5 md:grid-cols-2">
@@ -344,10 +346,10 @@ function RecentOrdersTable({
   return (
     <Card className="overflow-hidden">
       <div className="flex items-center justify-between border-b border-border px-5 py-4">
+        <h2 className="font-heading text-lg font-bold text-content">آخر الطلبات المحدثة</h2>
         <Link href="/orders" className="text-sm font-medium text-gold transition hover:text-gold-hover">
           عرض الكل
         </Link>
-        <h2 className="font-heading text-lg font-bold text-content">آخر الطلبات المحدثة</h2>
       </div>
 
       <div className="overflow-x-auto">
@@ -468,15 +470,15 @@ export function DashboardOverviewScreen() {
           <InvoiceCard title="الفواتير الداخلية" />
           <Card className="p-4">
             <div className="flex items-center justify-between">
-              <Badge tone="gold" dot>
-                مباشر
-              </Badge>
               <div className="text-right">
                 <p className="text-sm text-content-muted">طلبات تحتاج متابعة</p>
                 <p className="mt-1 font-heading text-2xl font-bold text-content">
                   {activeOrders}
                 </p>
               </div>
+              <Badge tone="gold" dot>
+                مباشر
+              </Badge>
             </div>
           </Card>
         </aside>

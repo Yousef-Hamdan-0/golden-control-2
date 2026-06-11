@@ -460,14 +460,14 @@ function KpiCards({
       {cards.map((card) => (
         <Card key={card.label} className="p-4">
           <div className="flex items-start justify-between gap-4">
-            <div className="rounded-md bg-gold-soft p-2 text-gold">
-              <Icon name={card.icon} />
-            </div>
             <div className="text-right">
               <p className="text-sm text-content-muted">{card.label}</p>
               <p className="mt-2 font-heading text-2xl font-bold text-content">
                 {card.value}
               </p>
+            </div>
+            <div className="rounded-md bg-gold-soft p-2 text-gold">
+              <Icon name={card.icon} />
             </div>
           </div>
           {card.tone ? (
@@ -518,9 +518,6 @@ function OrderFormCard({ onClose }: { onClose: () => void }) {
   return (
     <Card className="overflow-hidden">
       <CardHeader className="flex items-center justify-between gap-4">
-        <Button type="button" variant="ghost" size="sm" onClick={onClose}>
-          إغلاق
-        </Button>
         <div className="text-right">
           <h3 className="font-heading text-lg font-bold text-content">
             إنشاء طلب صيانة
@@ -529,6 +526,9 @@ function OrderFormCard({ onClose }: { onClose: () => void }) {
             نموذج وهمي مطابق للبيانات المطلوبة في رحلة الطلب.
           </p>
         </div>
+        <Button type="button" variant="ghost" size="sm" onClick={onClose}>
+          إغلاق
+        </Button>
       </CardHeader>
       <form className="grid gap-4 p-4 md:grid-cols-2">
         <Input placeholder="اسم العميل" aria-label="اسم العميل" />
@@ -808,18 +808,18 @@ export function InventoryScreen({ section = "parts" }: { section?: string }) {
           {lowStock.map((item) => (
             <Card key={item.id} className="p-4">
               <div className="flex items-start justify-between">
-                <Badge tone="danger" dot>
-                  تحت الحد الأدنى
-                </Badge>
                 <div className="text-right">
                   <h3 className="font-heading text-lg font-bold text-content">{item.name}</h3>
                   <p className="text-sm text-content-muted">{item.location}</p>
                 </div>
+                <Badge tone="danger" dot>
+                  تحت الحد الأدنى
+                </Badge>
               </div>
               <div className="mt-5">
                 <div className="mb-2 flex justify-between text-xs text-content-muted">
-                  <span>الحد الأدنى {item.minStock}</span>
                   <span>المتوفر {item.stock}</span>
+                  <span>الحد الأدنى {item.minStock}</span>
                 </div>
                 <ProgressBar value={(item.stock / item.minStock) * 100} />
               </div>
@@ -1126,13 +1126,13 @@ export function TechnicianPerformanceScreen() {
         {TECHNICIANS.map((tech) => (
           <Card key={tech.id} className="p-4">
             <div className="flex items-start justify-between">
-              <Badge tone={tech.status === "available" ? "success" : tech.status === "busy" ? "gold" : "neutral"} dot>
-                {tech.status === "available" ? "متاح" : tech.status === "busy" ? "مشغول" : "مجاز"}
-              </Badge>
               <div className="text-right">
                 <h3 className="font-heading text-lg font-bold text-content">{tech.name}</h3>
                 <p className="text-sm text-content-muted">{tech.id}</p>
               </div>
+              <Badge tone={tech.status === "available" ? "success" : tech.status === "busy" ? "gold" : "neutral"} dot>
+                {tech.status === "available" ? "متاح" : tech.status === "busy" ? "مشغول" : "مجاز"}
+              </Badge>
             </div>
             <div className="mt-5 grid grid-cols-3 gap-3 text-center">
               <div className="rounded-md bg-surface-2 p-3">
@@ -1150,8 +1150,8 @@ export function TechnicianPerformanceScreen() {
             </div>
             <div className="mt-5">
               <div className="mb-2 flex justify-between text-xs text-content-muted">
-                <span>{tech.satisfaction}%</span>
                 <span>رضا العملاء</span>
+                <span>{tech.satisfaction}%</span>
               </div>
               <ProgressBar value={tech.satisfaction} />
             </div>
@@ -1208,8 +1208,8 @@ export function SettingsCenterScreen() {
               "استخدام الليرة السورية كعملة أساسية",
             ].map((item) => (
               <label key={item} className="flex items-center justify-between rounded-md bg-surface-2 px-3 py-3 text-sm text-content">
-                <input type="checkbox" defaultChecked className="h-4 w-4 accent-gold" />
                 <span>{item}</span>
+                <input type="checkbox" defaultChecked className="h-4 w-4 accent-gold" />
               </label>
             ))}
           </div>

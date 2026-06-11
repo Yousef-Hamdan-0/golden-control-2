@@ -1,9 +1,10 @@
 import { InventoryScreen } from "@/features/operations/components/OperationsScreens";
 
-export default function InventoryPage({
+export default async function InventoryPage({
   params,
 }: {
-  params: { slug?: string[] };
+  params: any;
 }) {
-  return <InventoryScreen section={params.slug?.[0]} />;
+  const { slug } = (await params) as { slug?: string[] };
+  return <InventoryScreen section={slug?.[0]} />;
 }

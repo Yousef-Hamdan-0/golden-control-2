@@ -41,11 +41,11 @@ export function DailyInventoryForm() {
     >
       <Card className="overflow-hidden">
         {/* Info banner */}
-        <div className="flex items-center justify-end gap-2 border-b border-border bg-surface-2 px-4 py-3 text-sm text-content-muted">
-          <span>يرجى التأكد من مطابقة الأدوات المسجّلة مع الواقع الفعلي لعهدة الفني قبل الحفظ.</span>
+        <div className="flex items-center gap-2 border-b border-border bg-surface-2 px-4 py-3 text-sm text-content-muted">
           <span className="flex h-5 w-5 items-center justify-center rounded-full bg-gold text-white">
             <Icon name="alert" size={13} />
           </span>
+          <span>يرجى التأكد من مطابقة الأدوات المسجّلة مع الواقع الفعلي لعهدة الفني قبل الحفظ.</span>
         </div>
 
         <div className="space-y-6 p-6">

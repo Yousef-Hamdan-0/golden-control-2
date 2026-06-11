@@ -58,6 +58,9 @@ export function DailyInventoryScreen() {
 
       {/* Pagination */}
       <div className="flex items-center justify-between gap-3 text-sm text-content-muted">
+        <span>
+          عرض {start}-{end} من أصل {total} فني
+        </span>
         <div className="flex items-center gap-1">
           <Button
             variant="outline"
@@ -91,9 +94,6 @@ export function DailyInventoryScreen() {
             <Icon name="chevron-left" size={16} />
           </Button>
         </div>
-        <span>
-          عرض {start}-{end} من أصل {total} فني
-        </span>
       </div>
     </div>
   );
