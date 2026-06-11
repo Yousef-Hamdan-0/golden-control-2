@@ -9,6 +9,7 @@ import {
   readMockSession,
   type MockSession,
 } from "@/lib/auth/mock-session";
+import { MaintenanceOrderModal } from "@/features/operations/components/OperationsScreens";
 
 type IconName =
   | "calendar"
@@ -403,16 +404,17 @@ function Topbar() {
   );
 }
 
-function NewOrderButton() {
+function NewOrderButton({ onClick }: { onClick: () => void }) {
   return (
     <div className="flex justify-end">
-      <Link
-        href="/orders?create=1"
+      <button
+        type="button"
+        onClick={onClick}
         className="inline-flex h-11 items-center justify-center gap-2 rounded-sm bg-[var(--gold-active)] px-4 font-heading text-[15px] font-bold text-white shadow-[0_10px_22px_rgba(138,107,47,0.18)] transition hover:-translate-y-px hover:bg-[var(--gold)] hover:shadow-[0_14px_28px_rgba(176,141,60,0.24)]"
       >
         <Icon name="plus" className="h-5 w-5" />
         طلب صيانة جديد
-      </Link>
+      </button>
     </div>
   );
 }
@@ -622,6 +624,7 @@ export function MockDashboardScreen() {
   const router = useRouter();
   const [session, setSession] = useState<MockSession | null>(null);
   const [isChecking, setIsChecking] = useState(true);
+  const [showOrderModal, setShowOrderModal] = useState(false);
 
   useEffect(() => {
     const storedSession = readMockSession();
@@ -657,6 +660,9 @@ export function MockDashboardScreen() {
           <Topbar />
 
           <div className="px-4 py-5 lg:px-4">
+            {showOrderModal ? (
+              <MaintenanceOrderModal onClose={() => setShowOrderModal(false)} />
+            ) : null}
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
               <div className="space-y-4">
                 <section className="text-right">
@@ -673,7 +679,7 @@ export function MockDashboardScreen() {
               </div>
 
               <div className="space-y-4">
-                <NewOrderButton />
+                <NewOrderButton onClick={() => setShowOrderModal(true)} />
                 <NewCustomersCard />
                 <InvoiceCard title="فواتير الخارجية" />
                 <InvoiceCard title="فواتير الداخلية" />

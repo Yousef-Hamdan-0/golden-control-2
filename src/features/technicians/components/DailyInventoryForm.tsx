@@ -16,7 +16,12 @@ import {
   type DailyInventoryCreateInput,
 } from "@/models/technician/daily-inventory.model";
 
-export function DailyInventoryForm() {
+interface DailyInventoryFormProps {
+  onCancel?: () => void;
+  onSaved?: () => void;
+}
+
+export function DailyInventoryForm({ onCancel, onSaved }: DailyInventoryFormProps = {}) {
   const router = useRouter();
   const { create } = useDailyInventoryMutations();
   // Reuse the users feature to populate the technician picker.
@@ -30,12 +35,19 @@ export function DailyInventoryForm() {
     resolver: zodResolver(DailyInventoryCreateSchema),
   });
 
-  const back = () => router.push("/technicians/inventory");
+  const back = () => {
+    if (onCancel) onCancel();
+    else router.push("/technicians/inventory");
+  };
+  const saved = () => {
+    if (onSaved) onSaved();
+    else router.push("/technicians/inventory");
+  };
 
   return (
     <form
       onSubmit={handleSubmit((values) =>
-        create.mutate(values, { onSuccess: back }),
+        create.mutate(values, { onSuccess: saved }),
       )}
       className="space-y-6"
     >

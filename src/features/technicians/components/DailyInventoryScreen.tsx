@@ -1,17 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { Modal } from "@/components/ui/Modal";
 import { Spinner } from "@/components/ui/Spinner";
 import { Icon } from "@/lib/icons";
 import { DailyInventoryCard } from "@/features/technicians/components/DailyInventoryCard";
+import { DailyInventoryForm } from "@/features/technicians/components/DailyInventoryForm";
 import { useDailyInventoryQuery } from "@/features/technicians/hooks/use-daily-inventory";
 
 export function DailyInventoryScreen() {
-  const router = useRouter();
   const [page, setPage] = useState(1);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const { data, isLoading, isError, refetch } = useDailyInventoryQuery(page);
 
   const total = data?.total ?? 0;
@@ -30,11 +31,27 @@ export function DailyInventoryScreen() {
             مراقبة وتسجيل الأدوات والمهمات الخاصة بفرق الصيانة الميدانية.
           </p>
         </div>
-        <Button onClick={() => router.push("/technicians/inventory/new")}>
+        <Button onClick={() => setShowCreateModal(true)}>
           <Icon name="plus" size={18} />
           إنشاء مخزون
         </Button>
       </div>
+
+      {showCreateModal ? (
+        <Modal
+          title="إنشاء مخزون"
+          description="تسجيل أدوات ومهمات فني داخل المخزون اليومي."
+          onClose={() => setShowCreateModal(false)}
+          widthClassName="max-w-3xl"
+        >
+          <div className="p-5">
+            <DailyInventoryForm
+              onCancel={() => setShowCreateModal(false)}
+              onSaved={() => setShowCreateModal(false)}
+            />
+          </div>
+        </Modal>
+      ) : null}
 
       {/* Grid */}
       {isLoading ? (

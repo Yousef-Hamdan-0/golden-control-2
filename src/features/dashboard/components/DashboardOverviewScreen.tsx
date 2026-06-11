@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/Textarea";
 import { Icon } from "@/lib/icons";
 import { readMockSession } from "@/lib/auth/mock-session";
 import { formatMoney } from "@/lib/format/currency";
+import { MaintenanceOrderModal } from "@/features/operations/components/OperationsScreens";
 
 type OrderStatus = "maintenance" | "completed" | "center";
 type ModalMode = "view" | "edit";
@@ -75,16 +76,17 @@ const initialRecentOrders: RecentOrder[] = [
   },
 ];
 
-function NewOrderButton() {
+function NewOrderButton({ onClick }: { onClick: () => void }) {
   return (
     <div className="flex justify-end">
-      <Link
-        href="/orders?create=1"
+      <button
+        type="button"
+        onClick={onClick}
         className="inline-flex h-11 items-center justify-center gap-2 rounded-sm bg-gold-active px-4 font-heading text-sm font-bold text-white shadow-card transition hover:-translate-y-px hover:bg-gold hover:shadow-gold"
       >
         <Icon name="plus" size={18} />
         طلب صيانة جديد
-      </Link>
+      </button>
     </div>
   );
 }
@@ -412,6 +414,7 @@ export function DashboardOverviewScreen() {
   const [isChecking, setIsChecking] = useState(true);
   const [orders, setOrders] = useState(initialRecentOrders);
   const [modal, setModal] = useState<{ order: RecentOrder; mode: ModalMode } | null>(null);
+  const [showOrderModal, setShowOrderModal] = useState(false);
 
   useEffect(() => {
     const storedSession = readMockSession();
@@ -455,8 +458,12 @@ export function DashboardOverviewScreen() {
             مرحباً بك مجدداً، إليك ملخص نشاط مركز الصيانة اليوم.
           </p>
         </section>
-        <NewOrderButton />
+        <NewOrderButton onClick={() => setShowOrderModal(true)} />
       </div>
+
+      {showOrderModal ? (
+        <MaintenanceOrderModal onClose={() => setShowOrderModal(false)} />
+      ) : null}
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-4">

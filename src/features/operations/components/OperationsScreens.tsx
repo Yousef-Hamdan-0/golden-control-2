@@ -1,12 +1,12 @@
 "use client";
 
-import Link from "next/link";
-import { useMemo, useState, type ReactNode } from "react";
+import { Fragment, useMemo, useState, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardHeader } from "@/components/ui/Card";
-import { Input } from "@/components/ui/Input";
+import { Field, Input } from "@/components/ui/Input";
+import { Modal } from "@/components/ui/Modal";
 import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -45,6 +45,37 @@ interface Order {
   visitDate: string;
   total: number;
   paid: number;
+}
+
+interface DeviceDraft {
+  type: string;
+  name: string;
+  brand: string;
+  model: string;
+}
+
+interface MaintenanceOrderDraft {
+  location: OrderType;
+  clientName: string;
+  phone1: string;
+  phone2: string;
+  address: string;
+  locationUrl: string;
+  devices: DeviceDraft[];
+  faultDescription: string;
+  notes: string;
+  visitDate: string;
+  visitTime: string;
+  priority: Priority;
+  technician: string;
+}
+
+type DateFilterMode = "day" | "month" | "year";
+
+interface DateFilter {
+  mode: DateFilterMode;
+  from: string;
+  to: string;
 }
 
 interface InventoryItem {
@@ -430,6 +461,98 @@ function contains(value: string, query: string) {
   return value.toLowerCase().includes(query.trim().toLowerCase());
 }
 
+const EMPTY_DEVICE: DeviceDraft = {
+  type: "",
+  name: "",
+  brand: "",
+  model: "",
+};
+
+const EMPTY_MAINTENANCE_ORDER: MaintenanceOrderDraft = {
+  location: "external",
+  clientName: "",
+  phone1: "",
+  phone2: "",
+  address: "",
+  locationUrl: "",
+  devices: [{ ...EMPTY_DEVICE }],
+  faultDescription: "",
+  notes: "",
+  visitDate: "",
+  visitTime: "",
+  priority: "medium",
+  technician: "",
+};
+
+const DATE_FILTER_LABELS: Record<DateFilterMode, string> = {
+  day: "اليوم",
+  month: "الشهر",
+  year: "السنة",
+};
+
+function orderToDraft(order: Order): MaintenanceOrderDraft {
+  return {
+    location: order.type,
+    clientName: order.client,
+    phone1: order.phone,
+    phone2: "",
+    address: order.address,
+    locationUrl: "",
+    devices: [
+      {
+        type: order.device.split(" ")[0] ?? "",
+        name: order.device,
+        brand: order.brand,
+        model: "",
+      },
+    ],
+    faultDescription: "",
+    notes: "",
+    visitDate: order.visitDate.slice(0, 10),
+    visitTime: order.visitDate.slice(11, 16),
+    priority: order.priority,
+    technician: order.technician === "غير محدد" ? "" : order.technician,
+  };
+}
+
+function draftToOrder(draft: MaintenanceOrderDraft, existing?: Order): Order {
+  const primaryDevice = draft.devices[0] ?? EMPTY_DEVICE;
+  const nextNumber =
+    Math.max(...ORDERS.map((order) => Number(order.id.replace(/\D/g, "")))) + 1;
+
+  return {
+    id: existing?.id ?? `ORD-${nextNumber}`,
+    type: draft.location,
+    client: draft.clientName || "عميل جديد",
+    phone: draft.phone1 || "غير محدد",
+    address: draft.location === "internal" ? "استلام داخل المركز" : draft.address || "غير محدد",
+    device: [primaryDevice.type, primaryDevice.name].filter(Boolean).join(" ") || "جهاز غير محدد",
+    brand: primaryDevice.brand || "غير محدد",
+    technician: draft.technician || "غير محدد",
+    status: existing?.status ?? "new",
+    priority: draft.priority,
+    visitDate: `${draft.visitDate || "2026-06-11"} ${draft.visitTime || "09:00"}`,
+    total: existing?.total ?? 0,
+    paid: existing?.paid ?? 0,
+  };
+}
+
+function normalizeDateKey(value: string, mode: DateFilterMode): string {
+  if (!value) return "";
+  if (mode === "year") return value.slice(0, 4);
+  if (mode === "month") return value.slice(0, 7);
+  return value.slice(0, 10);
+}
+
+function matchesDateFilter(order: Order, filter: DateFilter): boolean {
+  if (!filter.from && !filter.to) return true;
+  const orderKey = normalizeDateKey(order.visitDate, filter.mode);
+  const fromKey = normalizeDateKey(filter.from, filter.mode);
+  const toKey = normalizeDateKey(filter.to, filter.mode);
+
+  return (!fromKey || orderKey >= fromKey) && (!toKey || orderKey <= toKey);
+}
+
 function SectionTitle({
   title,
   subtitle,
@@ -514,50 +637,460 @@ function ProgressBar({ value }: { value: number }) {
   );
 }
 
-function OrderFormCard({ onClose }: { onClose: () => void }) {
+export function MaintenanceOrderModal({
+  onClose,
+  onSave,
+  initialOrder,
+}: {
+  onClose: () => void;
+  onSave?: (order: Order) => void;
+  initialOrder?: Order;
+}) {
+  const [draft, setDraft] = useState<MaintenanceOrderDraft>(
+    initialOrder ? orderToDraft(initialOrder) : EMPTY_MAINTENANCE_ORDER,
+  );
+  const isEdit = Boolean(initialOrder);
+
+  function updateDevice(index: number, patch: Partial<DeviceDraft>) {
+    setDraft((current) => ({
+      ...current,
+      devices: current.devices.map((device, currentIndex) =>
+        currentIndex === index ? { ...device, ...patch } : device,
+      ),
+    }));
+  }
+
+  function addDevice() {
+    setDraft((current) => ({
+      ...current,
+      devices: [...current.devices, { ...EMPTY_DEVICE }],
+    }));
+  }
+
+  function removeDevice(index: number) {
+    setDraft((current) => ({
+      ...current,
+      devices: current.devices.filter((_, currentIndex) => currentIndex !== index),
+    }));
+  }
+
+  function handleSubmit() {
+    onSave?.(draftToOrder(draft, initialOrder));
+    onClose();
+  }
+
   return (
-    <Card className="overflow-hidden">
-      <CardHeader className="flex items-center justify-between gap-4">
-        <div className="text-right">
-          <h3 className="font-heading text-lg font-bold text-content">
-            إنشاء طلب صيانة
-          </h3>
-          <p className="text-sm text-content-muted">
-            نموذج وهمي مطابق للبيانات المطلوبة في رحلة الطلب.
-          </p>
-        </div>
-        <Button type="button" variant="ghost" size="sm" onClick={onClose}>
-          إغلاق
-        </Button>
-      </CardHeader>
-      <form className="grid gap-4 p-4 md:grid-cols-2">
-        <Input placeholder="اسم العميل" aria-label="اسم العميل" />
-        <Input placeholder="رقم الهاتف" aria-label="رقم الهاتف" dir="ltr" />
-        <Select aria-label="نوع الطلب" defaultValue="external">
-          <option value="external">طلب خارجي</option>
-          <option value="internal">طلب داخلي</option>
-        </Select>
-        <Select aria-label="الأولوية" defaultValue="medium">
-          <option value="low">منخفضة</option>
-          <option value="medium">متوسطة</option>
-          <option value="high">عالية</option>
-          <option value="emergency">طارئة</option>
-        </Select>
-        <Input placeholder="نوع واسم الجهاز" aria-label="نوع واسم الجهاز" />
-        <Input placeholder="الفني المسؤول" aria-label="الفني المسؤول" />
-        <Textarea
-          className="min-h-24 md:col-span-2"
-          placeholder="وصف العطل والملاحظات"
-          aria-label="وصف العطل والملاحظات"
-        />
-        <div className="flex justify-end md:col-span-2">
-          <Button type="button">
-            <Icon name="plus" size={18} />
-            حفظ الطلب الوهمي
+    <Modal
+      title={isEdit ? "تعديل طلب صيانة" : "إنشاء طلب صيانة"}
+      description="أدخل بيانات الطلب، العميل، الأجهزة، العطل، وموعد الزيارة."
+      onClose={onClose}
+      widthClassName="max-w-5xl"
+    >
+      <form className="space-y-6 p-5" onSubmit={(event) => event.preventDefault()}>
+        <section className="space-y-3">
+          <h3 className="font-heading text-base font-bold text-gold">موقع الطلب</h3>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {(["internal", "external"] as OrderType[]).map((value) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setDraft((current) => ({ ...current, location: value }))}
+                className={[
+                  "rounded-md border px-4 py-3 text-right text-sm transition",
+                  draft.location === value
+                    ? "border-gold bg-gold-soft text-gold"
+                    : "border-border bg-surface-2 text-content hover:bg-gold-soft",
+                ].join(" ")}
+              >
+                {typeLabel(value)}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="space-y-3">
+          <h3 className="font-heading text-base font-bold text-gold">بيانات العميل</h3>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field label="الاسم">
+              <Input
+                value={draft.clientName}
+                onChange={(event) =>
+                  setDraft((current) => ({ ...current, clientName: event.target.value }))
+                }
+                placeholder="اسم العميل"
+              />
+            </Field>
+            <Field label="الهاتف 1">
+              <Input
+                dir="ltr"
+                value={draft.phone1}
+                onChange={(event) =>
+                  setDraft((current) => ({ ...current, phone1: event.target.value }))
+                }
+                placeholder="09xx xxx xxx"
+              />
+            </Field>
+            <Field label="الهاتف 2">
+              <Input
+                dir="ltr"
+                value={draft.phone2}
+                onChange={(event) =>
+                  setDraft((current) => ({ ...current, phone2: event.target.value }))
+                }
+                placeholder="اختياري"
+              />
+            </Field>
+            <Field label="العنوان">
+              <Input
+                value={draft.address}
+                onChange={(event) =>
+                  setDraft((current) => ({ ...current, address: event.target.value }))
+                }
+                placeholder="المدينة / المنطقة / التفاصيل"
+              />
+            </Field>
+            <Field label="رابط الموقع (اختياري)" className="md:col-span-2">
+              <Input
+                dir="ltr"
+                value={draft.locationUrl}
+                onChange={(event) =>
+                  setDraft((current) => ({ ...current, locationUrl: event.target.value }))
+                }
+                placeholder="https://maps.google.com/..."
+              />
+            </Field>
+          </div>
+        </section>
+
+        <section className="space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="font-heading text-base font-bold text-gold">بيانات الأجهزة</h3>
+            <Button type="button" variant="outline" size="sm" onClick={addDevice}>
+              <Icon name="plus" size={16} />
+              جهاز آخر
+            </Button>
+          </div>
+          <div className="space-y-3">
+            {draft.devices.map((device, index) => (
+              <div key={index} className="rounded-md border border-border bg-surface-2 p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <span className="text-sm font-semibold text-content">جهاز {index + 1}</span>
+                  {draft.devices.length > 1 ? (
+                    <Button
+                      type="button"
+                      variant="danger"
+                      size="sm"
+                      onClick={() => removeDevice(index)}
+                    >
+                      <Icon name="trash" size={16} />
+                      حذف
+                    </Button>
+                  ) : null}
+                </div>
+                <div className="grid gap-4 md:grid-cols-4">
+                  <Field label="نوع الجهاز">
+                    <Input
+                      value={device.type}
+                      onChange={(event) => updateDevice(index, { type: event.target.value })}
+                      placeholder="ثلاجة / غسالة / شاشة"
+                    />
+                  </Field>
+                  <Field label="اسم الجهاز">
+                    <Input
+                      value={device.name}
+                      onChange={(event) => updateDevice(index, { name: event.target.value })}
+                      placeholder="اسم الجهاز"
+                    />
+                  </Field>
+                  <Field label="الماركة">
+                    <Input
+                      value={device.brand}
+                      onChange={(event) => updateDevice(index, { brand: event.target.value })}
+                      placeholder="LG / Samsung..."
+                    />
+                  </Field>
+                  <Field label="الموديل (اختياري)">
+                    <Input
+                      value={device.model}
+                      onChange={(event) => updateDevice(index, { model: event.target.value })}
+                      placeholder="رقم الموديل"
+                    />
+                  </Field>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="space-y-3">
+          <h3 className="font-heading text-base font-bold text-gold">بيانات العطل</h3>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field label="وصف العطل">
+              <Textarea
+                className="min-h-28"
+                value={draft.faultDescription}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    faultDescription: event.target.value,
+                  }))
+                }
+                placeholder="اكتب وصف العطل هنا"
+              />
+            </Field>
+            <Field label="ملاحظات (اختياري)">
+              <Textarea
+                className="min-h-28"
+                value={draft.notes}
+                onChange={(event) =>
+                  setDraft((current) => ({ ...current, notes: event.target.value }))
+                }
+                placeholder="أي ملاحظات إضافية"
+              />
+            </Field>
+          </div>
+        </section>
+
+        <section className="space-y-3">
+          <h3 className="font-heading text-base font-bold text-gold">تاريخ التسليم / الزيارة</h3>
+          <div className="grid gap-4 md:grid-cols-4">
+            <Field label="التاريخ">
+              <Input
+                type="date"
+                value={draft.visitDate}
+                onChange={(event) =>
+                  setDraft((current) => ({ ...current, visitDate: event.target.value }))
+                }
+              />
+            </Field>
+            <Field label="الوقت">
+              <Input
+                type="time"
+                value={draft.visitTime}
+                onChange={(event) =>
+                  setDraft((current) => ({ ...current, visitTime: event.target.value }))
+                }
+              />
+            </Field>
+            <Field label="الأولوية">
+              <Select
+                value={draft.priority}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    priority: event.target.value as Priority,
+                  }))
+                }
+              >
+                <option value="low">منخفضة (Low)</option>
+                <option value="medium">متوسطة (Medium)</option>
+                <option value="high">عالية (High)</option>
+                <option value="emergency">طارئة (Emergency)</option>
+              </Select>
+            </Field>
+            <Field label="الفني (اختياري)">
+              <Select
+                value={draft.technician}
+                onChange={(event) =>
+                  setDraft((current) => ({ ...current, technician: event.target.value }))
+                }
+              >
+                <option value="">بدون تحديد</option>
+                {TECHNICIANS.map((tech) => (
+                  <option key={tech.id} value={tech.name}>
+                    {tech.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          </div>
+        </section>
+
+        <div className="flex items-center justify-end gap-3 border-t border-border pt-4">
+          <Button type="button" variant="outline" onClick={onClose}>
+            إلغاء
+          </Button>
+          <Button type="button" onClick={handleSubmit}>
+            <Icon name={isEdit ? "pencil" : "plus"} size={18} />
+            {isEdit ? "حفظ التعديل" : "إنشاء الطلب"}
           </Button>
         </div>
       </form>
-    </Card>
+    </Modal>
+  );
+}
+
+function DateFilterModal({
+  filter,
+  onApply,
+  onClose,
+}: {
+  filter: DateFilter;
+  onApply: (filter: DateFilter) => void;
+  onClose: () => void;
+}) {
+  const [draft, setDraft] = useState<DateFilter>(filter);
+
+  return (
+    <Modal
+      title="فلترة حسب الوقت"
+      description="حدد نوع الفترة ثم اختر تاريخ البداية والنهاية."
+      onClose={onClose}
+      widthClassName="max-w-xl"
+    >
+      <div className="space-y-4 p-5">
+        <Field label="نوع الفترة">
+          <Select
+            value={draft.mode}
+            onChange={(event) =>
+              setDraft((current) => ({ ...current, mode: event.target.value as DateFilterMode }))
+            }
+          >
+            {Object.entries(DATE_FILTER_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="من تاريخ">
+            <Input
+              type="date"
+              value={draft.from}
+              onChange={(event) =>
+                setDraft((current) => ({ ...current, from: event.target.value }))
+              }
+            />
+          </Field>
+          <Field label="إلى تاريخ">
+            <Input
+              type="date"
+              value={draft.to}
+              onChange={(event) =>
+                setDraft((current) => ({ ...current, to: event.target.value }))
+              }
+            />
+          </Field>
+        </div>
+        <div className="flex items-center justify-end gap-3 border-t border-border pt-4">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setDraft({ mode: "day", from: "", to: "" })}
+          >
+            مسح
+          </Button>
+          <Button
+            type="button"
+            onClick={() => {
+              onApply(draft);
+              onClose();
+            }}
+          >
+            تطبيق الفلتر
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function SupplyPartModal({ onClose }: { onClose: () => void }) {
+  return (
+    <Modal
+      title="توريد قطعة"
+      description="إضافة عملية توريد وهمية إلى حركة المخزون."
+      onClose={onClose}
+      widthClassName="max-w-2xl"
+    >
+      <form className="grid gap-4 p-5 md:grid-cols-2" onSubmit={(event) => event.preventDefault()}>
+        <Field label="اسم القطعة">
+          <Input placeholder="مثال: حساس حرارة NTC" />
+        </Field>
+        <Field label="الكود">
+          <Input placeholder="PRT-000" dir="ltr" />
+        </Field>
+        <Field label="التصنيف">
+          <Input placeholder="ثلاجات / غسالات / شاشات" />
+        </Field>
+        <Field label="الكمية">
+          <Input type="number" min={1} defaultValue={1} />
+        </Field>
+        <Field label="تكلفة الوحدة">
+          <Input type="number" min={0} placeholder="0" />
+        </Field>
+        <Field label="الموقع">
+          <Input placeholder="رف A-01" />
+        </Field>
+        <Field label="ملاحظات" className="md:col-span-2">
+          <Textarea className="min-h-24" placeholder="ملاحظات اختيارية" />
+        </Field>
+        <div className="flex items-center justify-end gap-3 border-t border-border pt-4 md:col-span-2">
+          <Button type="button" variant="outline" onClick={onClose}>
+            إلغاء
+          </Button>
+          <Button type="button" onClick={onClose}>
+            <Icon name="plus" size={18} />
+            حفظ التوريد
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function InternalInvoiceModal({ onClose }: { onClose: () => void }) {
+  return (
+    <Modal
+      title="فاتورة داخلية"
+      description="إنشاء فاتورة داخلية وهمية مرتبطة بطلب صيانة."
+      onClose={onClose}
+      widthClassName="max-w-2xl"
+    >
+      <form className="grid gap-4 p-5 md:grid-cols-2" onSubmit={(event) => event.preventDefault()}>
+        <Field label="رقم الطلب">
+          <Input placeholder="ORD-0000" dir="ltr" />
+        </Field>
+        <Field label="اسم العميل">
+          <Input placeholder="اسم العميل" />
+        </Field>
+        <Field label="الفني">
+          <Select defaultValue="">
+            <option value="">اختر الفني</option>
+            {TECHNICIANS.map((tech) => (
+              <option key={tech.id} value={tech.name}>
+                {tech.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="الإجمالي">
+          <Input type="number" min={0} placeholder="0" />
+        </Field>
+        <Field label="المدفوع">
+          <Input type="number" min={0} placeholder="0" />
+        </Field>
+        <Field label="العملة">
+          <Select defaultValue="SYP">
+            <option value="SYP">ليرة سورية</option>
+            <option value="USD">دولار</option>
+          </Select>
+        </Field>
+        <Field label="ملاحظات" className="md:col-span-2">
+          <Textarea className="min-h-24" placeholder="بنود أو ملاحظات الفاتورة" />
+        </Field>
+        <div className="flex items-center justify-end gap-3 border-t border-border pt-4 md:col-span-2">
+          <Button type="button" variant="outline" onClick={onClose}>
+            إلغاء
+          </Button>
+          <Button type="button" onClick={onClose}>
+            <Icon name="plus" size={18} />
+            إنشاء الفاتورة
+          </Button>
+        </div>
+      </form>
+    </Modal>
   );
 }
 
@@ -565,32 +1098,58 @@ export function OrdersScreen() {
   const params = useSearchParams();
   const initialType = params.get("type") as OrderType | null;
   const initialStatus = params.get("status") as OrderStatus | null;
+  const [orders, setOrders] = useState<Order[]>(ORDERS);
   const [type, setType] = useState<OrderType | "all">(initialType ?? "all");
   const [status, setStatus] = useState<OrderStatus | "all">(initialStatus ?? "all");
   const [query, setQuery] = useState("");
   const [priority, setPriority] = useState<Priority | "all">("all");
   const [showForm, setShowForm] = useState(params.get("create") === "1");
+  const [editingOrder, setEditingOrder] = useState<Order | null>(null);
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [showDateFilter, setShowDateFilter] = useState(false);
+  const [dateFilter, setDateFilter] = useState<DateFilter>({
+    mode: "day",
+    from: "",
+    to: "",
+  });
 
   const filtered = useMemo(
     () =>
-      ORDERS.filter((order) => {
+      orders.filter((order) => {
         const byType = type === "all" || order.type === type;
         const byStatus = status === "all" || order.status === status;
         const byPriority = priority === "all" || order.priority === priority;
         const byQuery =
           !query ||
           contains(order.id, query) ||
-          contains(order.client, query) ||
-          contains(order.device, query) ||
           contains(order.phone, query);
-        return byType && byStatus && byPriority && byQuery;
+        const byDate = matchesDateFilter(order, dateFilter);
+        return byType && byStatus && byPriority && byQuery && byDate;
       }),
-    [priority, query, status, type],
+    [dateFilter, orders, priority, query, status, type],
   );
 
-  const completed = ORDERS.filter((order) => order.status === "completed").length;
-  const pulled = ORDERS.filter((order) => order.status === "pull-to-center").length;
-  const revenue = ORDERS.reduce((sum, order) => sum + order.paid, 0);
+  const completed = orders.filter((order) => order.status === "completed").length;
+  const pulled = orders.filter((order) => order.status === "pull-to-center").length;
+  const hasDateFilter = Boolean(dateFilter.from || dateFilter.to);
+
+  function upsertOrder(order: Order) {
+    setOrders((current) => {
+      const exists = current.some((item) => item.id === order.id);
+      return exists
+        ? current.map((item) => (item.id === order.id ? order : item))
+        : [order, ...current];
+    });
+  }
+
+  function toggleRow(orderId: string) {
+    setExpandedRows((current) => {
+      const next = new Set(current);
+      if (next.has(orderId)) next.delete(orderId);
+      else next.add(orderId);
+      return next;
+    });
+  }
 
   return (
     <div className="space-y-6">
@@ -609,20 +1168,38 @@ export function OrdersScreen() {
 
       <KpiCards
         cards={[
-          { label: "إجمالي الطلبات", value: String(ORDERS.length), icon: "clipboard" },
+          { label: "إجمالي الطلبات", value: String(orders.length), icon: "clipboard" },
           { label: "مكتملة", value: String(completed), icon: "shield", tone: "success" },
           { label: "مسحوبة للمركز", value: String(pulled), icon: "box", tone: "info" },
-          { label: "الدفعات المحصلة", value: formatMoney(revenue), icon: "wallet" },
         ]}
       />
 
-      {showForm ? <OrderFormCard onClose={() => setShowForm(false)} /> : null}
+      {showForm ? (
+        <MaintenanceOrderModal
+          onClose={() => setShowForm(false)}
+          onSave={upsertOrder}
+        />
+      ) : null}
+      {editingOrder ? (
+        <MaintenanceOrderModal
+          initialOrder={editingOrder}
+          onClose={() => setEditingOrder(null)}
+          onSave={upsertOrder}
+        />
+      ) : null}
+      {showDateFilter ? (
+        <DateFilterModal
+          filter={dateFilter}
+          onApply={setDateFilter}
+          onClose={() => setShowDateFilter(false)}
+        />
+      ) : null}
 
       <FilterCard>
         <Input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="بحث برقم الطلب أو العميل"
+          placeholder="بحث برقم الطلب أو الهاتف"
           aria-label="بحث الطلبات"
         />
         <Select
@@ -658,11 +1235,19 @@ export function OrdersScreen() {
             </option>
           ))}
         </Select>
+        <Button
+          type="button"
+          variant={hasDateFilter ? "primary" : "outline"}
+          onClick={() => setShowDateFilter(true)}
+        >
+          <Icon name="clock" size={18} />
+          وقت
+        </Button>
       </FilterCard>
 
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-[980px] w-full text-right text-sm">
+          <table className="min-w-[920px] w-full text-right text-sm">
             <thead>
               <tr className="bg-surface-2 text-content-muted">
                 {[
@@ -672,7 +1257,6 @@ export function OrdersScreen() {
                   "الفني",
                   "الحالة",
                   "الأولوية",
-                  "المتبقي",
                   "الإجراءات",
                 ].map((header) => (
                   <th key={header} className="px-4 py-3 font-medium">
@@ -683,52 +1267,88 @@ export function OrdersScreen() {
             </thead>
             <tbody>
               {filtered.map((order) => (
-                <tr key={order.id} className="border-b border-border last:border-0 hover:bg-gold-soft">
-                  <td className="px-4 py-4 font-bold text-gold">{order.id}</td>
-                  <td className="px-4 py-4">
-                    <div className="font-medium text-content">{order.client}</div>
-                    <div className="text-xs text-content-muted" dir="ltr">
-                      {order.phone}
-                    </div>
-                  </td>
-                  <td className="px-4 py-4 text-content-muted">
-                    {order.device}
-                    <span className="mx-1 text-border">/</span>
-                    {order.brand}
-                  </td>
-                  <td className="px-4 py-4 text-content">{order.technician}</td>
-                  <td className="px-4 py-4">
-                    <Badge tone={ORDER_STATUS_TONE[order.status]} dot>
-                      {ORDER_STATUS_LABELS[order.status]}
-                    </Badge>
-                  </td>
-                  <td className="px-4 py-4">
-                    <Badge tone={order.priority === "emergency" ? "danger" : "neutral"}>
-                      {PRIORITY_LABELS[order.priority]}
-                    </Badge>
-                  </td>
-                  <td className="px-4 py-4 text-content-muted">
-                    {formatMoney(remaining(order.total, order.paid))}
-                  </td>
-                  <td className="px-4 py-4">
-                    <div className="flex items-center gap-2">
-                      <Link
-                        href={`/orders?id=${order.id}`}
-                        aria-label={`عرض ${order.id}`}
-                        className="rounded-sm p-1.5 text-content-muted hover:bg-surface-2"
-                      >
-                        <Icon name="eye" size={18} />
-                      </Link>
-                      <Link
-                        href={`/orders?edit=${order.id}`}
-                        aria-label={`تعديل ${order.id}`}
-                        className="rounded-sm p-1.5 text-content-muted hover:bg-surface-2"
-                      >
-                        <Icon name="pencil" size={18} />
-                      </Link>
-                    </div>
-                  </td>
-                </tr>
+                <Fragment key={order.id}>
+                  <tr key={order.id} className="border-b border-border hover:bg-gold-soft">
+                    <td className="px-4 py-4 font-bold text-gold">{order.id}</td>
+                    <td className="px-4 py-4">
+                      <div className="font-medium text-content">{order.client}</div>
+                      <div className="text-xs text-content-muted" dir="ltr">
+                        {order.phone}
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 text-content-muted">
+                      {order.device}
+                      <span className="mx-1 text-border">/</span>
+                      {order.brand}
+                    </td>
+                    <td className="px-4 py-4 text-content">{order.technician}</td>
+                    <td className="px-4 py-4">
+                      <Badge tone={ORDER_STATUS_TONE[order.status]} dot>
+                        {ORDER_STATUS_LABELS[order.status]}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-4">
+                      <Badge tone={order.priority === "emergency" ? "danger" : "neutral"}>
+                        {PRIORITY_LABELS[order.priority]}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          aria-label={`${expandedRows.has(order.id) ? "إخفاء" : "إظهار"} ${order.id}`}
+                          title={expandedRows.has(order.id) ? "إخفاء المعلومات" : "إظهار المعلومات"}
+                          onClick={() => toggleRow(order.id)}
+                          className="rounded-sm p-1.5 text-content-muted hover:bg-surface-2"
+                        >
+                          <Icon name={expandedRows.has(order.id) ? "eye-off" : "eye"} size={18} />
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={`تعديل ${order.id}`}
+                          title="تعديل"
+                          onClick={() => setEditingOrder(order)}
+                          className="rounded-sm p-1.5 text-content-muted hover:bg-surface-2"
+                        >
+                          <Icon name="pencil" size={18} />
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={`حذف ${order.id}`}
+                          title="حذف"
+                          onClick={() => setOrders((current) => current.filter((item) => item.id !== order.id))}
+                          className="rounded-sm p-1.5 text-danger hover:bg-danger-soft"
+                        >
+                          <Icon name="trash" size={18} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                  {expandedRows.has(order.id) ? (
+                    <tr className="border-b border-border bg-surface-2/70">
+                      <td colSpan={7} className="px-4 py-4">
+                        <div className="grid gap-3 text-sm text-content-muted md:grid-cols-4">
+                          <div>
+                            <span className="font-semibold text-content">موقع الطلب: </span>
+                            {typeLabel(order.type)}
+                          </div>
+                          <div>
+                            <span className="font-semibold text-content">العنوان: </span>
+                            {order.address}
+                          </div>
+                          <div>
+                            <span className="font-semibold text-content">موعد الزيارة: </span>
+                            {order.visitDate}
+                          </div>
+                          <div>
+                            <span className="font-semibold text-content">الإجمالي: </span>
+                            {formatMoney(order.total)}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : null}
+                </Fragment>
               ))}
             </tbody>
           </table>
@@ -742,6 +1362,7 @@ export function OrdersScreen() {
 export function InventoryScreen({ section = "parts" }: { section?: string }) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("all");
+  const [showSupplyModal, setShowSupplyModal] = useState(false);
   const lowStock = INVENTORY.filter((item) => item.stock <= item.minStock);
   const categories = Array.from(new Set(INVENTORY.map((item) => item.category)));
   const filtered = INVENTORY.filter((item) => {
@@ -760,6 +1381,7 @@ export function InventoryScreen({ section = "parts" }: { section?: string }) {
         subtitle="إدارة مخزون قطع الصيانة، حدود النقص، ومتابعة الصرف والتوريد."
         icon="box"
       />
+      {showSupplyModal ? <SupplyPartModal onClose={() => setShowSupplyModal(false)} /> : null}
 
       <KpiCards
         cards={[
@@ -797,7 +1419,7 @@ export function InventoryScreen({ section = "parts" }: { section?: string }) {
           <Icon name="clipboard" size={18} />
           جرد سريع
         </Button>
-        <Button type="button" variant="outline">
+        <Button type="button" variant="outline" onClick={() => setShowSupplyModal(true)}>
           <Icon name="plus" size={18} />
           توريد قطعة
         </Button>
@@ -877,6 +1499,7 @@ export function InvoicesScreen() {
   const [type, setType] = useState<InvoiceType | "all">(initialType ?? "all");
   const [currency, setCurrency] = useState<Currency | "all">(initialCurrency ?? "all");
   const [status, setStatus] = useState<PaymentStatus | "all">("all");
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
 
   const filtered = INVOICES.filter((invoice) => {
     const byType = type === "all" || invoice.type === type;
@@ -895,6 +1518,7 @@ export function InvoicesScreen() {
         subtitle="مراجعة الفواتير الداخلية والخارجية، الدفعات، المتبقي، وتجهيز الطباعة."
         icon="file"
       />
+      {showInvoiceModal ? <InternalInvoiceModal onClose={() => setShowInvoiceModal(false)} /> : null}
       <KpiCards
         cards={[
           { label: "عدد الفواتير", value: String(filtered.length), icon: "file" },
@@ -920,7 +1544,7 @@ export function InvoicesScreen() {
           <option value="partial">مدفوعة جزئياً</option>
           <option value="unpaid">غير مدفوعة</option>
         </Select>
-        <Button type="button">
+        <Button type="button" onClick={() => setShowInvoiceModal(true)}>
           <Icon name="plus" size={18} />
           فاتورة داخلية
         </Button>
