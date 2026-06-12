@@ -128,7 +128,7 @@ export function UserForm(props: Props) {
               </Field>
               <Field label="الراتب الشهري" error={errors.salary?.message}>
                 <div className="relative">
-                  <Input type="number" step="0.01" className="pl-12" {...register("salary")} />
+                  <Input type="number" step="0.01" dir="ltr" className="pl-12" {...register("salary")} />
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-content-muted">
                     {CURRENCY_SYMBOL}
                   </span>

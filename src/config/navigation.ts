@@ -33,7 +33,7 @@ export const NAVIGATION: NavItem[] = [
   {
     label: "إدارة العملاء",
     href: "/customers",
-    icon: "users",
+    icon: "user",
   },
   {
     label: "إدارة الفنيين",

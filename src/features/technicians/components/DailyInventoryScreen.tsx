@@ -8,12 +8,16 @@ import { Spinner } from "@/components/ui/Spinner";
 import { Icon } from "@/lib/icons";
 import { DailyInventoryCard } from "@/features/technicians/components/DailyInventoryCard";
 import { DailyInventoryForm } from "@/features/technicians/components/DailyInventoryForm";
-import { useDailyInventoryQuery } from "@/features/technicians/hooks/use-daily-inventory";
+import {
+  useDailyInventoryMutations,
+  useDailyInventoryQuery,
+} from "@/features/technicians/hooks/use-daily-inventory";
 
 export function DailyInventoryScreen() {
   const [page, setPage] = useState(1);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const { data, isLoading, isError, refetch } = useDailyInventoryQuery(page);
+  const { remove } = useDailyInventoryMutations();
 
   const total = data?.total ?? 0;
   const pageSize = data?.pageSize ?? 6;
@@ -68,7 +72,12 @@ export function DailyInventoryScreen() {
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {data?.items.map((entry) => (
-            <DailyInventoryCard key={entry.id} entry={entry} />
+            <DailyInventoryCard
+              key={entry.id}
+              entry={entry}
+              isDeleting={remove.isPending}
+              onDelete={() => remove.mutate(entry.id)}
+            />
           ))}
         </div>
       )}

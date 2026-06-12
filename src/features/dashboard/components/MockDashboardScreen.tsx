@@ -525,13 +525,13 @@ function FinanceCard() {
             name="wallet"
             className="absolute bottom-3 left-4 h-12 w-12 text-white/14"
           />
-          <p className="text-[12px] text-white/80">إجمالي الدفعات</p>
+          <p className="text-[12px] text-white/80">إجمالي الإيرادات</p>
           <p className="mt-1 font-heading text-[22px] font-bold">12,450</p>
           <p className="text-[12px] text-white/85">ر.س</p>
         </div>
 
         <div className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-5 text-center">
-          <p className="text-[12px] text-[var(--text-muted)]">المصروفات</p>
+          <p className="text-[12px] text-[var(--text-muted)]">المبيعات</p>
           <p className="mt-2 font-heading text-[24px] font-bold text-[var(--gold-active)]">
             8,200
             <span className="mr-1 text-[12px] font-normal text-[var(--text-muted)]">

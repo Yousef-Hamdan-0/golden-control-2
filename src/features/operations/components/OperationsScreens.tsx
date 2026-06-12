@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -13,7 +13,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Icon, type IconName } from "@/lib/icons";
 import { formatMoney, type Currency } from "@/lib/format/currency";
 
-type OrderStatus =
+export type OrderStatus =
   | "new"
   | "accepted"
   | "on-the-way"
@@ -26,10 +26,12 @@ type OrderStatus =
   | "cancelled"
   | "not-answer";
 
-type OrderType = "external" | "internal";
-type Priority = "low" | "medium" | "high" | "emergency";
-type InvoiceType = "external" | "internal";
-type PaymentStatus = "paid" | "partial" | "unpaid";
+export type OrderType = "external" | "internal";
+export type Priority = "low" | "medium" | "high" | "emergency";
+export type InvoiceType = "external" | "internal";
+export type PaymentStatus = "paid" | "partial" | "unpaid";
+export type PaymentMethod = "cash" | "sham-cash";
+export type PaymentCurrency = "SYP" | "USD";
 
 export interface Order {
   id: string;
@@ -70,10 +72,7 @@ interface MaintenanceOrderDraft {
   technician: string;
 }
 
-type DateFilterMode = "day" | "month" | "year";
-
 interface DateFilter {
-  mode: DateFilterMode;
   from: string;
   to: string;
 }
@@ -89,17 +88,39 @@ interface InventoryItem {
   location: string;
 }
 
-interface Invoice {
+interface InventoryMovement {
+  id: string;
+  partId: string;
+  partName: string;
+  type: "supply" | "withdraw" | "adjustment";
+  quantity: number;
+  owner: string;
+  createdAt: string;
+  reference: string;
+}
+
+export interface InvoicePayment {
+  id: string;
+  amount: number;
+  currency: PaymentCurrency;
+  method: PaymentMethod;
+  paidAt: string;
+}
+
+export interface Invoice {
   id: string;
   orderId: string;
   type: InvoiceType;
   client: string;
+  clientPhone: string;
   technician: string;
   status: PaymentStatus;
   currency: Currency;
+  paymentMethod: PaymentMethod;
   total: number;
   paid: number;
   issuedAt: string;
+  payments: InvoicePayment[];
 }
 
 interface FinanceRecord {
@@ -169,6 +190,13 @@ const PAYMENT_TONE: Record<PaymentStatus, BadgeTone> = {
   partial: "gold",
   unpaid: "danger",
 };
+
+const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+  cash: "كاش",
+  "sham-cash": "شام كاش",
+};
+
+const USD_TO_SYP_RATE = 14500;
 
 const ORDERS: Order[] = [
   {
@@ -316,54 +344,142 @@ const INVENTORY: InventoryItem[] = [
   },
 ];
 
+const INVENTORY_MOVEMENTS: InventoryMovement[] = [
+  {
+    id: "MOV-9108",
+    partId: "PRT-103",
+    partName: "لوحة تحكم شاشة",
+    type: "supply",
+    quantity: 4,
+    owner: "المستودع",
+    createdAt: "2026-06-12 13:20",
+    reference: "توريد جديد",
+  },
+  {
+    id: "MOV-9107",
+    partId: "PRT-101",
+    partName: "كمبروسر ثلاجة 1/4",
+    type: "withdraw",
+    quantity: 1,
+    owner: "رامي سمير",
+    createdAt: "2026-06-12 10:10",
+    reference: "طلب ORD-5542",
+  },
+  {
+    id: "MOV-9106",
+    partId: "PRT-102",
+    partName: "حساس حرارة NTC",
+    type: "withdraw",
+    quantity: 2,
+    owner: "هاني خالد",
+    createdAt: "2026-06-11 17:45",
+    reference: "طلب ORD-5538",
+  },
+  {
+    id: "MOV-9105",
+    partId: "PRT-105",
+    partName: "فلتر مكيف داخلي",
+    type: "adjustment",
+    quantity: 6,
+    owner: "المخزون",
+    createdAt: "2026-06-11 09:05",
+    reference: "تسوية جرد",
+  },
+  {
+    id: "MOV-9104",
+    partId: "PRT-104",
+    partName: "موتور جلاية",
+    type: "withdraw",
+    quantity: 1,
+    owner: "نور حمزة",
+    createdAt: "2026-06-10 15:30",
+    reference: "طلب ORD-5529",
+  },
+  {
+    id: "MOV-9103",
+    partId: "PRT-101",
+    partName: "كمبروسر ثلاجة 1/4",
+    type: "supply",
+    quantity: 3,
+    owner: "المستودع",
+    createdAt: "2026-06-09 12:00",
+    reference: "فاتورة شراء",
+  },
+];
+
+const INVENTORY_MOVEMENT_LABELS: Record<InventoryMovement["type"], { label: string; tone: BadgeTone }> = {
+  supply: { label: "توريد", tone: "success" },
+  withdraw: { label: "صرف", tone: "gold" },
+  adjustment: { label: "تسوية", tone: "info" },
+};
+
 const INVOICES: Invoice[] = [
   {
     id: "INV-9021",
     orderId: "ORD-5542",
     type: "external",
     client: "محمد العتيبي",
+    clientPhone: "0991 223 441",
     technician: "رامي سمير",
     status: "partial",
     currency: "SYP",
+    paymentMethod: "cash",
     total: 950000,
     paid: 450000,
     issuedAt: "2026-06-11",
+    payments: [
+      { id: "PAY-721", amount: 450000, currency: "SYP", method: "cash", paidAt: "2026-06-11" },
+    ],
   },
   {
     id: "INV-9020",
     orderId: "ORD-5541",
     type: "external",
     client: "سارة القحطاني",
+    clientPhone: "0944 772 118",
     technician: "رامي سمير",
     status: "paid",
     currency: "SYP",
+    paymentMethod: "sham-cash",
     total: 680000,
     paid: 680000,
     issuedAt: "2026-06-10",
+    payments: [
+      { id: "PAY-720", amount: 300000, currency: "SYP", method: "sham-cash", paidAt: "2026-06-10" },
+      { id: "PAY-719", amount: 380000, currency: "SYP", method: "sham-cash", paidAt: "2026-06-10" },
+    ],
   },
   {
     id: "INV-9019",
     orderId: "ORD-5540",
     type: "internal",
     client: "مركز الصفاء التجاري",
+    clientPhone: "011 442 0911",
     technician: "هاني خالد",
     status: "partial",
     currency: "USD",
+    paymentMethod: "cash",
     total: 125,
     paid: 60,
     issuedAt: "2026-06-10",
+    payments: [
+      { id: "PAY-718", amount: 60, currency: "USD", method: "cash", paidAt: "2026-06-10" },
+    ],
   },
   {
     id: "INV-9018",
     orderId: "ORD-5538",
     type: "internal",
     client: "شركة الربيع",
+    clientPhone: "011 889 2020",
     technician: "هاني خالد",
     status: "unpaid",
     currency: "SYP",
+    paymentMethod: "cash",
     total: 1450000,
     paid: 0,
     issuedAt: "2026-06-09",
+    payments: [],
   },
 ];
 
@@ -484,12 +600,6 @@ const EMPTY_MAINTENANCE_ORDER: MaintenanceOrderDraft = {
   technician: "",
 };
 
-const DATE_FILTER_LABELS: Record<DateFilterMode, string> = {
-  day: "اليوم",
-  month: "الشهر",
-  year: "السنة",
-};
-
 function orderToDraft(order: Order): MaintenanceOrderDraft {
   return {
     location: order.type,
@@ -537,38 +647,34 @@ function draftToOrder(draft: MaintenanceOrderDraft, existing?: Order): Order {
   };
 }
 
-function normalizeDateKey(value: string, mode: DateFilterMode): string {
+function normalizeDateKey(value: string): string {
   if (!value) return "";
-  if (mode === "year") return value.slice(0, 4);
-  if (mode === "month") return value.slice(0, 7);
   return value.slice(0, 10);
 }
 
-function matchesDateFilter(order: Order, filter: DateFilter): boolean {
+function matchesDateValue(value: string, filter: DateFilter): boolean {
   if (!filter.from && !filter.to) return true;
-  const orderKey = normalizeDateKey(order.visitDate, filter.mode);
-  const fromKey = normalizeDateKey(filter.from, filter.mode);
-  const toKey = normalizeDateKey(filter.to, filter.mode);
+  const dateKey = normalizeDateKey(value);
+  const fromKey = normalizeDateKey(filter.from);
+  const toKey = normalizeDateKey(filter.to);
 
-  return (!fromKey || orderKey >= fromKey) && (!toKey || orderKey <= toKey);
+  return (!fromKey || dateKey >= fromKey) && (!toKey || dateKey <= toKey);
+}
+
+function matchesDateFilter(order: Order, filter: DateFilter): boolean {
+  return matchesDateValue(order.visitDate, filter);
 }
 
 function SectionTitle({
   title,
   subtitle,
-  icon,
 }: {
   title: string;
   subtitle?: string;
-  icon: IconName;
 }) {
   return (
     <div className="flex flex-wrap items-start justify-between gap-4">
       <PageHeader title={title} subtitle={subtitle} />
-      <div className="flex items-center gap-2 text-gold">
-        <span className="text-sm font-medium">لوحة تشغيلية</span>
-        <Icon name={icon} />
-      </div>
     </div>
   );
 }
@@ -606,8 +712,14 @@ function KpiCards({
   );
 }
 
-function FilterCard({ children }: { children: ReactNode }) {
-  return <Card className="grid gap-3 p-4 md:grid-cols-4">{children}</Card>;
+function FilterCard({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return <Card className={`grid gap-3 p-4 md:grid-cols-4 ${className}`}>{children}</Card>;
 }
 
 function EmptyState({ title }: { title: string }) {
@@ -1075,25 +1187,11 @@ function DateFilterModal({
   return (
     <Modal
       title="فلترة حسب الوقت"
-      description="حدد نوع الفترة ثم اختر تاريخ البداية والنهاية."
+      description="اختر تاريخ البداية والنهاية لعرض السجلات ضمن الفترة المحددة."
       onClose={onClose}
       widthClassName="max-w-xl"
     >
       <div className="space-y-4 p-5">
-        <Field label="نوع الفترة">
-          <Select
-            value={draft.mode}
-            onChange={(event) =>
-              setDraft((current) => ({ ...current, mode: event.target.value as DateFilterMode }))
-            }
-          >
-            {Object.entries(DATE_FILTER_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </Select>
-        </Field>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="من تاريخ">
             <Input
@@ -1118,7 +1216,7 @@ function DateFilterModal({
           <Button
             type="button"
             variant="outline"
-            onClick={() => setDraft({ mode: "day", from: "", to: "" })}
+            onClick={() => setDraft({ from: "", to: "" })}
           >
             مسح
           </Button>
@@ -1132,6 +1230,99 @@ function DateFilterModal({
             تطبيق الفلتر
           </Button>
         </div>
+      </div>
+    </Modal>
+  );
+}
+
+function DetailItem({
+  label,
+  value,
+  ltr = false,
+}: {
+  label: string;
+  value: ReactNode;
+  ltr?: boolean;
+}) {
+  return (
+    <div className="rounded-md border border-border bg-surface-2 p-3">
+      <div className="text-xs text-content-muted">{label}</div>
+      <div className="mt-1 font-semibold text-content" dir={ltr ? "ltr" : "rtl"}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
+export function OrderDetailsModal({
+  order,
+  invoice,
+  onClose,
+}: {
+  order: Order;
+  invoice?: Invoice | null;
+  onClose: () => void;
+}) {
+  const invoiceBalance = invoice ? remaining(invoice.total, invoice.paid) : 0;
+
+  return (
+    <Modal
+      title={`تفاصيل الطلب ${order.id}`}
+      description="معلومات الطلب، الفني المسؤول، الحالة، والفاتورة المرتبطة."
+      onClose={onClose}
+      widthClassName="max-w-4xl"
+    >
+      <div className="space-y-5 p-5">
+        <div className="grid gap-3 md:grid-cols-4">
+          <DetailItem label="العميل" value={order.client} />
+          <DetailItem label="الهاتف" value={order.phone} ltr />
+          <DetailItem label="نوع الطلب" value={typeLabel(order.type)} />
+          <DetailItem label="موعد الزيارة" value={order.visitDate} />
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-4">
+          <DetailItem label="الجهاز" value={order.device} />
+          <DetailItem label="الماركة" value={order.brand} />
+          <DetailItem label="الأولوية" value={PRIORITY_LABELS[order.priority]} />
+          <DetailItem
+            label="حالة الطلب"
+            value={
+              <Badge tone={ORDER_STATUS_TONE[order.status]} dot>
+                {ORDER_STATUS_LABELS[order.status]}
+              </Badge>
+            }
+          />
+        </div>
+
+        <Card className="bg-surface-2 p-4 shadow-none">
+          <h3 className="font-heading text-base font-bold text-content">معلومات الفني</h3>
+          <div className="mt-3 grid gap-3 md:grid-cols-3">
+            <DetailItem label="الفني المسؤول" value={order.technician} />
+            <DetailItem label="حالة الإسناد" value={order.technician === "غير محدد" ? "غير محدد" : "مسند"} />
+            <DetailItem label="موقع التنفيذ" value={order.address} />
+          </div>
+        </Card>
+
+        <Card className="bg-surface-2 p-4 shadow-none">
+          <h3 className="font-heading text-base font-bold text-content">الفاتورة</h3>
+          {invoice ? (
+            <div className="mt-3 grid gap-3 md:grid-cols-4">
+              <DetailItem label="رقم الفاتورة" value={invoice.id} ltr />
+              <DetailItem
+                label="حالة الفاتورة"
+                value={
+                  <Badge tone={PAYMENT_TONE[invoice.status]} dot>
+                    {PAYMENT_LABELS[invoice.status]}
+                  </Badge>
+                }
+              />
+              <DetailItem label="الإجمالي" value={formatMoney(invoice.total, invoice.currency)} />
+              <DetailItem label="المتبقي" value={formatMoney(invoiceBalance, invoice.currency)} />
+            </div>
+          ) : (
+            <p className="mt-3 text-sm text-content-muted">لا توجد فاتورة مرتبطة بهذا الطلب حالياً.</p>
+          )}
+        </Card>
       </div>
     </Modal>
   );
@@ -1152,20 +1343,17 @@ function SupplyPartModal({ onClose }: { onClose: () => void }) {
         <Field label="الكود">
           <Input placeholder="PRT-000" dir="ltr" />
         </Field>
-        <Field label="التصنيف">
-          <Input placeholder="ثلاجات / غسالات / شاشات" />
-        </Field>
         <Field label="الكمية">
           <Input type="number" min={1} defaultValue={1} />
         </Field>
-        <Field label="تكلفة الوحدة">
+        <Field label="قيمة القطعة بالليرة السورية">
           <Input type="number" min={0} placeholder="0" />
+        </Field>
+        <Field label="قيمة القطعة بالدولار">
+          <Input type="number" min={0} step="0.01" placeholder="0" />
         </Field>
         <Field label="الموقع">
           <Input placeholder="رف A-01" />
-        </Field>
-        <Field label="ملاحظات" className="md:col-span-2">
-          <Textarea className="min-h-24" placeholder="ملاحظات اختيارية" />
         </Field>
         <div className="flex items-center justify-end gap-3 border-t border-border pt-4 md:col-span-2">
           <Button type="button" variant="outline" onClick={onClose}>
@@ -1246,10 +1434,9 @@ export function OrdersScreen() {
   const [priority, setPriority] = useState<Priority | "all">("all");
   const [showForm, setShowForm] = useState(params.get("create") === "1");
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
-  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
   const [showDateFilter, setShowDateFilter] = useState(false);
   const [dateFilter, setDateFilter] = useState<DateFilter>({
-    mode: "day",
     from: "",
     to: "",
   });
@@ -1284,21 +1471,11 @@ export function OrdersScreen() {
     });
   }
 
-  function toggleRow(orderId: string) {
-    setExpandedRows((current) => {
-      const next = new Set(current);
-      if (next.has(orderId)) next.delete(orderId);
-      else next.add(orderId);
-      return next;
-    });
-  }
-
   return (
     <div className="space-y-6">
       <SectionTitle
         title="إدارة الطلبات"
         subtitle="متابعة الطلبات الداخلية والخارجية، الحالات، الأولويات، والفني المسؤول."
-        icon="clipboard"
       />
 
       <div className="flex justify-end">
@@ -1330,6 +1507,13 @@ export function OrdersScreen() {
           onSave={upsertOrder}
         />
       ) : null}
+      {viewingOrder ? (
+        <OrderDetailsModal
+          order={viewingOrder}
+          invoice={INVOICES.find((invoice) => invoice.orderId === viewingOrder.id) ?? null}
+          onClose={() => setViewingOrder(null)}
+        />
+      ) : null}
       {showDateFilter ? (
         <DateFilterModal
           filter={dateFilter}
@@ -1338,7 +1522,7 @@ export function OrdersScreen() {
         />
       ) : null}
 
-      <FilterCard>
+      <FilterCard className="xl:grid-cols-5">
         <Input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
@@ -1384,7 +1568,7 @@ export function OrdersScreen() {
           onClick={() => setShowDateFilter(true)}
         >
           <Icon name="clock" size={18} />
-          وقت
+          الفترة الزمنية
         </Button>
       </FilterCard>
 
@@ -1410,7 +1594,6 @@ export function OrdersScreen() {
             </thead>
             <tbody>
               {filtered.map((order) => (
-                <Fragment key={order.id}>
                   <tr key={order.id} className="border-b border-border hover:bg-gold-soft">
                     <td className="px-4 py-4 font-bold text-gold">{order.id}</td>
                     <td className="px-4 py-4">
@@ -1439,12 +1622,12 @@ export function OrdersScreen() {
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
-                          aria-label={`${expandedRows.has(order.id) ? "إخفاء" : "إظهار"} ${order.id}`}
-                          title={expandedRows.has(order.id) ? "إخفاء المعلومات" : "إظهار المعلومات"}
-                          onClick={() => toggleRow(order.id)}
+                          aria-label={`تفاصيل ${order.id}`}
+                          title="تفاصيل الطلب"
+                          onClick={() => setViewingOrder(order)}
                           className="rounded-sm p-1.5 text-content-muted hover:bg-surface-2"
                         >
-                          <Icon name={expandedRows.has(order.id) ? "eye-off" : "eye"} size={18} />
+                          <Icon name="eye" size={18} />
                         </button>
                         <button
                           type="button"
@@ -1467,31 +1650,6 @@ export function OrdersScreen() {
                       </div>
                     </td>
                   </tr>
-                  {expandedRows.has(order.id) ? (
-                    <tr className="border-b border-border bg-surface-2/70">
-                      <td colSpan={7} className="px-4 py-4">
-                        <div className="grid gap-3 text-sm text-content-muted md:grid-cols-4">
-                          <div>
-                            <span className="font-semibold text-content">موقع الطلب: </span>
-                            {typeLabel(order.type)}
-                          </div>
-                          <div>
-                            <span className="font-semibold text-content">العنوان: </span>
-                            {order.address}
-                          </div>
-                          <div>
-                            <span className="font-semibold text-content">موعد الزيارة: </span>
-                            {order.visitDate}
-                          </div>
-                          <div>
-                            <span className="font-semibold text-content">الإجمالي: </span>
-                            {formatMoney(order.total)}
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : null}
-                </Fragment>
               ))}
             </tbody>
           </table>
@@ -1504,71 +1662,169 @@ export function OrdersScreen() {
 
 export function InventoryScreen({ section = "parts" }: { section?: string }) {
   const [query, setQuery] = useState("");
-  const [category, setCategory] = useState("all");
   const [showSupplyModal, setShowSupplyModal] = useState(false);
+  const [movementPage, setMovementPage] = useState(1);
   const lowStock = INVENTORY.filter((item) => item.stock <= item.minStock);
-  const categories = Array.from(new Set(INVENTORY.map((item) => item.category)));
   const filtered = INVENTORY.filter((item) => {
     const byQuery = !query || contains(item.name, query) || contains(item.id, query);
-    const byCategory = category === "all" || item.category === category;
-    return byQuery && byCategory;
+    return byQuery;
   });
 
   const isAlerts = section === "alerts";
   const isMovement = section === "movement";
+  const inventoryValue = INVENTORY.reduce((sum, item) => sum + item.stock * item.unitCost, 0);
+  const sortedMovements = [...INVENTORY_MOVEMENTS].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const movementPageSize = 5;
+  const movementPages = Math.max(1, Math.ceil(sortedMovements.length / movementPageSize));
+  const visibleMovements = sortedMovements.slice(
+    (movementPage - 1) * movementPageSize,
+    movementPage * movementPageSize,
+  );
 
   return (
     <div className="space-y-6">
       <SectionTitle
         title={isAlerts ? "تنبيهات المخزون" : isMovement ? "حركة المخزون" : "قطع الغيار"}
         subtitle="إدارة مخزون قطع الصيانة، حدود النقص، ومتابعة الصرف والتوريد."
-        icon="box"
       />
       {showSupplyModal ? <SupplyPartModal onClose={() => setShowSupplyModal(false)} /> : null}
 
       <KpiCards
-        cards={[
-          { label: "إجمالي القطع", value: String(INVENTORY.length), icon: "box" },
-          { label: "تنبيهات نقص", value: String(lowStock.length), icon: "alert", tone: "danger" },
-          {
-            label: "قيمة المخزون",
-            value: formatMoney(INVENTORY.reduce((sum, item) => sum + item.stock * item.unitCost, 0)),
-            icon: "wallet",
-          },
-          { label: "آخر حركة", value: "اليوم", icon: "clock", tone: "info" },
-        ]}
+        cards={
+          isMovement
+            ? [
+                { label: "إجمالي الحركات", value: String(INVENTORY_MOVEMENTS.length), icon: "clipboard" },
+                {
+                  label: "حركات التوريد",
+                  value: String(INVENTORY_MOVEMENTS.filter((item) => item.type === "supply").length),
+                  icon: "plus",
+                  tone: "success",
+                },
+                {
+                  label: "حركات الصرف",
+                  value: String(INVENTORY_MOVEMENTS.filter((item) => item.type === "withdraw").length),
+                  icon: "box",
+                  tone: "gold",
+                },
+                {
+                  label: "التسويات",
+                  value: String(INVENTORY_MOVEMENTS.filter((item) => item.type === "adjustment").length),
+                  icon: "clipboard",
+                  tone: "info",
+                },
+              ]
+            : [
+                { label: "إجمالي القطع", value: String(INVENTORY.length), icon: "box" },
+                { label: "تنبيهات نقص", value: String(lowStock.length), icon: "alert", tone: "danger" },
+                {
+                  label: "قيمة المخزون بالليرة",
+                  value: formatMoney(inventoryValue, "SYP"),
+                  icon: "wallet",
+                },
+                {
+                  label: "قيمة المخزون بالدولار",
+                  value: formatMoney(inventoryValue / USD_TO_SYP_RATE, "USD", { decimals: 2 }),
+                  icon: "wallet",
+                },
+              ]
+        }
       />
 
-      <FilterCard>
-        <Input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="بحث باسم القطعة أو الكود"
-          aria-label="بحث المخزون"
-        />
-        <Select
-          value={category}
-          onChange={(event) => setCategory(event.target.value)}
-          aria-label="تصنيف القطع"
-        >
-          <option value="all">كل التصنيفات</option>
-          {categories.map((item) => (
-            <option key={item} value={item}>
-              {item}
-            </option>
-          ))}
-        </Select>
-        <Button type="button" variant="outline">
-          <Icon name="clipboard" size={18} />
-          جرد سريع
-        </Button>
-        <Button type="button" variant="outline" onClick={() => setShowSupplyModal(true)}>
-          <Icon name="plus" size={18} />
-          توريد قطعة
-        </Button>
-      </FilterCard>
+      {!isMovement ? (
+        <FilterCard className="md:grid-cols-[minmax(0,1fr)_auto]">
+          <Input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="بحث باسم القطعة أو الكود"
+            aria-label="بحث المخزون"
+          />
+          <Button type="button" variant="outline" onClick={() => setShowSupplyModal(true)}>
+            <Icon name="plus" size={18} />
+            توريد قطعة
+          </Button>
+        </FilterCard>
+      ) : null}
 
-      {isAlerts ? (
+      {isMovement ? (
+        <Card className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-[860px] w-full text-right text-sm">
+              <thead>
+                <tr className="bg-surface-2 text-content-muted">
+                  {["رقم الحركة", "القطعة", "نوع الحركة", "الكمية", "المسؤول", "المرجع", "التاريخ"].map(
+                    (header) => (
+                      <th key={header} className="px-4 py-3 font-medium">
+                        {header}
+                      </th>
+                    ),
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {visibleMovements.map((movement) => (
+                  <tr key={movement.id} className="border-b border-border last:border-0 hover:bg-gold-soft">
+                    <td className="px-4 py-4 font-bold text-gold">{movement.id}</td>
+                    <td className="px-4 py-4 text-content">
+                      <div className="font-medium">{movement.partName}</div>
+                      <div className="text-xs text-content-muted" dir="ltr">{movement.partId}</div>
+                    </td>
+                    <td className="px-4 py-4">
+                      <Badge tone={INVENTORY_MOVEMENT_LABELS[movement.type].tone} dot>
+                        {INVENTORY_MOVEMENT_LABELS[movement.type].label}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-4 text-content-muted">{movement.quantity}</td>
+                    <td className="px-4 py-4 text-content-muted">{movement.owner}</td>
+                    <td className="px-4 py-4 text-content-muted">{movement.reference}</td>
+                    <td className="px-4 py-4 text-content-muted">{movement.createdAt}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-3 text-sm text-content-muted">
+            <span>
+              صفحة {movementPage} من {movementPages}
+            </span>
+            <div className="flex items-center gap-1">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 w-8 px-0"
+                disabled={movementPage <= 1}
+                onClick={() => setMovementPage((page) => Math.max(1, page - 1))}
+                aria-label="السابق"
+              >
+                <Icon name="chevron-right" size={16} />
+              </Button>
+              {Array.from({ length: movementPages }).map((_, index) => (
+                <Button
+                  key={index}
+                  type="button"
+                  size="sm"
+                  variant={movementPage === index + 1 ? "primary" : "outline"}
+                  className="h-8 w-8 px-0"
+                  onClick={() => setMovementPage(index + 1)}
+                >
+                  {index + 1}
+                </Button>
+              ))}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 w-8 px-0"
+                disabled={movementPage >= movementPages}
+                onClick={() => setMovementPage((page) => Math.min(movementPages, page + 1))}
+                aria-label="التالي"
+              >
+                <Icon name="chevron-left" size={16} />
+              </Button>
+            </div>
+          </div>
+        </Card>
+      ) : isAlerts ? (
         <div className="grid gap-4 md:grid-cols-2">
           {lowStock.map((item) => (
             <Card key={item.id} className="p-4">
@@ -1597,7 +1853,7 @@ export function InventoryScreen({ section = "parts" }: { section?: string }) {
             <table className="min-w-[840px] w-full text-right text-sm">
               <thead>
                 <tr className="bg-surface-2 text-content-muted">
-                  {["الكود", "القطعة", "التصنيف", "المتوفر", "الموقع", "آخر حركة", "القيمة"].map(
+                  {["الكود", "القطعة", "المتوفر", "الموقع", "القيمة بالليرة", "القيمة بالدولار"].map(
                     (header) => (
                       <th key={header} className="px-4 py-3 font-medium">
                         {header}
@@ -1612,17 +1868,16 @@ export function InventoryScreen({ section = "parts" }: { section?: string }) {
                     <td className="px-4 py-4 font-bold text-gold">{item.id}</td>
                     <td className="px-4 py-4 text-content">{item.name}</td>
                     <td className="px-4 py-4">
-                      <Badge tone="neutral">{item.category}</Badge>
-                    </td>
-                    <td className="px-4 py-4">
                       <Badge tone={item.stock <= item.minStock ? "danger" : "success"} dot>
                         {item.stock}
                       </Badge>
                     </td>
                     <td className="px-4 py-4 text-content-muted">{item.location}</td>
-                    <td className="px-4 py-4 text-content-muted">{item.lastMove}</td>
                     <td className="px-4 py-4 text-content-muted">
-                      {formatMoney(item.stock * item.unitCost)}
+                      {formatMoney(item.stock * item.unitCost, "SYP")}
+                    </td>
+                    <td className="px-4 py-4 text-content-muted">
+                      {formatMoney((item.stock * item.unitCost) / USD_TO_SYP_RATE, "USD", { decimals: 2 })}
                     </td>
                   </tr>
                 ))}
@@ -1635,42 +1890,313 @@ export function InventoryScreen({ section = "parts" }: { section?: string }) {
   );
 }
 
+function convertPaymentToInvoiceCurrency(
+  amount: number,
+  paymentCurrency: PaymentCurrency,
+  invoiceCurrency: Currency,
+) {
+  if (paymentCurrency === invoiceCurrency) return amount;
+  if (invoiceCurrency === "SYP") return amount * USD_TO_SYP_RATE;
+  return amount / USD_TO_SYP_RATE;
+}
+
+function InvoiceDetailsModal({
+  invoice,
+  order,
+  onClose,
+  onAddPayment,
+}: {
+  invoice: Invoice;
+  order?: Order;
+  onClose: () => void;
+  onAddPayment: () => void;
+}) {
+  return (
+    <Modal
+      title={`تفاصيل الفاتورة ${invoice.id}`}
+      description="تفاصيل الفاتورة، الطلب المرتبط، وسجل المدفوعات."
+      onClose={onClose}
+      widthClassName="max-w-4xl"
+    >
+      <div className="space-y-5 p-5">
+        <div className="grid gap-3 md:grid-cols-4">
+          <DetailItem label="العميل" value={invoice.client} />
+          <DetailItem label="هاتف العميل" value={invoice.clientPhone} ltr />
+          <DetailItem label="رقم الطلب" value={invoice.orderId} ltr />
+          <DetailItem label="الفني" value={invoice.technician} />
+        </div>
+        <div className="grid gap-3 md:grid-cols-4">
+          <DetailItem label="الإجمالي" value={formatMoney(invoice.total, invoice.currency)} />
+          <DetailItem label="المدفوع" value={formatMoney(invoice.paid, invoice.currency)} />
+          <DetailItem
+            label="المتبقي"
+            value={formatMoney(remaining(invoice.total, invoice.paid), invoice.currency)}
+          />
+          <DetailItem
+            label="طريقة الدفع"
+            value={PAYMENT_METHOD_LABELS[invoice.paymentMethod]}
+          />
+        </div>
+
+        {order ? (
+          <Card className="bg-surface-2 p-4 shadow-none">
+            <h3 className="font-heading text-base font-bold text-content">معلومات الطلب</h3>
+            <div className="mt-3 grid gap-3 md:grid-cols-4">
+              <DetailItem label="الجهاز" value={order.device} />
+              <DetailItem label="حالة الطلب" value={ORDER_STATUS_LABELS[order.status]} />
+              <DetailItem label="الأولوية" value={PRIORITY_LABELS[order.priority]} />
+              <DetailItem label="موعد الزيارة" value={order.visitDate} />
+            </div>
+          </Card>
+        ) : null}
+
+        <Card className="overflow-hidden shadow-none">
+          <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+            <h3 className="font-heading text-base font-bold text-content">سجل المدفوعات</h3>
+            <Button type="button" size="sm" onClick={onAddPayment}>
+              <Icon name="plus" size={16} />
+              إضافة دفعة
+            </Button>
+          </div>
+          {invoice.payments.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="min-w-[640px] w-full text-right text-sm">
+                <thead>
+                  <tr className="bg-surface-2 text-content-muted">
+                    {["رقم الدفعة", "المبلغ", "الطريقة", "نوع العملية", "التاريخ"].map((header) => (
+                      <th key={header} className="px-4 py-3 font-medium">
+                        {header}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {invoice.payments.map((payment) => (
+                    <tr key={payment.id} className="border-t border-border">
+                      <td className="px-4 py-3 font-bold text-gold">{payment.id}</td>
+                      <td className="px-4 py-3 text-content-muted">
+                        {formatMoney(payment.amount, payment.currency)}
+                      </td>
+                      <td className="px-4 py-3 text-content-muted">
+                        {PAYMENT_METHOD_LABELS[payment.method]}
+                      </td>
+                      <td className="px-4 py-3 text-content-muted">
+                        {payment.currency === "SYP" ? "ليرة" : "دولار"}
+                      </td>
+                      <td className="px-4 py-3 text-content-muted">{payment.paidAt}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState title="لا توجد دفعات مسجلة على هذه الفاتورة." />
+          )}
+        </Card>
+      </div>
+    </Modal>
+  );
+}
+
+function AddPaymentModal({
+  invoice,
+  onClose,
+  onSave,
+}: {
+  invoice: Invoice;
+  onClose: () => void;
+  onSave: (payment: InvoicePayment, convertedAmount: number) => void;
+}) {
+  const [amount, setAmount] = useState("");
+  const [method, setMethod] = useState<PaymentMethod>("cash");
+  const [currency, setCurrency] = useState<PaymentCurrency>("SYP");
+  const remainingBefore = remaining(invoice.total, invoice.paid);
+  const numericAmount = Number(amount) || 0;
+  const convertedAmount = convertPaymentToInvoiceCurrency(numericAmount, currency, invoice.currency);
+  const remainingAfter = Math.max(0, remainingBefore - convertedAmount);
+
+  function save() {
+    onSave(
+      {
+        id: `PAY-${Date.now().toString().slice(-5)}`,
+        amount: numericAmount,
+        currency,
+        method,
+        paidAt: new Date().toISOString().slice(0, 10),
+      },
+      convertedAmount,
+    );
+    onClose();
+  }
+
+  return (
+    <Modal
+      title="إضافة دفعة جديدة"
+      description="تسجيل دفعة على الفاتورة مع حساب المتبقي بعد الدفع."
+      onClose={onClose}
+      widthClassName="max-w-2xl"
+    >
+      <div className="space-y-4 p-5">
+        <div className="grid gap-3 md:grid-cols-2">
+          <DetailItem label="رقم الفاتورة" value={invoice.id} ltr />
+          <DetailItem
+            label="المبلغ المتبقي"
+            value={formatMoney(remainingBefore, invoice.currency)}
+          />
+        </div>
+        <div className="rounded-md border border-gold/30 bg-gold-soft p-3 text-sm text-content-muted">
+          سعر صرف الدولار المستخدم مؤقتاً: {formatMoney(USD_TO_SYP_RATE, "SYP")} لكل 1 دولار. سيتم ربطه لاحقاً بمصدر API.
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <Field label="مبلغ الدفعة الجديدة">
+            <Input
+              type="number"
+              min={0}
+              value={amount}
+              onChange={(event) => setAmount(event.target.value)}
+              placeholder="0"
+            />
+          </Field>
+          <Field label="طريقة الدفع">
+            <Select value={method} onChange={(event) => setMethod(event.target.value as PaymentMethod)}>
+              <option value="cash">كاش</option>
+              <option value="sham-cash">شام كاش</option>
+            </Select>
+          </Field>
+          <Field label="نوع العملية">
+            <Select value={currency} onChange={(event) => setCurrency(event.target.value as PaymentCurrency)}>
+              <option value="SYP">ليرة</option>
+              <option value="USD">دولار</option>
+            </Select>
+          </Field>
+          <DetailItem
+            label="المتبقي بعد الدفع"
+            value={formatMoney(remainingAfter, invoice.currency)}
+          />
+        </div>
+        <div className="flex items-center justify-end gap-3 border-t border-border pt-4">
+          <Button type="button" variant="outline" onClick={onClose}>
+            إلغاء
+          </Button>
+          <Button type="button" onClick={save} disabled={numericAmount <= 0}>
+            حفظ الدفعة
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 export function InvoicesScreen() {
   const params = useSearchParams();
   const initialType = params.get("type") as InvoiceType | null;
   const initialCurrency = params.get("currency")?.toUpperCase() as Currency | undefined;
+  const [invoices, setInvoices] = useState<Invoice[]>(INVOICES);
   const [type, setType] = useState<InvoiceType | "all">(initialType ?? "all");
   const [currency, setCurrency] = useState<Currency | "all">(initialCurrency ?? "all");
   const [status, setStatus] = useState<PaymentStatus | "all">("all");
-  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | "all">("all");
+  const [query, setQuery] = useState("");
+  const [dateFilter, setDateFilter] = useState<DateFilter>({ from: "", to: "" });
+  const [showDateFilter, setShowDateFilter] = useState(false);
+  const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null);
+  const [paymentInvoice, setPaymentInvoice] = useState<Invoice | null>(null);
 
-  const filtered = INVOICES.filter((invoice) => {
+  const filtered = invoices.filter((invoice) => {
     const byType = type === "all" || invoice.type === type;
     const byCurrency = currency === "all" || invoice.currency === currency;
     const byStatus = status === "all" || invoice.status === status;
-    return byType && byCurrency && byStatus;
+    const byPaymentMethod = paymentMethod === "all" || invoice.paymentMethod === paymentMethod;
+    const byQuery =
+      !query ||
+      contains(invoice.id, query) ||
+      contains(invoice.clientPhone, query);
+    const byDate = matchesDateValue(invoice.issuedAt, dateFilter);
+    return byType && byCurrency && byStatus && byPaymentMethod && byQuery && byDate;
   });
 
   const total = filtered.reduce((sum, invoice) => sum + invoice.total, 0);
   const paid = filtered.reduce((sum, invoice) => sum + invoice.paid, 0);
+  const completedInvoices = invoices.filter((invoice) => invoice.status === "paid").length;
+  const incompletedInvoices = invoices.filter((invoice) => invoice.status !== "paid").length;
+  const hasDateFilter = Boolean(dateFilter.from || dateFilter.to);
+
+  function savePayment(payment: InvoicePayment, convertedAmount: number) {
+    if (!paymentInvoice) return;
+    setInvoices((current) =>
+      current.map((invoice) => {
+        if (invoice.id !== paymentInvoice.id) return invoice;
+        const nextPaid = Math.min(invoice.total, invoice.paid + convertedAmount);
+        const nextStatus: PaymentStatus =
+          nextPaid >= invoice.total ? "paid" : nextPaid > 0 ? "partial" : "unpaid";
+        return {
+          ...invoice,
+          paid: nextPaid,
+          status: nextStatus,
+          paymentMethod: payment.method,
+          payments: [payment, ...invoice.payments],
+        };
+      }),
+    );
+    setViewingInvoice((current) =>
+      current?.id === paymentInvoice.id
+        ? {
+            ...current,
+            paid: Math.min(current.total, current.paid + convertedAmount),
+            status:
+              Math.min(current.total, current.paid + convertedAmount) >= current.total
+                ? "paid"
+                : "partial",
+            paymentMethod: payment.method,
+            payments: [payment, ...current.payments],
+          }
+        : current,
+    );
+  }
 
   return (
     <div className="space-y-6">
       <SectionTitle
         title="إدارة الفواتير"
         subtitle="مراجعة الفواتير الداخلية والخارجية، الدفعات، المتبقي، وتجهيز الطباعة."
-        icon="file"
       />
-      {showInvoiceModal ? <InternalInvoiceModal onClose={() => setShowInvoiceModal(false)} /> : null}
+      {showDateFilter ? (
+        <DateFilterModal
+          filter={dateFilter}
+          onApply={setDateFilter}
+          onClose={() => setShowDateFilter(false)}
+        />
+      ) : null}
+      {viewingInvoice ? (
+        <InvoiceDetailsModal
+          invoice={viewingInvoice}
+          order={ORDERS.find((order) => order.id === viewingInvoice.orderId)}
+          onClose={() => setViewingInvoice(null)}
+          onAddPayment={() => setPaymentInvoice(viewingInvoice)}
+        />
+      ) : null}
+      {paymentInvoice ? (
+        <AddPaymentModal
+          invoice={paymentInvoice}
+          onClose={() => setPaymentInvoice(null)}
+          onSave={savePayment}
+        />
+      ) : null}
       <KpiCards
         cards={[
-          { label: "عدد الفواتير", value: String(filtered.length), icon: "file" },
+          { label: "عدد الفواتير المكتملة", value: String(completedInvoices), icon: "file" },
+          { label: "عدد الفواتير غير المكتملة", value: String(incompletedInvoices), icon: "alert", tone: "gold" },
           { label: "المدفوع", value: formatMoney(paid), icon: "wallet", tone: "success" },
           { label: "المتبقي", value: formatMoney(total - paid), icon: "clock", tone: "gold" },
-          { label: "فواتير جزئية", value: String(INVOICES.filter((i) => i.status === "partial").length), icon: "alert" },
         ]}
       />
-      <FilterCard>
+      <FilterCard className="xl:grid-cols-6">
+        <Input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="بحث برقم الفاتورة أو هاتف العميل"
+          aria-label="بحث الفواتير"
+        />
         <Select value={type} onChange={(event) => setType(event.target.value as InvoiceType | "all")}>
           <option value="all">كل الفواتير</option>
           <option value="external">فواتير خارجية</option>
@@ -1687,9 +2213,18 @@ export function InvoicesScreen() {
           <option value="partial">مدفوعة جزئياً</option>
           <option value="unpaid">غير مدفوعة</option>
         </Select>
-        <Button type="button" onClick={() => setShowInvoiceModal(true)}>
-          <Icon name="plus" size={18} />
-          فاتورة داخلية
+        <Select value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value as PaymentMethod | "all")}>
+          <option value="all">كل طرق الدفع</option>
+          <option value="cash">كاش</option>
+          <option value="sham-cash">شام كاش</option>
+        </Select>
+        <Button
+          type="button"
+          variant={hasDateFilter ? "primary" : "outline"}
+          onClick={() => setShowDateFilter(true)}
+        >
+          <Icon name="clock" size={18} />
+          الفترة الزمنية
         </Button>
       </FilterCard>
       <Card className="overflow-hidden">
@@ -1711,7 +2246,12 @@ export function InvoicesScreen() {
                 <tr key={invoice.id} className="border-b border-border last:border-0 hover:bg-gold-soft">
                   <td className="px-4 py-4 font-bold text-gold">{invoice.id}</td>
                   <td className="px-4 py-4 text-content-muted">{invoice.orderId}</td>
-                  <td className="px-4 py-4 text-content">{invoice.client}</td>
+                  <td className="px-4 py-4 text-content">
+                    <div className="font-medium">{invoice.client}</div>
+                    <div className="text-xs text-content-muted" dir="ltr">
+                      {invoice.clientPhone}
+                    </div>
+                  </td>
                   <td className="px-4 py-4 text-content-muted">{invoice.technician}</td>
                   <td className="px-4 py-4">
                     <Badge tone="neutral">{typeLabel(invoice.type)}</Badge>
@@ -1729,12 +2269,15 @@ export function InvoicesScreen() {
                   </td>
                   <td className="px-4 py-4">
                     <div className="flex gap-2">
-                      <Button type="button" size="sm" variant="outline">
-                        PDF
-                      </Button>
-                      <Button type="button" size="sm" variant="ghost">
-                        دفعة
-                      </Button>
+                      <button
+                        type="button"
+                        aria-label={`تفاصيل ${invoice.id}`}
+                        title="تفاصيل الفاتورة"
+                        onClick={() => setViewingInvoice(invoice)}
+                        className="rounded-sm p-1.5 text-content-muted hover:bg-surface-2"
+                      >
+                        <Icon name="eye" size={18} />
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -1781,7 +2324,6 @@ export function FinanceScreen({ section }: { section?: string[] }) {
       <SectionTitle
         title={title}
         subtitle="مراقبة التدفقات المالية، المصروفات، المبيعات، وصافي الأرباح."
-        icon="wallet"
       />
       <KpiCards
         cards={[
@@ -1861,7 +2403,6 @@ export function TechnicianPerformanceScreen() {
       <SectionTitle
         title="أداء الفنيين"
         subtitle="تتبع الإنجاز، الطلبات النشطة، التأخير، رضا العملاء، والعائد لكل فني."
-        icon="chart"
       />
       <KpiCards
         cards={[
@@ -1939,7 +2480,6 @@ export function SettingsCenterScreen() {
       <SectionTitle
         title="الإعدادات"
         subtitle="إعدادات المركز، بيانات التواصل، سعر الصرف، وسلوك النظام العام."
-        icon="gear"
       />
       <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
         <Card className="overflow-hidden">
@@ -1975,8 +2515,8 @@ export function SettingsCenterScreen() {
               "استخدام الليرة السورية كعملة أساسية",
             ].map((item) => (
               <label key={item} className="flex items-center justify-between rounded-md bg-surface-2 px-3 py-3 text-sm text-content">
-                <span>{item}</span>
                 <input type="checkbox" defaultChecked className="h-4 w-4 accent-gold" />
+                <span>{item}</span>
               </label>
             ))}
           </div>

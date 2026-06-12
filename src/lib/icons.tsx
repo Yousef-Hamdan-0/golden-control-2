@@ -2,6 +2,7 @@ import type { SVGProps } from "react";
 
 export type IconName =
   | "shield"
+  | "user"
   | "users"
   | "wrench"
   | "clipboard"
@@ -30,6 +31,7 @@ export type IconName =
 
 const PATHS: Record<IconName, string> = {
   shield: "M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6l7-3z",
+  user: "M12 12a4 4 0 100-8 4 4 0 000 8zM4 21a8 8 0 0116 0",
   users:
     "M16 14a4 4 0 10-8 0M12 7a3 3 0 100 6 3 3 0 000-6zM20 14a3 3 0 00-3-3M4 14a3 3 0 013-3",
   wrench:

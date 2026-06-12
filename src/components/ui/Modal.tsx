@@ -22,7 +22,7 @@ export function Modal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6"
+      className="fixed inset-0 left-0 right-0 top-0 bottom-0 z-[100] flex min-h-screen w-screen items-center justify-center bg-black/60 px-4 py-6"
     >
       <Card className={`max-h-[90vh] w-full overflow-y-auto ${widthClassName}`}>
         <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">

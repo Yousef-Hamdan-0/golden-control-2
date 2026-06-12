@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -135,7 +135,6 @@ function InvoiceCard({ title }: { title: string }) {
           </p>
         </div>
       </div>
-      <p className="text-xs font-bold text-success">12% ↑</p>
     </Card>
   );
 }
@@ -190,12 +189,12 @@ function FinanceCard() {
       <div className="grid gap-4 md:grid-cols-3">
         <div className="relative overflow-hidden rounded-md bg-gold-active p-5 text-white">
           <Icon name="wallet" className="absolute bottom-3 left-4 h-12 w-12 text-white/15" />
-          <p className="text-xs text-white/80">إجمالي الدفعات</p>
+          <p className="text-xs text-white/80">إجمالي الإيرادات</p>
           <p className="mt-1 font-heading text-2xl font-bold">{formatMoney(12450000)}</p>
         </div>
 
         <div className="rounded-md border border-border bg-surface p-5 text-center">
-          <p className="text-xs text-content-muted">المصروفات</p>
+          <p className="text-xs text-content-muted">المبيعات</p>
           <p className="mt-2 font-heading text-2xl font-bold text-gold-active">
             {formatMoney(8200000)}
           </p>
@@ -231,7 +230,7 @@ function OrderModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="recent-order-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 px-4 py-6"
+      className="fixed inset-0 z-[100] flex min-h-screen w-screen items-center justify-center bg-black/60 px-4 py-6"
     >
       <Card className="max-h-[90vh] w-full max-w-2xl overflow-y-auto">
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
@@ -427,11 +426,6 @@ export function DashboardOverviewScreen() {
     setIsChecking(false);
   }, [router]);
 
-  const activeOrders = useMemo(
-    () => orders.filter((order) => order.status !== "completed").length,
-    [orders],
-  );
-
   function handleSave(updatedOrder: RecentOrder) {
     setOrders((current) =>
       current.map((order) => (order.id === updatedOrder.id ? updatedOrder : order)),
@@ -475,19 +469,6 @@ export function DashboardOverviewScreen() {
           <NewCustomersCard />
           <InvoiceCard title="الفواتير الخارجية" />
           <InvoiceCard title="الفواتير الداخلية" />
-          <Card className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="text-right">
-                <p className="text-sm text-content-muted">طلبات تحتاج متابعة</p>
-                <p className="mt-1 font-heading text-2xl font-bold text-content">
-                  {activeOrders}
-                </p>
-              </div>
-              <Badge tone="gold" dot>
-                مباشر
-              </Badge>
-            </div>
-          </Card>
         </aside>
       </div>
 

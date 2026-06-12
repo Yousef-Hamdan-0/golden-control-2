@@ -54,11 +54,12 @@ export function Sidebar() {
 
   return (
     <aside
+      dir="rtl"
       className={cn(
         "fixed inset-y-0 right-0 z-30 hidden w-64 flex-col border-l border-border bg-surface lg:flex",
       )}
     >
-      <div className="flex h-16 items-center justify-end gap-3 border-b border-border px-5">
+      <div className="flex h-16 items-center justify-start gap-3 border-b border-border px-5">
         <div className="text-right leading-tight">
           <div className="max-w-36 truncate text-sm font-bold text-content">
             {CURRENT_USER.fullName}
@@ -76,17 +77,17 @@ export function Sidebar() {
         <Link
           href="/dashboard"
           className={cn(
-            "flex items-center justify-end gap-3 rounded-md px-4 py-3 text-right",
+            "flex w-full items-center justify-start gap-3 rounded-md px-4 py-3 text-right",
             isActive(pathname, searchParams, "/dashboard", true)
               ? "bg-gold-soft"
               : "hover:bg-gold-soft",
           )}
         >
+          <Icon name="shield" className="text-gold" />
           <div className="leading-tight">
             <div className="text-sm font-semibold text-gold">لوحة القيادة</div>
             <div className="text-xs text-content-muted">نظرة عامة</div>
           </div>
-          <Icon name="shield" className="text-gold" />
         </Link>
       </div>
 
@@ -104,7 +105,7 @@ export function Sidebar() {
                 <Link
                   href={href}
                   className={cn(
-                    "group relative flex w-full items-center justify-end gap-3 rounded-md px-4 py-2.5 text-right text-sm transition",
+                    "group relative flex w-full items-center justify-start gap-3 rounded-md px-4 py-2.5 text-right text-sm transition",
                     active
                       ? "border border-border bg-surface-2 font-semibold text-gold shadow-card"
                       : "text-content hover:bg-gold-soft",
@@ -113,8 +114,8 @@ export function Sidebar() {
                   {active && (
                     <span className="absolute right-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full bg-gold" />
                   )}
-                  <span>{item.label}</span>
                   {item.icon && <Icon name={item.icon} className="text-content-muted" />}
+                  <span>{item.label}</span>
                 </Link>
               </div>
             );
@@ -135,6 +136,10 @@ export function Sidebar() {
                 {active && (
                   <span className="absolute right-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-full bg-gold" />
                 )}
+                <span className="flex flex-1 items-center gap-3">
+                  {item.icon && <Icon name={item.icon} className="text-content-muted" />}
+                  <span>{item.label}</span>
+                </span>
                 <Icon
                   name="chevron-down"
                   size={16}
@@ -143,10 +148,6 @@ export function Sidebar() {
                     isOpen && "rotate-180",
                   )}
                 />
-                <span className="flex flex-1 items-center justify-end gap-3">
-                  <span>{item.label}</span>
-                  {item.icon && <Icon name={item.icon} className="text-content-muted" />}
-                </span>
               </button>
 
               {isOpen && item.children && (
@@ -180,19 +181,19 @@ export function Sidebar() {
               key={item.label}
               type="button"
               onClick={handleLogout}
-              className="flex w-full items-center justify-end gap-3 rounded-md px-4 py-2.5 text-right text-sm text-danger transition hover:bg-danger-soft"
+              className="flex w-full items-center justify-start gap-3 rounded-md px-4 py-2.5 text-right text-sm text-danger transition hover:bg-danger-soft"
             >
-              <span>{item.label}</span>
               {item.icon && <Icon name={item.icon} />}
+              <span>{item.label}</span>
             </button>
           ) : (
             <Link
               key={item.label}
               href={item.href ?? "#"}
-              className="flex items-center justify-end gap-3 rounded-md px-4 py-2.5 text-right text-sm text-content transition hover:bg-gold-soft"
+              className="flex w-full items-center justify-start gap-3 rounded-md px-4 py-2.5 text-right text-sm text-content transition hover:bg-gold-soft"
             >
-              <span>{item.label}</span>
               {item.icon && <Icon name={item.icon} />}
+              <span>{item.label}</span>
             </Link>
           ),
         )}

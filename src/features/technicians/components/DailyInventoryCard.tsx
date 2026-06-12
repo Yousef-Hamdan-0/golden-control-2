@@ -25,23 +25,49 @@ function SectionTitle({ children }: { children: string }) {
   );
 }
 
-export function DailyInventoryCard({ entry }: { entry: DailyInventory }) {
+export function DailyInventoryCard({
+  entry,
+  onDelete,
+  isDeleting = false,
+}: {
+  entry: DailyInventory;
+  onDelete?: () => void;
+  isDeleting?: boolean;
+}) {
   return (
     <Card className="flex flex-col overflow-hidden">
       {/* Header: technician */}
       <div className="border-b border-border bg-surface-2 px-4 py-3 text-right">
-        <div className="text-sm font-bold text-content">{entry.technicianName}</div>
-        <div className="mt-0.5 flex items-center gap-1 text-xs text-content-muted">
-          <Icon name="phone" size={13} />
-          <span dir="ltr">{entry.technicianPhone}</span>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="text-sm font-bold text-content">{entry.technicianName}</div>
+            <div className="mt-0.5 flex items-center gap-1 text-xs text-content-muted">
+              <Icon name="phone" size={13} />
+              <span dir="ltr">{entry.technicianPhone}</span>
+            </div>
+          </div>
+          {onDelete ? (
+            <button
+              type="button"
+              onClick={onDelete}
+              disabled={isDeleting}
+              aria-label={`حذف مخزون ${entry.technicianName}`}
+              title="حذف"
+              className="rounded-sm p-1.5 text-danger transition hover:bg-danger-soft disabled:opacity-50"
+            >
+              <Icon name="trash" size={17} />
+            </button>
+          ) : (
+            <span />
+          )}
         </div>
       </div>
 
       <div className="space-y-4 p-4">
         {/* Created time */}
-        <div className="flex items-center gap-1.5 text-xs text-content-muted">
-          <Icon name="clock" size={14} />
+        <div className="flex items-center justify-end gap-1.5 text-xs text-content-muted">
           <span>وقت الإنشاء {formatCreated(entry.createdAt)}</span>
+          <Icon name="clock" size={14} />
         </div>
 
         {/* Tools */}

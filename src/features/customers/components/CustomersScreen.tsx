@@ -8,6 +8,11 @@ import { Field, Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { Textarea } from "@/components/ui/Textarea";
 import { Icon } from "@/lib/icons";
+import {
+  OrderDetailsModal,
+  type Invoice,
+  type Order,
+} from "@/features/operations/components/OperationsScreens";
 
 interface CustomerOrder {
   id: string;
@@ -15,6 +20,18 @@ interface CustomerOrder {
   status: "active" | "completed" | "cancelled";
   date: string;
   total: string;
+  type?: Order["type"];
+  brand?: string;
+  technician?: string;
+  orderStatus?: Order["status"];
+  priority?: Order["priority"];
+  visitTime?: string;
+  totalAmount?: number;
+  paidAmount?: number;
+  invoiceId?: string;
+  invoiceStatus?: Invoice["status"];
+  paymentMethod?: Invoice["paymentMethod"];
+  payments?: Invoice["payments"];
 }
 
 interface Customer {
@@ -106,6 +123,71 @@ function nextCustomerId(customers: Customer[]) {
   return `CUS-${Math.max(...customers.map((item) => Number(item.id.replace(/\D/g, "")))) + 1}`;
 }
 
+function parseMoney(value: string) {
+  return Number(value.replace(/[^\d]/g, "")) || 0;
+}
+
+function buildOrderDetails(customer: Customer, customerOrder: CustomerOrder) {
+  const totalAmount = customerOrder.totalAmount ?? parseMoney(customerOrder.total);
+  const paidAmount =
+    customerOrder.paidAmount ??
+    (customerOrder.status === "completed" ? totalAmount : Math.round(totalAmount / 2));
+
+  const order: Order = {
+    id: customerOrder.id,
+    type: customerOrder.type ?? "external",
+    client: customer.name,
+    phone: customer.phone1,
+    address: customer.address,
+    device: customerOrder.device,
+    brand: customerOrder.brand ?? customerOrder.device.split(" ").slice(-1)[0] ?? "غير محدد",
+    technician: customerOrder.technician ?? "رامي سمير",
+    status:
+      customerOrder.orderStatus ??
+      (customerOrder.status === "completed"
+        ? "completed"
+        : customerOrder.status === "cancelled"
+          ? "cancelled"
+          : "under-repair"),
+    priority: customerOrder.priority ?? "medium",
+    visitDate: `${customerOrder.date} ${customerOrder.visitTime ?? "09:00"}`,
+    total: totalAmount,
+    paid: paidAmount,
+  };
+
+  const invoice: Invoice = {
+    id: customerOrder.invoiceId ?? `INV-${customerOrder.id.replace(/\D/g, "").slice(-4)}`,
+    orderId: customerOrder.id,
+    type: order.type,
+    client: customer.name,
+    clientPhone: customer.phone1,
+    technician: order.technician,
+    status:
+      customerOrder.invoiceStatus ??
+      (paidAmount >= totalAmount ? "paid" : paidAmount > 0 ? "partial" : "unpaid"),
+    currency: "SYP",
+    paymentMethod: customerOrder.paymentMethod ?? "cash",
+    total: totalAmount,
+    paid: paidAmount,
+    issuedAt: customerOrder.date,
+    payments:
+      customerOrder.payments ??
+      (paidAmount > 0
+        ? [
+            {
+              id: `PAY-${customerOrder.id.replace(/\D/g, "").slice(-4)}`,
+              amount: paidAmount,
+              currency: "SYP",
+              method: customerOrder.paymentMethod ?? "cash",
+              paidAt: customerOrder.date,
+            },
+          ]
+        : []),
+  };
+
+  return { order, invoice };
+}
+
 function CustomerFormModal({
   customer,
   customers,
@@ -169,10 +251,12 @@ function CustomerDetailsModal({
   customer,
   onClose,
   onEdit,
+  onOpenOrder,
 }: {
   customer: Customer;
   onClose: () => void;
   onEdit: () => void;
+  onOpenOrder: (details: { order: Order; invoice: Invoice }) => void;
 }) {
   return (
     <Modal title={customer.name} description="معلومات العميل وسجل طلباته." onClose={onClose} widthClassName="max-w-4xl">
@@ -211,7 +295,7 @@ function CustomerDetailsModal({
             <table className="min-w-[680px] w-full text-right text-sm">
               <thead>
                 <tr className="bg-surface-2 text-content-muted">
-                  {["رقم الطلب", "الجهاز", "الحالة", "التاريخ", "الإجمالي"].map((header) => (
+                  {["رقم الطلب", "الجهاز", "الحالة", "التاريخ", "الإجمالي", "الإجراءات"].map((header) => (
                     <th key={header} className="px-4 py-3 font-medium">{header}</th>
                   ))}
                 </tr>
@@ -228,6 +312,17 @@ function CustomerDetailsModal({
                     </td>
                     <td className="px-4 py-3 text-content-muted">{order.date}</td>
                     <td className="px-4 py-3 text-content-muted">{order.total}</td>
+                    <td className="px-4 py-3">
+                      <button
+                        type="button"
+                        aria-label={`تفاصيل ${order.id}`}
+                        title="تفاصيل الطلب"
+                        onClick={() => onOpenOrder(buildOrderDetails(customer, order))}
+                        className="rounded-sm p-1.5 text-content-muted hover:bg-surface-2"
+                      >
+                        <Icon name="eye" size={18} />
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -244,6 +339,10 @@ export function CustomersScreen() {
   const [query, setQuery] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [selectedOrderDetails, setSelectedOrderDetails] = useState<{
+    order: Order;
+    invoice: Invoice;
+  } | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   const filtered = useMemo(
@@ -305,6 +404,14 @@ export function CustomersScreen() {
           customer={selectedCustomer}
           onClose={() => setSelectedCustomer(null)}
           onEdit={() => setEditingCustomer(selectedCustomer)}
+          onOpenOrder={setSelectedOrderDetails}
+        />
+      ) : null}
+      {selectedOrderDetails ? (
+        <OrderDetailsModal
+          order={selectedOrderDetails.order}
+          invoice={selectedOrderDetails.invoice}
+          onClose={() => setSelectedOrderDetails(null)}
         />
       ) : null}
 
