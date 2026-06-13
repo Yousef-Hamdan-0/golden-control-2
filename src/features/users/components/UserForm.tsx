@@ -36,9 +36,9 @@ type Props = CreateProps | EditProps;
 
 function SectionLabel({ children }: { children: string }) {
   return (
-    <div className="mb-4 flex items-center justify-end gap-2">
-      <span className="text-sm font-semibold text-gold">{children}</span>
+    <div className="mb-4 flex items-center justify-start gap-2 text-right" dir="rtl">
       <span className="h-4 w-1 rounded-full bg-gold" />
+      <span className="text-sm font-semibold text-gold">{children}</span>
     </div>
   );
 }

@@ -59,7 +59,6 @@ export const NAVIGATION: NavItem[] = [
     icon: "box",
     children: [
       { label: "قطع الغيار", href: "/inventory" },
-      { label: "تنبيهات النقص", href: "/inventory/alerts" },
       { label: "حركة المخزون", href: "/inventory/movement" },
     ],
   },

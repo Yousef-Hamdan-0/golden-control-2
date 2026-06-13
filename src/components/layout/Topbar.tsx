@@ -30,13 +30,28 @@ function routeTitle(pathname: string, fallback: string): string {
   return fallback;
 }
 
-export function Topbar({ title }: { title: string }) {
+export function Topbar({
+  title,
+  onMenuClick,
+}: {
+  title: string;
+  onMenuClick?: () => void;
+}) {
   const pathname = usePathname();
   const currentTitle = routeTitle(pathname, title);
 
   return (
     <header className="sticky top-0 z-20 h-16 border-b border-border bg-surface relative">
-      <div className="absolute right-4 top-1/2 flex -translate-y-1/2 items-center gap-2 lg:right-6">
+      <div className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-1.5 sm:gap-2 lg:right-6">
+        <button
+          type="button"
+          aria-label="فتح القائمة"
+          title="القائمة"
+          onClick={onMenuClick}
+          className="inline-flex h-10 w-10 items-center justify-center rounded-sm text-content transition hover:bg-gold-soft hover:text-gold lg:hidden"
+        >
+          <Icon name="menu" />
+        </button>
         <Link
           href="/settings/center"
           aria-label="الإعدادات"
@@ -48,7 +63,7 @@ export function Topbar({ title }: { title: string }) {
         <ThemeToggle className="rounded-sm text-content hover:bg-gold-soft hover:text-gold" />
       </div>
 
-      <h1 className="pointer-events-none absolute left-1/2 top-1/2 max-w-[44vw] -translate-x-1/2 -translate-y-1/2 truncate text-center font-heading text-[22px] font-bold text-content">
+      <h1 className="pointer-events-none absolute left-1/2 top-1/2 max-w-[38vw] -translate-x-1/2 -translate-y-1/2 truncate text-center font-heading text-lg font-bold text-content sm:max-w-[48vw] sm:text-[22px]">
         {currentTitle}
       </h1>
 

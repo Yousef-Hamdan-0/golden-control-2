@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { Card } from "@/components/ui/Card";
+import { ConfirmToast } from "@/components/ui/ConfirmToast";
 import { Icon } from "@/lib/icons";
 import type { DailyInventory } from "@/models/technician/daily-inventory.model";
 
@@ -34,8 +36,22 @@ export function DailyInventoryCard({
   onDelete?: () => void;
   isDeleting?: boolean;
 }) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
   return (
     <Card className="flex flex-col overflow-hidden">
+      {confirmDelete ? (
+        <ConfirmToast
+          title="تأكيد حذف المخزون"
+          message={`هل تريد حذف مخزون ${entry.technicianName} من المخزون اليومي؟`}
+          isLoading={isDeleting}
+          onCancel={() => setConfirmDelete(false)}
+          onConfirm={() => {
+            setConfirmDelete(false);
+            onDelete?.();
+          }}
+        />
+      ) : null}
       {/* Header: technician */}
       <div className="border-b border-border bg-surface-2 px-4 py-3 text-right">
         <div className="flex items-start justify-between gap-3">
@@ -49,7 +65,7 @@ export function DailyInventoryCard({
           {onDelete ? (
             <button
               type="button"
-              onClick={onDelete}
+              onClick={() => setConfirmDelete(true)}
               disabled={isDeleting}
               aria-label={`حذف مخزون ${entry.technicianName}`}
               title="حذف"

@@ -8,11 +8,13 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
+import { TablePagination } from "@/components/ui/TablePagination";
 import { Textarea } from "@/components/ui/Textarea";
 import { Icon } from "@/lib/icons";
 import { readMockSession } from "@/lib/auth/mock-session";
 import { formatMoney } from "@/lib/format/currency";
 import { MaintenanceOrderModal } from "@/features/operations/components/OperationsScreens";
+import { PAGE_SIZE } from "@/config/constants";
 
 type OrderStatus = "maintenance" | "completed" | "center";
 type ModalMode = "view" | "edit";
@@ -344,6 +346,14 @@ function RecentOrdersTable({
   orders: RecentOrder[];
   onOpen: (order: RecentOrder, mode: ModalMode) => void;
 }) {
+  const [page, setPage] = useState(1);
+  const pages = Math.max(1, Math.ceil(orders.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pages);
+  const visibleOrders = orders.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE,
+  );
+
   return (
     <Card className="overflow-hidden">
       <div className="flex items-center justify-between border-b border-border px-5 py-4">
@@ -366,7 +376,7 @@ function RecentOrdersTable({
             </tr>
           </thead>
           <tbody>
-            {orders.map((order) => (
+            {visibleOrders.map((order) => (
               <tr key={order.id} className="border-t border-border text-sm text-content hover:bg-gold-soft">
                 <td className="px-5 py-5 font-bold text-gold">#{order.id}</td>
                 <td className="px-5 py-5">{order.client}</td>
@@ -378,7 +388,7 @@ function RecentOrdersTable({
                   </Badge>
                 </td>
                 <td className="px-5 py-5">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-start gap-2" dir="rtl">
                     <button
                       type="button"
                       aria-label={`عرض ${order.id}`}
@@ -404,6 +414,13 @@ function RecentOrdersTable({
           </tbody>
         </table>
       </div>
+      <TablePagination
+        page={currentPage}
+        total={orders.length}
+        pageSize={PAGE_SIZE}
+        onPage={setPage}
+        itemLabel="طلب"
+      />
     </Card>
   );
 }

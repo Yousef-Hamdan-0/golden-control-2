@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { ConfirmToast } from "@/components/ui/ConfirmToast";
 import { SkeletonRow } from "@/components/ui/Spinner";
 import { Icon } from "@/lib/icons";
 import {
@@ -36,35 +38,50 @@ function StatusBadge({ status }: { status: User["status"] }) {
 function RowActions({ user }: { user: User }) {
   const router = useRouter();
   const { remove } = useUserMutations();
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
   return (
-    <div className="flex items-center gap-2">
-      <button
-        type="button"
-        aria-label="حذف"
-        onClick={() => {
-          if (confirm(`حذف المستخدم ${user.fullName}؟`)) remove.mutate(user.id);
-        }}
-        className="rounded-sm p-1.5 text-danger hover:bg-danger-soft"
-      >
-        <Icon name="trash" size={18} />
-      </button>
-      <button
-        type="button"
-        aria-label="تعديل"
-        onClick={() => router.push(`/settings/users/${encodeURIComponent(user.id)}/edit`)}
-        className="rounded-sm p-1.5 text-content-muted hover:bg-surface-2"
-      >
-        <Icon name="pencil" size={18} />
-      </button>
-      <button
-        type="button"
-        aria-label="عرض"
-        onClick={() => router.push(`/settings/users/${encodeURIComponent(user.id)}`)}
-        className="rounded-sm p-1.5 text-content-muted hover:bg-surface-2"
-      >
-        <Icon name="eye" size={18} />
-      </button>
-    </div>
+    <>
+      <div className="flex items-center justify-start gap-2" dir="rtl">
+        <button
+          type="button"
+          aria-label="عرض"
+          onClick={() => router.push(`/settings/users/${encodeURIComponent(user.id)}`)}
+          className="rounded-sm p-1.5 text-content-muted hover:bg-surface-2"
+        >
+          <Icon name="eye" size={18} />
+        </button>
+        <button
+          type="button"
+          aria-label="تعديل"
+          onClick={() => router.push(`/settings/users/${encodeURIComponent(user.id)}/edit`)}
+          className="rounded-sm p-1.5 text-content-muted hover:bg-surface-2"
+        >
+          <Icon name="pencil" size={18} />
+        </button>
+        <button
+          type="button"
+          aria-label="حذف"
+          onClick={() => setConfirmDelete(true)}
+          className="rounded-sm p-1.5 text-danger hover:bg-danger-soft"
+        >
+          <Icon name="trash" size={18} />
+        </button>
+      </div>
+      {confirmDelete ? (
+        <ConfirmToast
+          title="تأكيد حذف المستخدم"
+          message={`هل تريد حذف المستخدم ${user.fullName}؟ لا يمكن التراجع عن هذه العملية.`}
+          isLoading={remove.isPending}
+          onCancel={() => setConfirmDelete(false)}
+          onConfirm={() =>
+            remove.mutate(user.id, {
+              onSuccess: () => setConfirmDelete(false),
+            })
+          }
+        />
+      ) : null}
+    </>
   );
 }
 

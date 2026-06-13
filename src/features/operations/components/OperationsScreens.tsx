@@ -1,17 +1,21 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardHeader } from "@/components/ui/Card";
+import { ConfirmToast } from "@/components/ui/ConfirmToast";
 import { Field, Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { Select } from "@/components/ui/Select";
+import { TablePagination } from "@/components/ui/TablePagination";
 import { Textarea } from "@/components/ui/Textarea";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Icon, type IconName } from "@/lib/icons";
 import { formatMoney, type Currency } from "@/lib/format/currency";
+import { cn } from "@/lib/utils/cn";
+import { PAGE_SIZE } from "@/config/constants";
 
 export type OrderStatus =
   | "new"
@@ -38,9 +42,12 @@ export interface Order {
   type: OrderType;
   client: string;
   phone: string;
+  phone2?: string;
   address: string;
+  locationUrl?: string;
   device: string;
   brand: string;
+  devices?: DeviceDraft[];
   technician: string;
   status: OrderStatus;
   priority: Priority;
@@ -197,6 +204,8 @@ const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
 };
 
 const USD_TO_SYP_RATE = 14500;
+const INVENTORY_ITEMS_STORAGE_KEY = "golden-control.inventory.items";
+const INVENTORY_MOVEMENTS_STORAGE_KEY = "golden-control.inventory.movements";
 
 const ORDERS: Order[] = [
   {
@@ -204,9 +213,15 @@ const ORDERS: Order[] = [
     type: "external",
     client: "محمد العتيبي",
     phone: "0991 223 441",
+    phone2: "0988 440 221",
     address: "دمشق - المزة",
+    locationUrl: "https://maps.google.com/?q=Damascus+Mezzeh",
     device: "ثلاجة LG",
     brand: "LG",
+    devices: [
+      { type: "ثلاجة", name: "ثلاجة LG", brand: "LG", model: "GR-B247" },
+      { type: "فريزر", name: "فريزر منزلي", brand: "LG", model: "F-220" },
+    ],
     technician: "رامي سمير",
     status: "under-repair",
     priority: "high",
@@ -220,8 +235,10 @@ const ORDERS: Order[] = [
     client: "سارة القحطاني",
     phone: "0944 772 118",
     address: "دمشق - المالكي",
+    locationUrl: "https://maps.google.com/?q=Damascus+Malki",
     device: "شاشة سامسونغ",
     brand: "Samsung",
+    devices: [{ type: "شاشة", name: "شاشة سامسونغ", brand: "Samsung", model: "UA55" }],
     technician: "رامي سمير",
     status: "completed",
     priority: "medium",
@@ -234,9 +251,14 @@ const ORDERS: Order[] = [
     type: "internal",
     client: "مركز الصفاء التجاري",
     phone: "011 442 0911",
+    phone2: "0933 118 205",
     address: "استلام داخل المركز",
     device: "غسالة ناشونال",
     brand: "National",
+    devices: [
+      { type: "غسالة", name: "غسالة ناشونال", brand: "National", model: "NA-F70" },
+      { type: "جلاية", name: "جلاية صحون", brand: "Beko", model: "" },
+    ],
     technician: "هاني خالد",
     status: "pull-to-center",
     priority: "emergency",
@@ -250,8 +272,10 @@ const ORDERS: Order[] = [
     client: "ليان منصور",
     phone: "0988 113 520",
     address: "دمشق - كفرسوسة",
+    locationUrl: "https://maps.google.com/?q=Damascus+Kafr+Sousa",
     device: "فرن كهربائي",
     brand: "Ariston",
+    devices: [{ type: "فرن", name: "فرن كهربائي", brand: "Ariston", model: "" }],
     technician: "نور حمزة",
     status: "postponed",
     priority: "low",
@@ -264,9 +288,14 @@ const ORDERS: Order[] = [
     type: "internal",
     client: "شركة الربيع",
     phone: "011 889 2020",
+    phone2: "0955 202 889",
     address: "استلام داخل المركز",
     device: "مكيف سبليت",
     brand: "Gree",
+    devices: [
+      { type: "مكيف", name: "مكيف سبليت", brand: "Gree", model: "18K" },
+      { type: "مكيف", name: "مكيف مكتب", brand: "Gree", model: "12K" },
+    ],
     technician: "هاني خالد",
     status: "incompleted",
     priority: "high",
@@ -280,8 +309,10 @@ const ORDERS: Order[] = [
     client: "مالك ناصر",
     phone: "0933 441 224",
     address: "ريف دمشق - جرمانا",
+    locationUrl: "https://maps.google.com/?q=Jaramana",
     device: "جلاية بوش",
     brand: "Bosch",
+    devices: [{ type: "جلاية", name: "جلاية بوش", brand: "Bosch", model: "" }],
     technician: "رامي سمير",
     status: "not-answer",
     priority: "medium",
@@ -406,6 +437,24 @@ const INVENTORY_MOVEMENTS: InventoryMovement[] = [
     reference: "فاتورة شراء",
   },
 ];
+
+function readStoredList<T>(key: string, fallback: T[]): T[] {
+  if (typeof window === "undefined") return fallback;
+
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as T[]) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeStoredList<T>(key: string, items: T[]) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(key, JSON.stringify(items));
+}
 
 const INVENTORY_MOVEMENT_LABELS: Record<InventoryMovement["type"], { label: string; tone: BadgeTone }> = {
   supply: { label: "توريد", tone: "success" },
@@ -565,6 +614,13 @@ const TECHNICIANS: TechnicianPerformance[] = [
   },
 ];
 
+const TECHNICIAN_PHONE_BY_NAME: Record<string, string> = {
+  "رامي سمير": "0955 114 220",
+  "هاني خالد": "0944 620 331",
+  "نور حمزة": "0933 781 904",
+  "سامر يوسف": "0991 440 772",
+};
+
 function typeLabel(type: OrderType | InvoiceType) {
   return type === "external" ? "خارجي" : "داخلي";
 }
@@ -601,21 +657,21 @@ const EMPTY_MAINTENANCE_ORDER: MaintenanceOrderDraft = {
 };
 
 function orderToDraft(order: Order): MaintenanceOrderDraft {
+  const fallbackDevice = {
+    type: order.device.split(" ")[0] ?? "",
+    name: order.device,
+    brand: order.brand,
+    model: "",
+  };
+
   return {
     location: order.type,
     clientName: order.client,
     phone1: order.phone,
-    phone2: "",
+    phone2: order.phone2 ?? "",
     address: order.address,
-    locationUrl: "",
-    devices: [
-      {
-        type: order.device.split(" ")[0] ?? "",
-        name: order.device,
-        brand: order.brand,
-        model: "",
-      },
-    ],
+    locationUrl: order.locationUrl ?? "",
+    devices: order.devices?.length ? order.devices : [fallbackDevice],
     faultDescription: "",
     notes: "",
     visitDate: order.visitDate.slice(0, 10),
@@ -635,9 +691,12 @@ function draftToOrder(draft: MaintenanceOrderDraft, existing?: Order): Order {
     type: draft.location,
     client: draft.clientName || "عميل جديد",
     phone: draft.phone1 || "غير محدد",
+    phone2: draft.phone2,
     address: draft.location === "internal" ? "استلام داخل المركز" : draft.address || "غير محدد",
+    locationUrl: draft.locationUrl,
     device: [primaryDevice.type, primaryDevice.name].filter(Boolean).join(" ") || "جهاز غير محدد",
     brand: primaryDevice.brand || "غير محدد",
+    devices: draft.devices,
     technician: draft.technician || "غير محدد",
     status: existing?.status ?? "new",
     priority: draft.priority,
@@ -668,13 +727,16 @@ function matchesDateFilter(order: Order, filter: DateFilter): boolean {
 function SectionTitle({
   title,
   subtitle,
+  action,
 }: {
   title: string;
   subtitle?: string;
+  action?: ReactNode;
 }) {
   return (
     <div className="flex flex-wrap items-start justify-between gap-4">
       <PageHeader title={title} subtitle={subtitle} />
+      {action ? <div className="shrink-0">{action}</div> : null}
     </div>
   );
 }
@@ -1254,6 +1316,28 @@ function DetailItem({
   );
 }
 
+function getOrderDevices(order: Order): DeviceDraft[] {
+  if (order.devices?.length) return order.devices;
+
+  return [
+    {
+      type: order.device.split(" ")[0] ?? "",
+      name: order.device,
+      brand: order.brand,
+      model: "",
+    },
+  ];
+}
+
+function formatDeviceName(device: DeviceDraft) {
+  return [device.type, device.name].filter(Boolean).join(" ") || "جهاز غير محدد";
+}
+
+function getTechnicianPhone(name: string) {
+  if (!name || name === "غير محدد") return "لا يوجد";
+  return TECHNICIAN_PHONE_BY_NAME[name] ?? "لا يوجد";
+}
+
 export function OrderDetailsModal({
   order,
   invoice,
@@ -1263,105 +1347,339 @@ export function OrderDetailsModal({
   invoice?: Invoice | null;
   onClose: () => void;
 }) {
+  const [showInvoiceDetails, setShowInvoiceDetails] = useState(false);
   const invoiceBalance = invoice ? remaining(invoice.total, invoice.paid) : 0;
+  const devices = getOrderDevices(order);
+  const extraDevices = devices.slice(1);
+  const phone2 = order.phone2?.trim() || "لا يوجد";
+  const customerLocation = order.locationUrl?.trim();
+  const technicianPhone = getTechnicianPhone(order.technician);
 
   return (
-    <Modal
-      title={`تفاصيل الطلب ${order.id}`}
-      description="معلومات الطلب، الفني المسؤول، الحالة، والفاتورة المرتبطة."
-      onClose={onClose}
-      widthClassName="max-w-4xl"
-    >
-      <div className="space-y-5 p-5">
-        <div className="grid gap-3 md:grid-cols-4">
-          <DetailItem label="العميل" value={order.client} />
-          <DetailItem label="الهاتف" value={order.phone} ltr />
-          <DetailItem label="نوع الطلب" value={typeLabel(order.type)} />
-          <DetailItem label="موعد الزيارة" value={order.visitDate} />
-        </div>
-
-        <div className="grid gap-3 md:grid-cols-4">
-          <DetailItem label="الجهاز" value={order.device} />
-          <DetailItem label="الماركة" value={order.brand} />
-          <DetailItem label="الأولوية" value={PRIORITY_LABELS[order.priority]} />
-          <DetailItem
-            label="حالة الطلب"
-            value={
-              <Badge tone={ORDER_STATUS_TONE[order.status]} dot>
-                {ORDER_STATUS_LABELS[order.status]}
-              </Badge>
-            }
-          />
-        </div>
-
-        <Card className="bg-surface-2 p-4 shadow-none">
-          <h3 className="font-heading text-base font-bold text-content">معلومات الفني</h3>
-          <div className="mt-3 grid gap-3 md:grid-cols-3">
-            <DetailItem label="الفني المسؤول" value={order.technician} />
-            <DetailItem label="حالة الإسناد" value={order.technician === "غير محدد" ? "غير محدد" : "مسند"} />
-            <DetailItem label="موقع التنفيذ" value={order.address} />
+    <>
+      <Modal
+        title={`تفاصيل الطلب ${order.id}`}
+        description="معلومات العميل، الأجهزة، الفني، الحالة، والفاتورة المرتبطة."
+        onClose={onClose}
+        widthClassName="max-w-4xl"
+      >
+        <div className="space-y-5 p-5">
+          <div className="grid gap-3 md:grid-cols-4">
+            <DetailItem label="العميل" value={order.client} />
+            <DetailItem label="الهاتف الأول" value={order.phone} ltr />
+            <DetailItem label="الهاتف الثاني" value={phone2} ltr={Boolean(order.phone2?.trim())} />
+            <DetailItem label="نوع الطلب" value={typeLabel(order.type)} />
           </div>
-        </Card>
 
-        <Card className="bg-surface-2 p-4 shadow-none">
-          <h3 className="font-heading text-base font-bold text-content">الفاتورة</h3>
-          {invoice ? (
-            <div className="mt-3 grid gap-3 md:grid-cols-4">
-              <DetailItem label="رقم الفاتورة" value={invoice.id} ltr />
-              <DetailItem
-                label="حالة الفاتورة"
-                value={
-                  <Badge tone={PAYMENT_TONE[invoice.status]} dot>
-                    {PAYMENT_LABELS[invoice.status]}
-                  </Badge>
-                }
-              />
-              <DetailItem label="الإجمالي" value={formatMoney(invoice.total, invoice.currency)} />
-              <DetailItem label="المتبقي" value={formatMoney(invoiceBalance, invoice.currency)} />
+          <div className="grid gap-3 md:grid-cols-4">
+            <DetailItem label="موعد الزيارة" value={order.visitDate} />
+            <DetailItem label="عنوان العميل" value={order.address} />
+            <DetailItem
+              label="موقع العميل"
+              value={
+                customerLocation ? (
+                  <a
+                    href={customerLocation}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-gold hover:text-gold-hover"
+                  >
+                    فتح الموقع
+                  </a>
+                ) : (
+                  "لا يوجد"
+                )
+              }
+            />
+            <DetailItem
+              label="حالة الطلب"
+              value={
+                <Badge tone={ORDER_STATUS_TONE[order.status]} dot>
+                  {ORDER_STATUS_LABELS[order.status]}
+                </Badge>
+              }
+            />
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-3">
+            <DetailItem label="الجهاز الرئيسي" value={order.device} />
+            <DetailItem label="الماركة" value={order.brand} />
+            <DetailItem label="الأولوية" value={PRIORITY_LABELS[order.priority]} />
+          </div>
+
+          <Card className="bg-surface-2 p-4 shadow-none">
+            <h3 className="font-heading text-base font-bold text-content">الأجهزة الأخرى التي يريد العميل صيانتها</h3>
+            {extraDevices.length > 0 ? (
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                {extraDevices.map((device, index) => (
+                  <div key={`${device.name}-${index}`} className="rounded-md border border-border bg-surface p-3">
+                    <div className="font-semibold text-content">{formatDeviceName(device)}</div>
+                    <div className="mt-1 text-sm text-content-muted">
+                      الماركة: {device.brand || "غير محدد"}
+                    </div>
+                    <div className="mt-1 text-sm text-content-muted">
+                      الموديل: {device.model || "غير محدد"}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-3 text-sm text-content-muted">لا توجد أجهزة أخرى لهذا الطلب.</p>
+            )}
+          </Card>
+
+          <Card className="bg-surface-2 p-4 shadow-none">
+            <h3 className="font-heading text-base font-bold text-content">معلومات الفني</h3>
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              <DetailItem label="اسم الفني" value={order.technician} />
+              <DetailItem label="رقم الفني" value={technicianPhone} ltr={technicianPhone !== "لا يوجد"} />
             </div>
-          ) : (
-            <p className="mt-3 text-sm text-content-muted">لا توجد فاتورة مرتبطة بهذا الطلب حالياً.</p>
-          )}
-        </Card>
-      </div>
-    </Modal>
+          </Card>
+
+          <Card className="bg-surface-2 p-4 shadow-none">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="font-heading text-base font-bold text-content">الفاتورة</h3>
+              {invoice ? (
+                <button
+                  type="button"
+                  aria-label={`تفاصيل الفاتورة ${invoice.id}`}
+                  title="تفاصيل الفاتورة"
+                  onClick={() => setShowInvoiceDetails(true)}
+                  className="rounded-sm p-1.5 text-content-muted hover:bg-surface hover:text-content"
+                >
+                  <Icon name="eye" size={18} />
+                </button>
+              ) : null}
+            </div>
+            {invoice ? (
+              <div className="mt-3 grid gap-3 md:grid-cols-4">
+                <DetailItem label="رقم الفاتورة" value={invoice.id} ltr />
+                <DetailItem
+                  label="حالة الفاتورة"
+                  value={
+                    <Badge tone={PAYMENT_TONE[invoice.status]} dot>
+                      {PAYMENT_LABELS[invoice.status]}
+                    </Badge>
+                  }
+                />
+                <DetailItem label="الإجمالي" value={formatMoney(invoice.total, invoice.currency)} />
+                <DetailItem label="المتبقي" value={formatMoney(invoiceBalance, invoice.currency)} />
+              </div>
+            ) : (
+              <p className="mt-3 text-sm text-content-muted">لا توجد فاتورة مرتبطة بهذا الطلب حالياً.</p>
+            )}
+          </Card>
+        </div>
+      </Modal>
+
+      {showInvoiceDetails && invoice ? (
+        <InvoiceDetailsModal
+          invoice={invoice}
+          order={order}
+          onClose={() => setShowInvoiceDetails(false)}
+        />
+      ) : null}
+    </>
   );
 }
 
-function SupplyPartModal({ onClose }: { onClose: () => void }) {
+function PartFormModal({
+  onClose,
+  onSave,
+  initialPart,
+}: {
+  onClose: () => void;
+  onSave: (item: InventoryItem) => void;
+  initialPart?: InventoryItem | null;
+}) {
+  const [name, setName] = useState(initialPart?.name ?? "");
+  const [code, setCode] = useState(initialPart?.id ?? "");
+  const [quantity, setQuantity] = useState(String(initialPart?.stock ?? 1));
+  const [location, setLocation] = useState(initialPart?.location ?? "");
+  const [valueSyp, setValueSyp] = useState(String(initialPart?.unitCost ?? ""));
+  const [valueUsd, setValueUsd] = useState(
+    initialPart ? String(Number((initialPart.unitCost / USD_TO_SYP_RATE).toFixed(2))) : "",
+  );
+  const isEdit = Boolean(initialPart);
+
+  function save() {
+    onSave({
+      id: code || `PRT-${Date.now().toString().slice(-4)}`,
+      name: name || "قطعة جديدة",
+      category: initialPart?.category ?? "عام",
+      stock: isEdit ? initialPart?.stock ?? 0 : Number(quantity) || 0,
+      minStock: initialPart?.minStock ?? 1,
+      unitCost: Number(valueSyp) || Math.round((Number(valueUsd) || 0) * USD_TO_SYP_RATE),
+      lastMove: isEdit ? "تعديل بيانات" : "إضافة قطعة",
+      location: location || "غير محدد",
+    });
+    onClose();
+  }
+
   return (
     <Modal
-      title="توريد قطعة"
-      description="إضافة عملية توريد وهمية إلى حركة المخزون."
+      title={isEdit ? "تعديل قطعة" : "إضافة قطعة"}
+      description={isEdit ? "تعديل بيانات القطعة وقيمتها وموقعها." : "إضافة قطعة جديدة إلى مخزون قطع الغيار."}
       onClose={onClose}
       widthClassName="max-w-2xl"
     >
       <form className="grid gap-4 p-5 md:grid-cols-2" onSubmit={(event) => event.preventDefault()}>
         <Field label="اسم القطعة">
-          <Input placeholder="مثال: حساس حرارة NTC" />
+          <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="مثال: حساس حرارة NTC" />
         </Field>
         <Field label="الكود">
-          <Input placeholder="PRT-000" dir="ltr" />
+          <Input value={code} onChange={(event) => setCode(event.target.value)} placeholder="PRT-000" dir="ltr" />
         </Field>
-        <Field label="الكمية">
-          <Input type="number" min={1} defaultValue={1} />
+        {!isEdit ? (
+          <Field label="الكمية الافتتاحية">
+            <Input value={quantity} onChange={(event) => setQuantity(event.target.value)} type="number" min={1} />
+          </Field>
+        ) : null}
+        <Field label="الموقع">
+          <Input value={location} onChange={(event) => setLocation(event.target.value)} placeholder="رف A-01" />
         </Field>
         <Field label="قيمة القطعة بالليرة السورية">
-          <Input type="number" min={0} placeholder="0" />
+          <Input value={valueSyp} onChange={(event) => setValueSyp(event.target.value)} type="number" min={0} placeholder="0" />
         </Field>
         <Field label="قيمة القطعة بالدولار">
-          <Input type="number" min={0} step="0.01" placeholder="0" />
-        </Field>
-        <Field label="الموقع">
-          <Input placeholder="رف A-01" />
+          <Input value={valueUsd} onChange={(event) => setValueUsd(event.target.value)} type="number" min={0} step="0.01" placeholder="0" />
         </Field>
         <div className="flex items-center justify-end gap-3 border-t border-border pt-4 md:col-span-2">
           <Button type="button" variant="outline" onClick={onClose}>
             إلغاء
           </Button>
-          <Button type="button" onClick={onClose}>
-            <Icon name="plus" size={18} />
-            حفظ التوريد
+          <Button type="button" onClick={save}>
+            <Icon name={isEdit ? "pencil" : "plus"} size={18} />
+            {isEdit ? "حفظ التعديل" : "إضافة القطعة"}
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function QuantityAdjustmentModal({
+  items,
+  onClose,
+  onSave,
+}: {
+  items: InventoryItem[];
+  onClose: () => void;
+  onSave: (partId: string, movementType: InventoryMovement["type"], quantity: number) => void;
+}) {
+  const [partId, setPartId] = useState(items[0]?.id ?? "");
+  const [movementType, setMovementType] = useState<"supply" | "adjustment">("supply");
+  const [quantity, setQuantity] = useState("1");
+  const selectedPart = items.find((item) => item.id === partId);
+  const numericQuantity = Number(quantity) || 0;
+  const delta = movementType === "supply" ? Math.max(0, numericQuantity) : numericQuantity;
+  const nextStock = selectedPart ? Math.max(0, selectedPart.stock + delta) : 0;
+  const wouldDropBelowZero = Boolean(selectedPart && selectedPart.stock + delta < 0);
+  const canSave = Boolean(selectedPart) && delta !== 0 && !wouldDropBelowZero;
+
+  return (
+    <Modal
+      title="تعديل الكمية"
+      description="اختر القطعة ونوع الحركة لتعديل كمية المخزون."
+      onClose={onClose}
+      widthClassName="max-w-2xl"
+    >
+      <form className="space-y-5 p-5" onSubmit={(event) => event.preventDefault()}>
+        <div className="rounded-md border border-border bg-surface-2 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="text-right">
+              <div className="text-xs text-content-muted">القطعة المحددة</div>
+              <div className="mt-1 font-heading text-lg font-bold text-content">
+                {selectedPart?.name ?? "لا توجد قطعة"}
+              </div>
+              <div className="mt-1 text-xs text-content-muted" dir="ltr">
+                {selectedPart?.id ?? "-"}
+              </div>
+            </div>
+            <Badge tone={INVENTORY_MOVEMENT_LABELS[movementType].tone} dot>
+              {INVENTORY_MOVEMENT_LABELS[movementType].label}
+            </Badge>
+          </div>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-3">
+          <Field label="القطعة">
+            <Select value={partId} onChange={(event) => setPartId(event.target.value)}>
+              {items.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name} - {item.id}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="نوع الحركة">
+            <Select
+              value={movementType}
+              onChange={(event) => {
+                const nextType = event.target.value as "supply" | "adjustment";
+                setMovementType(nextType);
+                setQuantity(nextType === "supply" && Number(quantity) <= 0 ? "1" : quantity);
+              }}
+            >
+              <option value="supply">توريد</option>
+              <option value="adjustment">تسوية</option>
+            </Select>
+          </Field>
+          <Field label={movementType === "supply" ? "كمية التوريد" : "قيمة التسوية"}>
+            <Input
+              value={quantity}
+              onChange={(event) => setQuantity(event.target.value)}
+              type="number"
+              min={movementType === "supply" ? 1 : undefined}
+              placeholder={movementType === "supply" ? "مثال: 5" : "مثال: 5 أو -3"}
+              dir="ltr"
+            />
+          </Field>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-3">
+          <div className="rounded-md border border-border bg-surface-2 p-3">
+            <div className="text-xs text-content-muted">الكمية الحالية</div>
+            <div className="mt-1 font-heading text-2xl font-bold text-content">{selectedPart?.stock ?? 0}</div>
+          </div>
+          <div className="rounded-md border border-border bg-surface-2 p-3">
+            <div className="text-xs text-content-muted">قيمة الحركة</div>
+            <div className={cn("mt-1 font-heading text-2xl font-bold", delta < 0 ? "text-danger" : "text-success")}>
+              {delta > 0 ? `+${delta}` : delta}
+            </div>
+          </div>
+          <div className="rounded-md border border-border bg-surface-2 p-3">
+            <div className="text-xs text-content-muted">الكمية بعد التعديل</div>
+            <div className="mt-1 font-heading text-2xl font-bold text-gold">{nextStock}</div>
+          </div>
+        </div>
+
+        {movementType === "supply" ? (
+          <p className="text-sm text-content-muted">حركة التوريد تزيد الكمية فقط.</p>
+        ) : (
+          <p className="text-sm text-content-muted">حركة التسوية تقبل رقماً موجباً أو سالباً.</p>
+        )}
+        {wouldDropBelowZero ? (
+          <p className="rounded-md border border-danger/30 bg-danger-soft p-3 text-sm text-danger">
+            لا يمكن أن تصبح كمية القطعة أقل من صفر.
+          </p>
+        ) : null}
+
+        <div className="flex items-center justify-end gap-3 border-t border-border pt-4">
+          <Button type="button" variant="outline" onClick={onClose}>
+            إلغاء
+          </Button>
+          <Button
+            type="button"
+            disabled={!canSave}
+            onClick={() => {
+              if (!selectedPart || delta === 0) return;
+              onSave(selectedPart.id, movementType, delta);
+              onClose();
+            }}
+          >
+            <Icon name="pencil" size={18} />
+            حفظ تعديل الكمية
           </Button>
         </div>
       </form>
@@ -1435,11 +1753,13 @@ export function OrdersScreen() {
   const [showForm, setShowForm] = useState(params.get("create") === "1");
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
   const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
+  const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
   const [showDateFilter, setShowDateFilter] = useState(false);
   const [dateFilter, setDateFilter] = useState<DateFilter>({
     from: "",
     to: "",
   });
+  const [page, setPage] = useState(1);
 
   const filtered = useMemo(
     () =>
@@ -1461,6 +1781,12 @@ export function OrdersScreen() {
   const incompleted = orders.filter((order) => order.status === "incompleted").length;
   const pulled = orders.filter((order) => order.status === "pull-to-center").length;
   const hasDateFilter = Boolean(dateFilter.from || dateFilter.to);
+  const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pages);
+  const visibleOrders = filtered.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE,
+  );
 
   function upsertOrder(order: Order) {
     setOrders((current) => {
@@ -1476,14 +1802,13 @@ export function OrdersScreen() {
       <SectionTitle
         title="إدارة الطلبات"
         subtitle="متابعة الطلبات الداخلية والخارجية، الحالات، الأولويات، والفني المسؤول."
+        action={
+          <Button type="button" onClick={() => setShowForm(true)}>
+            <Icon name="plus" size={18} />
+            طلب صيانة جديد
+          </Button>
+        }
       />
-
-      <div className="flex justify-end">
-        <Button type="button" onClick={() => setShowForm(true)}>
-          <Icon name="plus" size={18} />
-          طلب صيانة جديد
-        </Button>
-      </div>
 
       <KpiCards
         cards={[
@@ -1514,24 +1839,44 @@ export function OrdersScreen() {
           onClose={() => setViewingOrder(null)}
         />
       ) : null}
+      {orderToDelete ? (
+        <ConfirmToast
+          title="تأكيد حذف الطلب"
+          message={`هل تريد حذف الطلب ${orderToDelete.id} الخاص بالعميل ${orderToDelete.client}؟`}
+          onCancel={() => setOrderToDelete(null)}
+          onConfirm={() => {
+            setOrders((current) => current.filter((item) => item.id !== orderToDelete.id));
+            setOrderToDelete(null);
+          }}
+        />
+      ) : null}
       {showDateFilter ? (
         <DateFilterModal
           filter={dateFilter}
-          onApply={setDateFilter}
+          onApply={(filter) => {
+            setDateFilter(filter);
+            setPage(1);
+          }}
           onClose={() => setShowDateFilter(false)}
         />
       ) : null}
 
-      <FilterCard className="xl:grid-cols-5">
+      <FilterCard className="lg:grid-cols-[minmax(360px,2fr)_repeat(3,minmax(130px,1fr))_auto]">
         <Input
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="بحث برقم الطلب أو الهاتف"
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setPage(1);
+          }}
+          placeholder="بحث برقم الطلب أو هاتف العميل"
           aria-label="بحث الطلبات"
         />
         <Select
           value={type}
-          onChange={(event) => setType(event.target.value as OrderType | "all")}
+          onChange={(event) => {
+            setType(event.target.value as OrderType | "all");
+            setPage(1);
+          }}
           aria-label="تصفية نوع الطلب"
         >
           <option value="all">كل أنواع الطلبات</option>
@@ -1540,7 +1885,10 @@ export function OrdersScreen() {
         </Select>
         <Select
           value={status}
-          onChange={(event) => setStatus(event.target.value as OrderStatus | "all")}
+          onChange={(event) => {
+            setStatus(event.target.value as OrderStatus | "all");
+            setPage(1);
+          }}
           aria-label="تصفية حالة الطلب"
         >
           <option value="all">كل الحالات</option>
@@ -1552,7 +1900,10 @@ export function OrdersScreen() {
         </Select>
         <Select
           value={priority}
-          onChange={(event) => setPriority(event.target.value as Priority | "all")}
+          onChange={(event) => {
+            setPriority(event.target.value as Priority | "all");
+            setPage(1);
+          }}
           aria-label="تصفية الأولوية"
         >
           <option value="all">كل الأولويات</option>
@@ -1565,6 +1916,7 @@ export function OrdersScreen() {
         <Button
           type="button"
           variant={hasDateFilter ? "primary" : "outline"}
+          className="whitespace-nowrap"
           onClick={() => setShowDateFilter(true)}
         >
           <Icon name="clock" size={18} />
@@ -1593,7 +1945,7 @@ export function OrdersScreen() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((order) => (
+              {visibleOrders.map((order) => (
                   <tr key={order.id} className="border-b border-border hover:bg-gold-soft">
                     <td className="px-4 py-4 font-bold text-gold">{order.id}</td>
                     <td className="px-4 py-4">
@@ -1619,7 +1971,7 @@ export function OrdersScreen() {
                       </Badge>
                     </td>
                     <td className="px-4 py-4">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center justify-start gap-2" dir="rtl">
                         <button
                           type="button"
                           aria-label={`تفاصيل ${order.id}`}
@@ -1642,7 +1994,7 @@ export function OrdersScreen() {
                           type="button"
                           aria-label={`حذف ${order.id}`}
                           title="حذف"
-                          onClick={() => setOrders((current) => current.filter((item) => item.id !== order.id))}
+                          onClick={() => setOrderToDelete(order)}
                           className="rounded-sm p-1.5 text-danger hover:bg-danger-soft"
                         >
                           <Icon name="trash" size={18} />
@@ -1655,66 +2007,196 @@ export function OrdersScreen() {
           </table>
         </div>
         {filtered.length === 0 ? <EmptyState title="لا توجد طلبات مطابقة للفلاتر." /> : null}
+        <TablePagination
+          page={currentPage}
+          total={filtered.length}
+          pageSize={PAGE_SIZE}
+          onPage={setPage}
+          itemLabel="طلب"
+        />
       </Card>
     </div>
   );
 }
 
 export function InventoryScreen({ section = "parts" }: { section?: string }) {
+  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>(() =>
+    readStoredList(INVENTORY_ITEMS_STORAGE_KEY, INVENTORY),
+  );
+  const [inventoryMovements, setInventoryMovements] = useState<InventoryMovement[]>(() =>
+    readStoredList(INVENTORY_MOVEMENTS_STORAGE_KEY, INVENTORY_MOVEMENTS),
+  );
   const [query, setQuery] = useState("");
   const [showSupplyModal, setShowSupplyModal] = useState(false);
+  const [showQuantityModal, setShowQuantityModal] = useState(false);
+  const [editingPart, setEditingPart] = useState<InventoryItem | null>(null);
+  const [partToDelete, setPartToDelete] = useState<InventoryItem | null>(null);
+  const [partPage, setPartPage] = useState(1);
   const [movementPage, setMovementPage] = useState(1);
-  const lowStock = INVENTORY.filter((item) => item.stock <= item.minStock);
-  const filtered = INVENTORY.filter((item) => {
+  const [showMovementDateFilter, setShowMovementDateFilter] = useState(false);
+  const [movementDateFilter, setMovementDateFilter] = useState<DateFilter>({ from: "", to: "" });
+  const lowStock = inventoryItems.filter((item) => item.stock <= item.minStock);
+  const filtered = inventoryItems.filter((item) => {
     const byQuery = !query || contains(item.name, query) || contains(item.id, query);
     return byQuery;
   });
 
-  const isAlerts = section === "alerts";
   const isMovement = section === "movement";
-  const inventoryValue = INVENTORY.reduce((sum, item) => sum + item.stock * item.unitCost, 0);
-  const sortedMovements = [...INVENTORY_MOVEMENTS].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  const movementPageSize = 5;
-  const movementPages = Math.max(1, Math.ceil(sortedMovements.length / movementPageSize));
+  const inventoryValue = inventoryItems.reduce((sum, item) => sum + item.stock * item.unitCost, 0);
+  const sortedMovements = [...inventoryMovements]
+    .filter((movement) => matchesDateValue(movement.createdAt, movementDateFilter))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const movementPages = Math.max(1, Math.ceil(sortedMovements.length / PAGE_SIZE));
+  const currentMovementPage = Math.min(movementPage, movementPages);
   const visibleMovements = sortedMovements.slice(
-    (movementPage - 1) * movementPageSize,
-    movementPage * movementPageSize,
+    (currentMovementPage - 1) * PAGE_SIZE,
+    currentMovementPage * PAGE_SIZE,
   );
+  const partPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPartPage = Math.min(partPage, partPages);
+  const visibleParts = filtered.slice(
+    (currentPartPage - 1) * PAGE_SIZE,
+    currentPartPage * PAGE_SIZE,
+  );
+  const hasMovementDateFilter = Boolean(movementDateFilter.from || movementDateFilter.to);
+
+  useEffect(() => {
+    writeStoredList(INVENTORY_ITEMS_STORAGE_KEY, inventoryItems);
+  }, [inventoryItems]);
+
+  useEffect(() => {
+    writeStoredList(INVENTORY_MOVEMENTS_STORAGE_KEY, inventoryMovements);
+  }, [inventoryMovements]);
+
+  function upsertPart(item: InventoryItem) {
+    setInventoryItems((current) => {
+      const exists = current.some((part) => part.id === item.id);
+      return exists
+        ? current.map((part) => (part.id === item.id ? item : part))
+        : [item, ...current];
+    });
+
+    if (!editingPart) {
+      setInventoryMovements((current) => [
+        {
+          id: `MOV-${Date.now().toString().slice(-5)}`,
+          partId: item.id,
+          partName: item.name,
+          type: "supply",
+          quantity: item.stock,
+          owner: "إدارة المخزون",
+          createdAt: new Date().toISOString().slice(0, 10),
+          reference: "إضافة قطعة",
+        },
+        ...current,
+      ]);
+    }
+  }
+
+  function adjustQuantity(partId: string, movementType: InventoryMovement["type"], quantity: number) {
+    const movementPart = inventoryItems.find((item) => item.id === partId);
+    if (!movementPart) return;
+
+    const movementLabel = INVENTORY_MOVEMENT_LABELS[movementType].label;
+
+    setInventoryItems((current) =>
+      current.map((item) => {
+        if (item.id !== partId) return item;
+        const nextStock = Math.max(0, item.stock + quantity);
+        return {
+          ...item,
+          stock: nextStock,
+          lastMove: movementLabel,
+        };
+      }),
+    );
+
+    setInventoryMovements((current) => [
+      {
+        id: `MOV-${Date.now().toString().slice(-5)}`,
+        partId: movementPart.id,
+        partName: movementPart.name,
+        type: movementType,
+        quantity,
+        owner: "إدارة المخزون",
+        createdAt: new Date().toISOString().slice(0, 10),
+        reference: movementType === "supply" ? "تعديل كمية - توريد" : "تعديل كمية - تسوية",
+      },
+      ...current,
+    ]);
+  }
 
   return (
     <div className="space-y-6">
       <SectionTitle
-        title={isAlerts ? "تنبيهات المخزون" : isMovement ? "حركة المخزون" : "قطع الغيار"}
+        title={isMovement ? "حركة المخزون" : "قطع الغيار"}
         subtitle="إدارة مخزون قطع الصيانة، حدود النقص، ومتابعة الصرف والتوريد."
       />
-      {showSupplyModal ? <SupplyPartModal onClose={() => setShowSupplyModal(false)} /> : null}
+      {showSupplyModal || editingPart ? (
+        <PartFormModal
+          initialPart={editingPart}
+          onClose={() => {
+            setShowSupplyModal(false);
+            setEditingPart(null);
+          }}
+          onSave={upsertPart}
+        />
+      ) : null}
+      {showQuantityModal ? (
+        <QuantityAdjustmentModal
+          items={inventoryItems}
+          onClose={() => setShowQuantityModal(false)}
+          onSave={adjustQuantity}
+        />
+      ) : null}
+      {showMovementDateFilter ? (
+        <DateFilterModal
+          filter={movementDateFilter}
+          onApply={(filter) => {
+            setMovementDateFilter(filter);
+            setMovementPage(1);
+          }}
+          onClose={() => setShowMovementDateFilter(false)}
+        />
+      ) : null}
+      {partToDelete ? (
+        <ConfirmToast
+          title="تأكيد حذف القطعة"
+          message={`هل تريد حذف القطعة ${partToDelete.name} من جدول قطع الغيار؟`}
+          onCancel={() => setPartToDelete(null)}
+          onConfirm={() => {
+            setInventoryItems((current) => current.filter((item) => item.id !== partToDelete.id));
+            setPartToDelete(null);
+          }}
+        />
+      ) : null}
 
       <KpiCards
         cards={
           isMovement
             ? [
-                { label: "إجمالي الحركات", value: String(INVENTORY_MOVEMENTS.length), icon: "clipboard" },
+                { label: "إجمالي الحركات", value: String(inventoryMovements.length), icon: "clipboard" },
                 {
                   label: "حركات التوريد",
-                  value: String(INVENTORY_MOVEMENTS.filter((item) => item.type === "supply").length),
+                  value: String(inventoryMovements.filter((item) => item.type === "supply").length),
                   icon: "plus",
                   tone: "success",
                 },
                 {
                   label: "حركات الصرف",
-                  value: String(INVENTORY_MOVEMENTS.filter((item) => item.type === "withdraw").length),
+                  value: String(inventoryMovements.filter((item) => item.type === "withdraw").length),
                   icon: "box",
                   tone: "gold",
                 },
                 {
                   label: "التسويات",
-                  value: String(INVENTORY_MOVEMENTS.filter((item) => item.type === "adjustment").length),
+                  value: String(inventoryMovements.filter((item) => item.type === "adjustment").length),
                   icon: "clipboard",
                   tone: "info",
                 },
               ]
             : [
-                { label: "إجمالي القطع", value: String(INVENTORY.length), icon: "box" },
+                { label: "إجمالي القطع", value: String(inventoryItems.length), icon: "box" },
                 { label: "تنبيهات نقص", value: String(lowStock.length), icon: "alert", tone: "danger" },
                 {
                   label: "قيمة المخزون بالليرة",
@@ -1731,21 +2213,42 @@ export function InventoryScreen({ section = "parts" }: { section?: string }) {
       />
 
       {!isMovement ? (
-        <FilterCard className="md:grid-cols-[minmax(0,1fr)_auto]">
+        <Card className="flex flex-col gap-3 p-4 md:flex-row md:items-center" dir="rtl">
           <Input
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setPartPage(1);
+            }}
             placeholder="بحث باسم القطعة أو الكود"
             aria-label="بحث المخزون"
+            className="md:flex-1"
           />
-          <Button type="button" variant="outline" onClick={() => setShowSupplyModal(true)}>
-            <Icon name="plus" size={18} />
-            توريد قطعة
-          </Button>
-        </FilterCard>
+          <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
+            <Button type="button" className="shrink-0" onClick={() => setShowSupplyModal(true)}>
+              <Icon name="plus" size={18} />
+              إضافة قطعة
+            </Button>
+            <Button type="button" variant="outline" className="shrink-0" onClick={() => setShowQuantityModal(true)}>
+              <Icon name="pencil" size={18} />
+              تعديل الكمية
+            </Button>
+          </div>
+        </Card>
       ) : null}
 
       {isMovement ? (
+        <>
+        <div className="flex justify-end">
+          <Button
+            type="button"
+            variant={hasMovementDateFilter ? "primary" : "outline"}
+            onClick={() => setShowMovementDateFilter(true)}
+          >
+            <Icon name="clock" size={18} />
+            الفترة الزمنية
+          </Button>
+        </div>
         <Card className="overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-[860px] w-full text-right text-sm">
@@ -1782,78 +2285,22 @@ export function InventoryScreen({ section = "parts" }: { section?: string }) {
               </tbody>
             </table>
           </div>
-          <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-3 text-sm text-content-muted">
-            <span>
-              صفحة {movementPage} من {movementPages}
-            </span>
-            <div className="flex items-center gap-1">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-8 w-8 px-0"
-                disabled={movementPage <= 1}
-                onClick={() => setMovementPage((page) => Math.max(1, page - 1))}
-                aria-label="السابق"
-              >
-                <Icon name="chevron-right" size={16} />
-              </Button>
-              {Array.from({ length: movementPages }).map((_, index) => (
-                <Button
-                  key={index}
-                  type="button"
-                  size="sm"
-                  variant={movementPage === index + 1 ? "primary" : "outline"}
-                  className="h-8 w-8 px-0"
-                  onClick={() => setMovementPage(index + 1)}
-                >
-                  {index + 1}
-                </Button>
-              ))}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-8 w-8 px-0"
-                disabled={movementPage >= movementPages}
-                onClick={() => setMovementPage((page) => Math.min(movementPages, page + 1))}
-                aria-label="التالي"
-              >
-                <Icon name="chevron-left" size={16} />
-              </Button>
-            </div>
-          </div>
+          <TablePagination
+            page={currentMovementPage}
+            total={sortedMovements.length}
+            pageSize={PAGE_SIZE}
+            onPage={setMovementPage}
+            itemLabel="حركة"
+          />
         </Card>
-      ) : isAlerts ? (
-        <div className="grid gap-4 md:grid-cols-2">
-          {lowStock.map((item) => (
-            <Card key={item.id} className="p-4">
-              <div className="flex items-start justify-between">
-                <div className="text-right">
-                  <h3 className="font-heading text-lg font-bold text-content">{item.name}</h3>
-                  <p className="text-sm text-content-muted">{item.location}</p>
-                </div>
-                <Badge tone="danger" dot>
-                  تحت الحد الأدنى
-                </Badge>
-              </div>
-              <div className="mt-5">
-                <div className="mb-2 flex justify-between text-xs text-content-muted">
-                  <span>المتوفر {item.stock}</span>
-                  <span>الحد الأدنى {item.minStock}</span>
-                </div>
-                <ProgressBar value={(item.stock / item.minStock) * 100} />
-              </div>
-            </Card>
-          ))}
-        </div>
+        </>
       ) : (
         <Card className="overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-[840px] w-full text-right text-sm">
               <thead>
                 <tr className="bg-surface-2 text-content-muted">
-                  {["الكود", "القطعة", "المتوفر", "الموقع", "القيمة بالليرة", "القيمة بالدولار"].map(
+                  {["الكود", "القطعة", "المتوفر", "الموقع", "القيمة بالليرة", "القيمة بالدولار", "الإجراءات"].map(
                     (header) => (
                       <th key={header} className="px-4 py-3 font-medium">
                         {header}
@@ -1863,7 +2310,7 @@ export function InventoryScreen({ section = "parts" }: { section?: string }) {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((item) => (
+                {visibleParts.map((item) => (
                   <tr key={item.id} className="border-b border-border last:border-0 hover:bg-gold-soft">
                     <td className="px-4 py-4 font-bold text-gold">{item.id}</td>
                     <td className="px-4 py-4 text-content">{item.name}</td>
@@ -1879,11 +2326,40 @@ export function InventoryScreen({ section = "parts" }: { section?: string }) {
                     <td className="px-4 py-4 text-content-muted">
                       {formatMoney((item.stock * item.unitCost) / USD_TO_SYP_RATE, "USD", { decimals: 2 })}
                     </td>
+                    <td className="px-4 py-4">
+                      <div className="flex items-center justify-start gap-2" dir="rtl">
+                        <button
+                          type="button"
+                          aria-label={`تعديل ${item.id}`}
+                          title="تعديل"
+                          onClick={() => setEditingPart(item)}
+                          className="rounded-sm p-1.5 text-content-muted hover:bg-surface-2"
+                        >
+                          <Icon name="pencil" size={18} />
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={`حذف ${item.id}`}
+                          title="حذف"
+                          onClick={() => setPartToDelete(item)}
+                          className="rounded-sm p-1.5 text-danger hover:bg-danger-soft"
+                        >
+                          <Icon name="trash" size={18} />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+          <TablePagination
+            page={currentPartPage}
+            total={filtered.length}
+            pageSize={PAGE_SIZE}
+            onPage={setPartPage}
+            itemLabel="قطعة"
+          />
         </Card>
       )}
     </div>
@@ -1909,8 +2385,16 @@ function InvoiceDetailsModal({
   invoice: Invoice;
   order?: Order;
   onClose: () => void;
-  onAddPayment: () => void;
+  onAddPayment?: () => void;
 }) {
+  const [paymentsPage, setPaymentsPage] = useState(1);
+  const paymentPages = Math.max(1, Math.ceil(invoice.payments.length / PAGE_SIZE));
+  const currentPaymentsPage = Math.min(paymentsPage, paymentPages);
+  const visiblePayments = invoice.payments.slice(
+    (currentPaymentsPage - 1) * PAGE_SIZE,
+    currentPaymentsPage * PAGE_SIZE,
+  );
+
   return (
     <Modal
       title={`تفاصيل الفاتورة ${invoice.id}`}
@@ -1953,10 +2437,12 @@ function InvoiceDetailsModal({
         <Card className="overflow-hidden shadow-none">
           <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
             <h3 className="font-heading text-base font-bold text-content">سجل المدفوعات</h3>
-            <Button type="button" size="sm" onClick={onAddPayment}>
-              <Icon name="plus" size={16} />
-              إضافة دفعة
-            </Button>
+            {onAddPayment ? (
+              <Button type="button" size="sm" onClick={onAddPayment}>
+                <Icon name="plus" size={16} />
+                إضافة دفعة
+              </Button>
+            ) : null}
           </div>
           {invoice.payments.length > 0 ? (
             <div className="overflow-x-auto">
@@ -1971,7 +2457,7 @@ function InvoiceDetailsModal({
                   </tr>
                 </thead>
                 <tbody>
-                  {invoice.payments.map((payment) => (
+                  {visiblePayments.map((payment) => (
                     <tr key={payment.id} className="border-t border-border">
                       <td className="px-4 py-3 font-bold text-gold">{payment.id}</td>
                       <td className="px-4 py-3 text-content-muted">
@@ -1992,6 +2478,13 @@ function InvoiceDetailsModal({
           ) : (
             <EmptyState title="لا توجد دفعات مسجلة على هذه الفاتورة." />
           )}
+          <TablePagination
+            page={currentPaymentsPage}
+            total={invoice.payments.length}
+            pageSize={PAGE_SIZE}
+            onPage={setPaymentsPage}
+            itemLabel="دفعة"
+          />
         </Card>
       </div>
     </Modal>
@@ -2101,6 +2594,7 @@ export function InvoicesScreen() {
   const [showDateFilter, setShowDateFilter] = useState(false);
   const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null);
   const [paymentInvoice, setPaymentInvoice] = useState<Invoice | null>(null);
+  const [page, setPage] = useState(1);
 
   const filtered = invoices.filter((invoice) => {
     const byType = type === "all" || invoice.type === type;
@@ -2120,6 +2614,12 @@ export function InvoicesScreen() {
   const completedInvoices = invoices.filter((invoice) => invoice.status === "paid").length;
   const incompletedInvoices = invoices.filter((invoice) => invoice.status !== "paid").length;
   const hasDateFilter = Boolean(dateFilter.from || dateFilter.to);
+  const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pages);
+  const visibleInvoices = filtered.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE,
+  );
 
   function savePayment(payment: InvoicePayment, convertedAmount: number) {
     if (!paymentInvoice) return;
@@ -2163,7 +2663,10 @@ export function InvoicesScreen() {
       {showDateFilter ? (
         <DateFilterModal
           filter={dateFilter}
-          onApply={setDateFilter}
+          onApply={(filter) => {
+            setDateFilter(filter);
+            setPage(1);
+          }}
           onClose={() => setShowDateFilter(false)}
         />
       ) : null}
@@ -2190,30 +2693,32 @@ export function InvoicesScreen() {
           { label: "المتبقي", value: formatMoney(total - paid), icon: "clock", tone: "gold" },
         ]}
       />
-      <FilterCard className="xl:grid-cols-6">
+      <FilterCard className="lg:grid-cols-[minmax(320px,2fr)_repeat(4,minmax(120px,1fr))_auto]">
         <Input
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setPage(1);
+          }}
           placeholder="بحث برقم الفاتورة أو هاتف العميل"
           aria-label="بحث الفواتير"
         />
-        <Select value={type} onChange={(event) => setType(event.target.value as InvoiceType | "all")}>
+        <Select value={type} onChange={(event) => { setType(event.target.value as InvoiceType | "all"); setPage(1); }}>
           <option value="all">كل الفواتير</option>
           <option value="external">فواتير خارجية</option>
           <option value="internal">فواتير داخلية</option>
         </Select>
-        <Select value={currency} onChange={(event) => setCurrency(event.target.value as Currency | "all")}>
+        <Select value={currency} onChange={(event) => { setCurrency(event.target.value as Currency | "all"); setPage(1); }}>
           <option value="all">كل العملات</option>
           <option value="SYP">ليرة سورية</option>
           <option value="USD">دولار</option>
         </Select>
-        <Select value={status} onChange={(event) => setStatus(event.target.value as PaymentStatus | "all")}>
+        <Select value={status} onChange={(event) => { setStatus(event.target.value as PaymentStatus | "all"); setPage(1); }}>
           <option value="all">كل الحالات</option>
           <option value="paid">مدفوعة بالكامل</option>
           <option value="partial">مدفوعة جزئياً</option>
-          <option value="unpaid">غير مدفوعة</option>
         </Select>
-        <Select value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value as PaymentMethod | "all")}>
+        <Select value={paymentMethod} onChange={(event) => { setPaymentMethod(event.target.value as PaymentMethod | "all"); setPage(1); }}>
           <option value="all">كل طرق الدفع</option>
           <option value="cash">كاش</option>
           <option value="sham-cash">شام كاش</option>
@@ -2221,6 +2726,7 @@ export function InvoicesScreen() {
         <Button
           type="button"
           variant={hasDateFilter ? "primary" : "outline"}
+          className="whitespace-nowrap"
           onClick={() => setShowDateFilter(true)}
         >
           <Icon name="clock" size={18} />
@@ -2242,7 +2748,7 @@ export function InvoicesScreen() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((invoice) => (
+              {visibleInvoices.map((invoice) => (
                 <tr key={invoice.id} className="border-b border-border last:border-0 hover:bg-gold-soft">
                   <td className="px-4 py-4 font-bold text-gold">{invoice.id}</td>
                   <td className="px-4 py-4 text-content-muted">{invoice.orderId}</td>
@@ -2268,7 +2774,7 @@ export function InvoicesScreen() {
                     {formatMoney(remaining(invoice.total, invoice.paid), invoice.currency)}
                   </td>
                   <td className="px-4 py-4">
-                    <div className="flex gap-2">
+                    <div className="flex items-center justify-start gap-2" dir="rtl">
                       <button
                         type="button"
                         aria-label={`تفاصيل ${invoice.id}`}
@@ -2285,6 +2791,13 @@ export function InvoicesScreen() {
             </tbody>
           </table>
         </div>
+        <TablePagination
+          page={currentPage}
+          total={filtered.length}
+          pageSize={PAGE_SIZE}
+          onPage={setPage}
+          itemLabel="فاتورة"
+        />
       </Card>
     </div>
   );
@@ -2310,6 +2823,7 @@ export function FinanceScreen({ section }: { section?: string[] }) {
   const expensesTotal = expenses.reduce((sum, record) => sum + record.amount, 0);
   const profit = salesTotal - expensesTotal;
   const isReport = section?.[0] === "reports";
+  const [page, setPage] = useState(1);
 
   const records = useMemo(() => {
     const key = section?.join("/") ?? "";
@@ -2318,6 +2832,12 @@ export function FinanceScreen({ section }: { section?: string[] }) {
     if (key.includes("sales")) return sales;
     return FINANCE_RECORDS;
   }, [sales, section]);
+  const pages = Math.max(1, Math.ceil(records.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pages);
+  const visibleRecords = records.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE,
+  );
 
   return (
     <div className="space-y-6">
@@ -2368,7 +2888,7 @@ export function FinanceScreen({ section }: { section?: string[] }) {
                 </tr>
               </thead>
               <tbody>
-                {records.map((record) => (
+                {visibleRecords.map((record) => (
                   <tr key={record.id} className="border-b border-border last:border-0 hover:bg-gold-soft">
                     <td className="px-4 py-4 font-bold text-gold">{record.id}</td>
                     <td className="px-4 py-4 text-content">{record.title}</td>
@@ -2391,6 +2911,13 @@ export function FinanceScreen({ section }: { section?: string[] }) {
               </tbody>
             </table>
           </div>
+          <TablePagination
+            page={currentPage}
+            total={records.length}
+            pageSize={PAGE_SIZE}
+            onPage={setPage}
+            itemLabel="سجل"
+          />
         </Card>
       )}
     </div>

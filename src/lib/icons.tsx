@@ -27,7 +27,9 @@ export type IconName =
   | "phone"
   | "home"
   | "alert"
-  | "arrow-left";
+  | "arrow-left"
+  | "menu"
+  | "x";
 
 const PATHS: Record<IconName, string> = {
   shield: "M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6l7-3z",
@@ -61,6 +63,8 @@ const PATHS: Record<IconName, string> = {
   home: "M3 11l9-7 9 7M5 10v10h14V10",
   alert: "M12 8v5M12 16h.01M12 3a9 9 0 100 18 9 9 0 000-18z",
   "arrow-left": "M19 12H5M12 19l-7-7 7-7",
+  menu: "M4 6h16M4 12h16M4 18h16",
+  x: "M6 6l12 12M18 6L6 18",
 };
 
 interface IconProps extends SVGProps<SVGSVGElement> {

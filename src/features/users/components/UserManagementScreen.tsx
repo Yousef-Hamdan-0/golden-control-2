@@ -42,14 +42,14 @@ export function UserManagementScreen() {
       {/* Header */}
       <div className="space-y-4">
         <h2 className="text-right font-heading text-xl font-bold text-gold">إدارة المستخدمين</h2>
-        <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex flex-wrap items-end justify-between gap-4">
           <UserFilters
             role={role}
             status={status}
             onRole={resetPageThen(setRole)}
             onStatus={resetPageThen(setStatus)}
           />
-          <Button onClick={() => setShowCreateModal(true)}>
+          <Button className="shrink-0" onClick={() => setShowCreateModal(true)}>
             <Icon name="plus" size={18} />
             مستخدم جديد
           </Button>

@@ -4,10 +4,12 @@ import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { ConfirmToast } from "@/components/ui/ConfirmToast";
 import { Field, Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
-import { Textarea } from "@/components/ui/Textarea";
+import { TablePagination } from "@/components/ui/TablePagination";
 import { Icon } from "@/lib/icons";
+import { PAGE_SIZE } from "@/config/constants";
 import {
   OrderDetailsModal,
   type Invoice,
@@ -230,9 +232,6 @@ function CustomerFormModal({
         <Field label="رابط الموقع" className="md:col-span-2">
           <Input dir="ltr" value={draft.locationUrl} onChange={(event) => setDraft((current) => ({ ...current, locationUrl: event.target.value }))} placeholder="https://maps.google.com/..." />
         </Field>
-        <Field label="ملاحظات" className="md:col-span-2">
-          <Textarea className="min-h-24" value={draft.notes} onChange={(event) => setDraft((current) => ({ ...current, notes: event.target.value }))} placeholder="ملاحظات العميل" />
-        </Field>
         <div className="flex items-center justify-end gap-3 border-t border-border pt-4 md:col-span-2">
           <Button type="button" variant="outline" onClick={onClose}>
             إلغاء
@@ -258,6 +257,14 @@ function CustomerDetailsModal({
   onEdit: () => void;
   onOpenOrder: (details: { order: Order; invoice: Invoice }) => void;
 }) {
+  const [ordersPage, setOrdersPage] = useState(1);
+  const orderPages = Math.max(1, Math.ceil(customer.orders.length / PAGE_SIZE));
+  const currentOrdersPage = Math.min(ordersPage, orderPages);
+  const visibleOrders = customer.orders.slice(
+    (currentOrdersPage - 1) * PAGE_SIZE,
+    currentOrdersPage * PAGE_SIZE,
+  );
+
   return (
     <Modal title={customer.name} description="معلومات العميل وسجل طلباته." onClose={onClose} widthClassName="max-w-4xl">
       <div className="space-y-5 p-5">
@@ -301,7 +308,7 @@ function CustomerDetailsModal({
                 </tr>
               </thead>
               <tbody>
-                {customer.orders.map((order) => (
+                {visibleOrders.map((order) => (
                   <tr key={order.id} className="border-t border-border">
                     <td className="px-4 py-3 font-bold text-gold">{order.id}</td>
                     <td className="px-4 py-3 text-content">{order.device}</td>
@@ -328,6 +335,13 @@ function CustomerDetailsModal({
               </tbody>
             </table>
           </div>
+          <TablePagination
+            page={currentOrdersPage}
+            total={customer.orders.length}
+            pageSize={PAGE_SIZE}
+            onPage={setOrdersPage}
+            itemLabel="طلب"
+          />
         </div>
       </div>
     </Modal>
@@ -339,11 +353,13 @@ export function CustomersScreen() {
   const [query, setQuery] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
   const [selectedOrderDetails, setSelectedOrderDetails] = useState<{
     order: Order;
     invoice: Invoice;
   } | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [page, setPage] = useState(1);
 
   const filtered = useMemo(
     () =>
@@ -356,6 +372,12 @@ export function CustomersScreen() {
           contains(customer.id, query),
       ),
     [customers, query],
+  );
+  const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pages);
+  const visibleCustomers = filtered.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE,
   );
 
   function upsertCustomer(customer: Customer) {
@@ -403,7 +425,10 @@ export function CustomersScreen() {
         <CustomerDetailsModal
           customer={selectedCustomer}
           onClose={() => setSelectedCustomer(null)}
-          onEdit={() => setEditingCustomer(selectedCustomer)}
+          onEdit={() => {
+            setSelectedCustomer(null);
+            setEditingCustomer(selectedCustomer);
+          }}
           onOpenOrder={setSelectedOrderDetails}
         />
       ) : null}
@@ -414,28 +439,27 @@ export function CustomersScreen() {
           onClose={() => setSelectedOrderDetails(null)}
         />
       ) : null}
+      {customerToDelete ? (
+        <ConfirmToast
+          title="تأكيد حذف العميل"
+          message={`هل تريد حذف العميل ${customerToDelete.name}؟ سيتم حذف بياناته من القائمة الحالية.`}
+          onCancel={() => setCustomerToDelete(null)}
+          onConfirm={() => {
+            removeCustomer(customerToDelete.id);
+            setCustomerToDelete(null);
+          }}
+        />
+      ) : null}
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="p-4">
           <div className="text-sm text-content-muted">إجمالي العملاء</div>
           <div className="mt-2 font-heading text-2xl font-bold text-content">{customers.length}</div>
         </Card>
-        <Card className="p-4">
-          <div className="text-sm text-content-muted">طلبات العملاء</div>
-          <div className="mt-2 font-heading text-2xl font-bold text-content">
-            {customers.reduce((sum, customer) => sum + customer.orders.length, 0)}
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="text-sm text-content-muted">عملاء لديهم طلبات نشطة</div>
-          <div className="mt-2 font-heading text-2xl font-bold text-gold">
-            {customers.filter((customer) => customer.orders.some((order) => order.status === "active")).length}
-          </div>
-        </Card>
       </div>
 
       <Card className="p-4">
-        <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="بحث باسم العميل أو الهاتف أو المعرف" aria-label="بحث العملاء" />
+        <Input value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} placeholder="بحث باسم العميل أو هاتف العميل أو المعرف" aria-label="بحث العملاء" />
       </Card>
 
       <Card className="overflow-hidden">
@@ -449,7 +473,7 @@ export function CustomersScreen() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((customer) => (
+              {visibleCustomers.map((customer) => (
                 <tr key={customer.id} onClick={() => setSelectedCustomer(customer)} className="cursor-pointer border-t border-border hover:bg-gold-soft">
                   <td className="px-4 py-4 font-bold text-gold">{customer.id}</td>
                   <td className="px-4 py-4 font-semibold text-content">{customer.name}</td>
@@ -459,14 +483,14 @@ export function CustomersScreen() {
                     <Badge tone="gold">{customer.orders.length}</Badge>
                   </td>
                   <td className="px-4 py-4">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-start gap-2" dir="rtl">
                       <button type="button" aria-label={`عرض ${customer.name}`} title="عرض" onClick={(event) => { event.stopPropagation(); setSelectedCustomer(customer); }} className="rounded-sm p-1.5 text-content-muted hover:bg-surface-2">
                         <Icon name="eye" size={18} />
                       </button>
                       <button type="button" aria-label={`تعديل ${customer.name}`} title="تعديل" onClick={(event) => { event.stopPropagation(); setEditingCustomer(customer); }} className="rounded-sm p-1.5 text-content-muted hover:bg-surface-2">
                         <Icon name="pencil" size={18} />
                       </button>
-                      <button type="button" aria-label={`حذف ${customer.name}`} title="حذف" onClick={(event) => { event.stopPropagation(); removeCustomer(customer.id); }} className="rounded-sm p-1.5 text-danger hover:bg-danger-soft">
+                      <button type="button" aria-label={`حذف ${customer.name}`} title="حذف" onClick={(event) => { event.stopPropagation(); setCustomerToDelete(customer); }} className="rounded-sm p-1.5 text-danger hover:bg-danger-soft">
                         <Icon name="trash" size={18} />
                       </button>
                     </div>
@@ -476,6 +500,13 @@ export function CustomersScreen() {
             </tbody>
           </table>
         </div>
+        <TablePagination
+          page={currentPage}
+          total={filtered.length}
+          pageSize={PAGE_SIZE}
+          onPage={setPage}
+          itemLabel="عميل"
+        />
       </Card>
     </div>
   );
