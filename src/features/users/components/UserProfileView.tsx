@@ -24,18 +24,27 @@ function ReadField({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function UserProfileView({ userId }: { userId: string }) {
+export function UserProfileView({
+  userId,
+  user,
+  onEdit,
+}: {
+  userId?: string;
+  user?: User;
+  onEdit?: (user: User) => void;
+}) {
   const router = useRouter();
-  const { data: user, isLoading, isError } = useUserQuery(userId);
+  const { data: queriedUser, isLoading, isError } = useUserQuery(userId ?? "");
+  const currentUser = user ?? queriedUser;
 
-  if (isLoading) {
+  if (!user && isLoading) {
     return (
       <div className="flex justify-center py-20">
         <Spinner />
       </div>
     );
   }
-  if (isError || !user) {
+  if (isError || !currentUser) {
     return (
       <div className="rounded-md border border-danger/30 bg-danger-soft p-6 text-center text-sm text-danger">
         تعذّر العثور على المستخدم.
@@ -43,11 +52,11 @@ export function UserProfileView({ userId }: { userId: string }) {
     );
   }
 
-  const u = user as User;
+  const u = currentUser as User;
 
   return (
     <div className="space-y-4">
-      <Button onClick={() => router.push(`/settings/users/${encodeURIComponent(u.id)}/edit`)}>
+      <Button onClick={() => (onEdit ? onEdit(u) : router.push(`/settings/users/${encodeURIComponent(u.id)}/edit`))}>
         تعديل البيانات
       </Button>
 

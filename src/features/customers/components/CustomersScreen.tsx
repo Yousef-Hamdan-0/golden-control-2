@@ -202,47 +202,67 @@ function CustomerFormModal({
   onSave: (customer: Customer) => void;
 }) {
   const [draft, setDraft] = useState<Customer>(customer ?? EMPTY_CUSTOMER);
+  const [pendingEditCustomer, setPendingEditCustomer] = useState<Customer | null>(null);
   const isEdit = Boolean(customer);
 
-  function save() {
-    onSave({ ...draft, id: draft.id || nextCustomerId(customers) });
+  function saveCustomer(nextCustomer: Customer) {
+    onSave(nextCustomer);
     onClose();
   }
 
   return (
-    <Modal
-      title={isEdit ? "تعديل العميل" : "عميل جديد"}
-      description="إدارة بيانات العميل الأساسية ومعلومات التواصل."
-      onClose={onClose}
-      widthClassName="max-w-3xl"
-    >
-      <form className="grid gap-4 p-5 md:grid-cols-2" onSubmit={(event) => event.preventDefault()}>
-        <Field label="اسم العميل">
-          <Input value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} placeholder="اسم العميل" />
-        </Field>
-        <Field label="الهاتف 1">
-          <Input dir="ltr" value={draft.phone1} onChange={(event) => setDraft((current) => ({ ...current, phone1: event.target.value }))} placeholder="09xx xxx xxx" />
-        </Field>
-        <Field label="الهاتف 2">
-          <Input dir="ltr" value={draft.phone2} onChange={(event) => setDraft((current) => ({ ...current, phone2: event.target.value }))} placeholder="اختياري" />
-        </Field>
-        <Field label="العنوان">
-          <Input value={draft.address} onChange={(event) => setDraft((current) => ({ ...current, address: event.target.value }))} placeholder="العنوان" />
-        </Field>
-        <Field label="رابط الموقع" className="md:col-span-2">
-          <Input dir="ltr" value={draft.locationUrl} onChange={(event) => setDraft((current) => ({ ...current, locationUrl: event.target.value }))} placeholder="https://maps.google.com/..." />
-        </Field>
-        <div className="flex items-center justify-end gap-3 border-t border-border pt-4 md:col-span-2">
-          <Button type="button" variant="outline" onClick={onClose}>
-            إلغاء
-          </Button>
-          <Button type="button" onClick={save}>
-            <Icon name={isEdit ? "pencil" : "plus"} size={18} />
-            {isEdit ? "حفظ التعديل" : "إنشاء العميل"}
-          </Button>
-        </div>
-      </form>
-    </Modal>
+    <>
+      <Modal
+        title={isEdit ? "تعديل العميل" : "عميل جديد"}
+        description="إدارة بيانات العميل الأساسية ومعلومات التواصل."
+        onClose={onClose}
+        widthClassName="max-w-3xl"
+      >
+        <form className="grid gap-4 p-5 md:grid-cols-2" onSubmit={(event) => event.preventDefault()}>
+          <Field label="اسم العميل">
+            <Input value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} placeholder="اسم العميل" />
+          </Field>
+          <Field label="الهاتف 1">
+            <Input dir="ltr" value={draft.phone1} onChange={(event) => setDraft((current) => ({ ...current, phone1: event.target.value }))} placeholder="09xx xxx xxx" />
+          </Field>
+          <Field label="الهاتف 2">
+            <Input dir="ltr" value={draft.phone2} onChange={(event) => setDraft((current) => ({ ...current, phone2: event.target.value }))} placeholder="اختياري" />
+          </Field>
+          <Field label="العنوان">
+            <Input value={draft.address} onChange={(event) => setDraft((current) => ({ ...current, address: event.target.value }))} placeholder="العنوان" />
+          </Field>
+          <Field label="رابط الموقع" className="md:col-span-2">
+            <Input dir="ltr" value={draft.locationUrl} onChange={(event) => setDraft((current) => ({ ...current, locationUrl: event.target.value }))} placeholder="https://maps.google.com/..." />
+          </Field>
+          <div className="flex items-center justify-end gap-3 border-t border-border pt-4 md:col-span-2">
+            <Button type="button" variant="outline" onClick={onClose}>
+              إلغاء
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                const nextCustomer = { ...draft, id: draft.id || nextCustomerId(customers) };
+                if (isEdit) setPendingEditCustomer(nextCustomer);
+                else saveCustomer(nextCustomer);
+              }}
+            >
+              <Icon name={isEdit ? "pencil" : "plus"} size={18} />
+              {isEdit ? "حفظ التعديل" : "إنشاء العميل"}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+      {pendingEditCustomer ? (
+        <ConfirmToast
+          title="تأكيد تعديل العميل"
+          message={`هل تريد حفظ التعديلات على العميل ${pendingEditCustomer.name}؟`}
+          tone="gold"
+          confirmLabel="تأكيد التعديل"
+          onCancel={() => setPendingEditCustomer(null)}
+          onConfirm={() => saveCustomer(pendingEditCustomer)}
+        />
+      ) : null}
+    </>
   );
 }
 

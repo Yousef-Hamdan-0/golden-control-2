@@ -625,6 +625,10 @@ function typeLabel(type: OrderType | InvoiceType) {
   return type === "external" ? "خارجي" : "داخلي";
 }
 
+function currencyLabel(currency: Currency) {
+  return currency === "SYP" ? "ليرة سورية" : "دولار";
+}
+
 function remaining(total: number, paid: number) {
   return Math.max(0, total - paid);
 }
@@ -824,6 +828,7 @@ export function MaintenanceOrderModal({
     initialOrder ? orderToDraft(initialOrder) : EMPTY_MAINTENANCE_ORDER,
   );
   const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
+  const [pendingEditOrder, setPendingEditOrder] = useState<Order | null>(null);
   const isEdit = Boolean(initialOrder);
 
   function updateDevice(index: number, patch: Partial<DeviceDraft>) {
@@ -851,9 +856,13 @@ export function MaintenanceOrderModal({
 
   function handleSubmit() {
     const order = draftToOrder(draft, initialOrder);
+    if (isEdit) {
+      setPendingEditOrder(order);
+      return;
+    }
+
     onSave?.(order);
-    if (isEdit) onClose();
-    else setCreatedOrder(order);
+    setCreatedOrder(order);
   }
 
   return (
@@ -1100,6 +1109,19 @@ export function MaintenanceOrderModal({
           order={createdOrder}
           onClose={() => {
             setCreatedOrder(null);
+            onClose();
+          }}
+        />
+      ) : null}
+      {pendingEditOrder ? (
+        <ConfirmToast
+          title="تأكيد تعديل الطلب"
+          message={`هل تريد حفظ التعديلات على الطلب ${pendingEditOrder.id}؟`}
+          tone="gold"
+          confirmLabel="تأكيد التعديل"
+          onCancel={() => setPendingEditOrder(null)}
+          onConfirm={() => {
+            onSave?.(pendingEditOrder);
             onClose();
           }}
         />
@@ -1494,67 +1516,85 @@ function PartFormModal({
 }) {
   const [name, setName] = useState(initialPart?.name ?? "");
   const [code, setCode] = useState(initialPart?.id ?? "");
-  const [quantity, setQuantity] = useState(String(initialPart?.stock ?? 1));
   const [location, setLocation] = useState(initialPart?.location ?? "");
   const [valueSyp, setValueSyp] = useState(String(initialPart?.unitCost ?? ""));
   const [valueUsd, setValueUsd] = useState(
     initialPart ? String(Number((initialPart.unitCost / USD_TO_SYP_RATE).toFixed(2))) : "",
   );
+  const [pendingEditItem, setPendingEditItem] = useState<InventoryItem | null>(null);
   const isEdit = Boolean(initialPart);
 
-  function save() {
-    onSave({
+  function buildItem(): InventoryItem {
+    return {
       id: code || `PRT-${Date.now().toString().slice(-4)}`,
       name: name || "قطعة جديدة",
       category: initialPart?.category ?? "عام",
-      stock: isEdit ? initialPart?.stock ?? 0 : Number(quantity) || 0,
+      stock: initialPart?.stock ?? 0,
       minStock: initialPart?.minStock ?? 1,
       unitCost: Number(valueSyp) || Math.round((Number(valueUsd) || 0) * USD_TO_SYP_RATE),
       lastMove: isEdit ? "تعديل بيانات" : "إضافة قطعة",
       location: location || "غير محدد",
-    });
+    };
+  }
+
+  function saveItem(item: InventoryItem) {
+    onSave(item);
     onClose();
   }
 
   return (
-    <Modal
-      title={isEdit ? "تعديل قطعة" : "إضافة قطعة"}
-      description={isEdit ? "تعديل بيانات القطعة وقيمتها وموقعها." : "إضافة قطعة جديدة إلى مخزون قطع الغيار."}
-      onClose={onClose}
-      widthClassName="max-w-2xl"
-    >
-      <form className="grid gap-4 p-5 md:grid-cols-2" onSubmit={(event) => event.preventDefault()}>
-        <Field label="اسم القطعة">
-          <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="مثال: حساس حرارة NTC" />
-        </Field>
-        <Field label="الكود">
-          <Input value={code} onChange={(event) => setCode(event.target.value)} placeholder="PRT-000" dir="ltr" />
-        </Field>
-        {!isEdit ? (
-          <Field label="الكمية الافتتاحية">
-            <Input value={quantity} onChange={(event) => setQuantity(event.target.value)} type="number" min={1} />
+    <>
+      <Modal
+        title={isEdit ? "تعديل قطعة" : "إضافة قطعة"}
+        description={isEdit ? "تعديل بيانات القطعة وقيمتها وموقعها." : "إضافة قطعة جديدة إلى مخزون قطع الغيار."}
+        onClose={onClose}
+        widthClassName="max-w-2xl"
+      >
+        <form className="grid gap-4 p-5 md:grid-cols-2" onSubmit={(event) => event.preventDefault()}>
+          <Field label="اسم القطعة">
+            <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="مثال: حساس حرارة NTC" />
           </Field>
-        ) : null}
-        <Field label="الموقع">
-          <Input value={location} onChange={(event) => setLocation(event.target.value)} placeholder="رف A-01" />
-        </Field>
-        <Field label="قيمة القطعة بالليرة السورية">
-          <Input value={valueSyp} onChange={(event) => setValueSyp(event.target.value)} type="number" min={0} placeholder="0" />
-        </Field>
-        <Field label="قيمة القطعة بالدولار">
-          <Input value={valueUsd} onChange={(event) => setValueUsd(event.target.value)} type="number" min={0} step="0.01" placeholder="0" />
-        </Field>
-        <div className="flex items-center justify-end gap-3 border-t border-border pt-4 md:col-span-2">
-          <Button type="button" variant="outline" onClick={onClose}>
-            إلغاء
-          </Button>
-          <Button type="button" onClick={save}>
-            <Icon name={isEdit ? "pencil" : "plus"} size={18} />
-            {isEdit ? "حفظ التعديل" : "إضافة القطعة"}
-          </Button>
-        </div>
-      </form>
-    </Modal>
+          <Field label="الكود">
+            <Input value={code} onChange={(event) => setCode(event.target.value)} placeholder="PRT-000" dir="ltr" />
+          </Field>
+          <Field label="قيمة القطعة بالليرة السورية">
+            <Input value={valueSyp} onChange={(event) => setValueSyp(event.target.value)} type="number" min={0} placeholder="0" />
+          </Field>
+          <Field label="قيمة القطعة بالدولار">
+            <Input value={valueUsd} onChange={(event) => setValueUsd(event.target.value)} type="number" min={0} step="0.01" placeholder="0" />
+          </Field>
+          <Field label="الموقع" className="md:col-span-2">
+            <Input value={location} onChange={(event) => setLocation(event.target.value)} placeholder="رف A-01" />
+          </Field>
+          <div className="flex items-center justify-end gap-3 border-t border-border pt-4 md:col-span-2">
+            <Button type="button" variant="outline" onClick={onClose}>
+              إلغاء
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                const item = buildItem();
+                if (isEdit) setPendingEditItem(item);
+                else saveItem(item);
+              }}
+            >
+              <Icon name={isEdit ? "pencil" : "plus"} size={18} />
+              {isEdit ? "حفظ التعديل" : "إضافة القطعة"}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+      {pendingEditItem ? (
+        <ConfirmToast
+          title="تأكيد تعديل القطعة"
+          message={`هل تريد حفظ التعديلات على القطعة ${pendingEditItem.name}؟`}
+          tone="gold"
+          confirmLabel="تأكيد التعديل"
+          onCancel={() => setPendingEditItem(null)}
+          onConfirm={() => saveItem(pendingEditItem)}
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -1570,6 +1610,12 @@ function QuantityAdjustmentModal({
   const [partId, setPartId] = useState(items[0]?.id ?? "");
   const [movementType, setMovementType] = useState<"supply" | "adjustment">("supply");
   const [quantity, setQuantity] = useState("1");
+  const [pendingAdjustment, setPendingAdjustment] = useState<{
+    partId: string;
+    movementType: "supply" | "adjustment";
+    quantity: number;
+    partName: string;
+  } | null>(null);
   const selectedPart = items.find((item) => item.id === partId);
   const numericQuantity = Number(quantity) || 0;
   const delta = movementType === "supply" ? Math.max(0, numericQuantity) : numericQuantity;
@@ -1674,8 +1720,12 @@ function QuantityAdjustmentModal({
             disabled={!canSave}
             onClick={() => {
               if (!selectedPart || delta === 0) return;
-              onSave(selectedPart.id, movementType, delta);
-              onClose();
+              setPendingAdjustment({
+                partId: selectedPart.id,
+                movementType,
+                quantity: delta,
+                partName: selectedPart.name,
+              });
             }}
           >
             <Icon name="pencil" size={18} />
@@ -1683,6 +1733,19 @@ function QuantityAdjustmentModal({
           </Button>
         </div>
       </form>
+      {pendingAdjustment ? (
+        <ConfirmToast
+          title="تأكيد تعديل الكمية"
+          message={`هل تريد حفظ تعديل كمية ${pendingAdjustment.partName}؟`}
+          tone="gold"
+          confirmLabel="تأكيد التعديل"
+          onCancel={() => setPendingAdjustment(null)}
+          onConfirm={() => {
+            onSave(pendingAdjustment.partId, pendingAdjustment.movementType, pendingAdjustment.quantity);
+            onClose();
+          }}
+        />
+      ) : null}
     </Modal>
   );
 }
@@ -2416,9 +2479,20 @@ function InvoiceDetailsModal({
             label="المتبقي"
             value={formatMoney(remaining(invoice.total, invoice.paid), invoice.currency)}
           />
+          <DetailItem label="نوع العملة" value={currencyLabel(invoice.currency)} />
+        </div>
+        <div className="grid gap-3 md:grid-cols-4">
           <DetailItem
             label="طريقة الدفع"
             value={PAYMENT_METHOD_LABELS[invoice.paymentMethod]}
+          />
+          <DetailItem
+            label="حالة الفاتورة"
+            value={
+              <Badge tone={PAYMENT_TONE[invoice.status]} dot>
+                {PAYMENT_LABELS[invoice.status]}
+              </Badge>
+            }
           />
         </div>
 
@@ -2580,6 +2654,160 @@ function AddPaymentModal({
   );
 }
 
+function InvoiceEditModal({
+  invoice,
+  onClose,
+  onSave,
+}: {
+  invoice: Invoice;
+  onClose: () => void;
+  onSave: (invoice: Invoice) => void;
+}) {
+  const [draft, setDraft] = useState<Invoice>(invoice);
+  const [pendingInvoice, setPendingInvoice] = useState<Invoice | null>(null);
+
+  function patchDraft(patch: Partial<Invoice>) {
+    setDraft((current) => ({ ...current, ...patch }));
+  }
+
+  function buildInvoice(): Invoice {
+    const total = Math.max(0, Number(draft.total) || 0);
+    const paid = Math.min(total, Math.max(0, Number(draft.paid) || 0));
+    const nextStatus: PaymentStatus =
+      paid >= total && total > 0 ? "paid" : paid > 0 ? "partial" : draft.status === "paid" ? "partial" : draft.status;
+
+    return {
+      ...draft,
+      client: draft.client || "عميل غير محدد",
+      clientPhone: draft.clientPhone || "غير محدد",
+      technician: draft.technician || "غير محدد",
+      total,
+      paid,
+      status: nextStatus,
+      issuedAt: draft.issuedAt || new Date().toISOString().slice(0, 10),
+    };
+  }
+
+  return (
+    <>
+      <Modal
+        title={`تعديل الفاتورة ${invoice.id}`}
+        description="تعديل بيانات الفاتورة الأساسية، العملة، الحالة، وطريقة الدفع."
+        onClose={onClose}
+        widthClassName="max-w-3xl"
+      >
+        <form className="grid gap-4 p-5 md:grid-cols-2" onSubmit={(event) => event.preventDefault()}>
+          <Field label="رقم الطلب">
+            <Input
+              value={draft.orderId}
+              onChange={(event) => patchDraft({ orderId: event.target.value })}
+              dir="ltr"
+              placeholder="ORD-0000"
+            />
+          </Field>
+          <Field label="نوع الفاتورة">
+            <Select value={draft.type} onChange={(event) => patchDraft({ type: event.target.value as InvoiceType })}>
+              <option value="external">خارجي</option>
+              <option value="internal">داخلي</option>
+            </Select>
+          </Field>
+          <Field label="اسم العميل">
+            <Input
+              value={draft.client}
+              onChange={(event) => patchDraft({ client: event.target.value })}
+              placeholder="اسم العميل"
+            />
+          </Field>
+          <Field label="هاتف العميل">
+            <Input
+              value={draft.clientPhone}
+              onChange={(event) => patchDraft({ clientPhone: event.target.value })}
+              dir="ltr"
+              placeholder="09xx xxx xxx"
+            />
+          </Field>
+          <Field label="الفني">
+            <Select value={draft.technician} onChange={(event) => patchDraft({ technician: event.target.value })}>
+              {TECHNICIANS.map((tech) => (
+                <option key={tech.id} value={tech.name}>
+                  {tech.name}
+                </option>
+              ))}
+              <option value="غير محدد">غير محدد</option>
+            </Select>
+          </Field>
+          <Field label="نوع العملة المالية">
+            <Select value={draft.currency} onChange={(event) => patchDraft({ currency: event.target.value as Currency })}>
+              <option value="SYP">ليرة سورية</option>
+              <option value="USD">دولار</option>
+            </Select>
+          </Field>
+          <Field label="الإجمالي">
+            <Input
+              value={String(draft.total)}
+              onChange={(event) => patchDraft({ total: Number(event.target.value) })}
+              type="number"
+              min={0}
+              placeholder="0"
+            />
+          </Field>
+          <Field label="المدفوع">
+            <Input
+              value={String(draft.paid)}
+              onChange={(event) => patchDraft({ paid: Number(event.target.value) })}
+              type="number"
+              min={0}
+              placeholder="0"
+            />
+          </Field>
+          <Field label="الحالة">
+            <Select value={draft.status} onChange={(event) => patchDraft({ status: event.target.value as PaymentStatus })}>
+              <option value="paid">مدفوعة بالكامل</option>
+              <option value="partial">مدفوعة جزئياً</option>
+              <option value="unpaid">غير مدفوعة</option>
+            </Select>
+          </Field>
+          <Field label="طريقة الدفع">
+            <Select value={draft.paymentMethod} onChange={(event) => patchDraft({ paymentMethod: event.target.value as PaymentMethod })}>
+              <option value="cash">كاش</option>
+              <option value="sham-cash">شام كاش</option>
+            </Select>
+          </Field>
+          <Field label="تاريخ الإصدار" className="md:col-span-2">
+            <Input
+              value={draft.issuedAt}
+              onChange={(event) => patchDraft({ issuedAt: event.target.value })}
+              type="date"
+            />
+          </Field>
+          <div className="flex items-center justify-end gap-3 border-t border-border pt-4 md:col-span-2">
+            <Button type="button" variant="outline" onClick={onClose}>
+              إلغاء
+            </Button>
+            <Button type="button" onClick={() => setPendingInvoice(buildInvoice())}>
+              <Icon name="pencil" size={18} />
+              حفظ التعديل
+            </Button>
+          </div>
+        </form>
+      </Modal>
+      {pendingInvoice ? (
+        <ConfirmToast
+          title="تأكيد تعديل الفاتورة"
+          message={`هل تريد حفظ التعديلات على الفاتورة ${pendingInvoice.id}؟`}
+          tone="gold"
+          confirmLabel="تأكيد التعديل"
+          onCancel={() => setPendingInvoice(null)}
+          onConfirm={() => {
+            onSave(pendingInvoice);
+            onClose();
+          }}
+        />
+      ) : null}
+    </>
+  );
+}
+
 export function InvoicesScreen() {
   const params = useSearchParams();
   const initialType = params.get("type") as InvoiceType | null;
@@ -2593,6 +2821,7 @@ export function InvoicesScreen() {
   const [dateFilter, setDateFilter] = useState<DateFilter>({ from: "", to: "" });
   const [showDateFilter, setShowDateFilter] = useState(false);
   const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null);
+  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [paymentInvoice, setPaymentInvoice] = useState<Invoice | null>(null);
   const [page, setPage] = useState(1);
 
@@ -2654,6 +2883,14 @@ export function InvoicesScreen() {
     );
   }
 
+  function saveInvoice(nextInvoice: Invoice) {
+    setInvoices((current) =>
+      current.map((invoice) => (invoice.id === nextInvoice.id ? nextInvoice : invoice)),
+    );
+    setViewingInvoice((current) => (current?.id === nextInvoice.id ? nextInvoice : current));
+    setPaymentInvoice((current) => (current?.id === nextInvoice.id ? nextInvoice : current));
+  }
+
   return (
     <div className="space-y-6">
       <SectionTitle
@@ -2676,6 +2913,13 @@ export function InvoicesScreen() {
           order={ORDERS.find((order) => order.id === viewingInvoice.orderId)}
           onClose={() => setViewingInvoice(null)}
           onAddPayment={() => setPaymentInvoice(viewingInvoice)}
+        />
+      ) : null}
+      {editingInvoice ? (
+        <InvoiceEditModal
+          invoice={editingInvoice}
+          onClose={() => setEditingInvoice(null)}
+          onSave={saveInvoice}
         />
       ) : null}
       {paymentInvoice ? (
@@ -2735,10 +2979,10 @@ export function InvoicesScreen() {
       </FilterCard>
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-[900px] w-full text-right text-sm">
+          <table className="min-w-[1020px] w-full text-right text-sm">
             <thead>
               <tr className="bg-surface-2 text-content-muted">
-                {["رقم الفاتورة", "الطلب", "العميل", "الفني", "النوع", "الحالة", "الإجمالي", "المتبقي", "إجراءات"].map(
+                {["رقم الفاتورة", "الطلب", "العميل", "الفني", "النوع", "العملة", "الحالة", "الإجمالي", "المتبقي", "إجراءات"].map(
                   (header) => (
                     <th key={header} className="px-4 py-3 font-medium">
                       {header}
@@ -2763,6 +3007,11 @@ export function InvoicesScreen() {
                     <Badge tone="neutral">{typeLabel(invoice.type)}</Badge>
                   </td>
                   <td className="px-4 py-4">
+                    <Badge tone={invoice.currency === "SYP" ? "gold" : "info"}>
+                      {currencyLabel(invoice.currency)}
+                    </Badge>
+                  </td>
+                  <td className="px-4 py-4">
                     <Badge tone={PAYMENT_TONE[invoice.status]} dot>
                       {PAYMENT_LABELS[invoice.status]}
                     </Badge>
@@ -2783,6 +3032,15 @@ export function InvoicesScreen() {
                         className="rounded-sm p-1.5 text-content-muted hover:bg-surface-2"
                       >
                         <Icon name="eye" size={18} />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`تعديل ${invoice.id}`}
+                        title="تعديل الفاتورة"
+                        onClick={() => setEditingInvoice(invoice)}
+                        className="rounded-sm p-1.5 text-content-muted hover:bg-surface-2"
+                      >
+                        <Icon name="pencil" size={18} />
                       </button>
                     </div>
                   </td>

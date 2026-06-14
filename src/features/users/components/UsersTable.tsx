@@ -1,8 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -23,6 +21,8 @@ interface Props {
   page: number;
   pageSize: number;
   onPage: (p: number) => void;
+  onView: (user: User) => void;
+  onEdit: (user: User) => void;
 }
 
 const HEADERS = ["المعرف", "الاسم", "البريد الإلكتروني", "رقم الهاتف", "الدور", "الحالة", "الإجراءات"];
@@ -35,8 +35,15 @@ function StatusBadge({ status }: { status: User["status"] }) {
   );
 }
 
-function RowActions({ user }: { user: User }) {
-  const router = useRouter();
+function RowActions({
+  user,
+  onView,
+  onEdit,
+}: {
+  user: User;
+  onView: (user: User) => void;
+  onEdit: (user: User) => void;
+}) {
   const { remove } = useUserMutations();
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -46,7 +53,7 @@ function RowActions({ user }: { user: User }) {
         <button
           type="button"
           aria-label="عرض"
-          onClick={() => router.push(`/settings/users/${encodeURIComponent(user.id)}`)}
+          onClick={() => onView(user)}
           className="rounded-sm p-1.5 text-content-muted hover:bg-surface-2"
         >
           <Icon name="eye" size={18} />
@@ -54,7 +61,7 @@ function RowActions({ user }: { user: User }) {
         <button
           type="button"
           aria-label="تعديل"
-          onClick={() => router.push(`/settings/users/${encodeURIComponent(user.id)}/edit`)}
+          onClick={() => onEdit(user)}
           className="rounded-sm p-1.5 text-content-muted hover:bg-surface-2"
         >
           <Icon name="pencil" size={18} />
@@ -85,7 +92,7 @@ function RowActions({ user }: { user: User }) {
   );
 }
 
-export function UsersTable({ users, isLoading, total, page, pageSize, onPage }: Props) {
+export function UsersTable({ users, isLoading, total, page, pageSize, onPage, onView, onEdit }: Props) {
   const pages = Math.max(1, Math.ceil(total / pageSize));
   const start = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const end = Math.min(page * pageSize, total);
@@ -110,7 +117,9 @@ export function UsersTable({ users, isLoading, total, page, pageSize, onPage }: 
               : users.map((u) => (
                   <tr key={u.id} className="border-b border-border last:border-0 hover:bg-gold-soft">
                     <td className="px-4 py-4 font-medium text-gold">
-                      <Link href={`/settings/users/${encodeURIComponent(u.id)}`}>{u.id}</Link>
+                      <button type="button" onClick={() => onView(u)} className="font-medium text-gold hover:text-gold-hover">
+                        {u.id}
+                      </button>
                     </td>
                     <td className="px-4 py-4 text-content">{u.fullName}</td>
                     <td className="px-4 py-4 text-content-muted">{u.email}</td>
@@ -124,7 +133,7 @@ export function UsersTable({ users, isLoading, total, page, pageSize, onPage }: 
                       <StatusBadge status={u.status} />
                     </td>
                     <td className="px-4 py-4">
-                      <RowActions user={u} />
+                      <RowActions user={u} onView={onView} onEdit={onEdit} />
                     </td>
                   </tr>
                 ))}
@@ -138,7 +147,9 @@ export function UsersTable({ users, isLoading, total, page, pageSize, onPage }: 
           users.map((u) => (
             <div key={u.id} className="space-y-2 p-4">
               <div className="flex items-center justify-between">
-                <span className="font-medium text-gold">{u.id}</span>
+                <button type="button" onClick={() => onView(u)} className="font-medium text-gold hover:text-gold-hover">
+                  {u.id}
+                </button>
                 <StatusBadge status={u.status} />
               </div>
               <div className="text-right text-content">{u.fullName}</div>
@@ -148,7 +159,7 @@ export function UsersTable({ users, isLoading, total, page, pageSize, onPage }: 
               </div>
               <div className="flex items-center justify-between pt-1">
                 <Badge tone="neutral">{ROLE_LABELS_AR[u.role]}</Badge>
-                <RowActions user={u} />
+                <RowActions user={u} onView={onView} onEdit={onEdit} />
               </div>
             </div>
           ))}

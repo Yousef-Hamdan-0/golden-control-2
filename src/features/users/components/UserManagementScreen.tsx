@@ -11,8 +11,11 @@ import { UserFilters, type RoleFilter, type StatusFilter } from "@/features/user
 import { UsersTable } from "@/features/users/components/UsersTable";
 import { UserKpiCards } from "@/features/users/components/UserKpiCards";
 import { UserForm } from "@/features/users/components/UserForm";
+import { UserProfileView } from "@/features/users/components/UserProfileView";
 import { useUserMutations } from "@/features/users/hooks/use-user-mutations";
+import type { User } from "@/models/auth/user.model";
 import type { UserCreateInput } from "@/models/users/user-create.schema";
+import type { UserUpdateInput } from "@/models/users/user-update.schema";
 
 export function UserManagementScreen() {
   const params = useSearchParams();
@@ -22,7 +25,9 @@ export function UserManagementScreen() {
   const [status, setStatus] = useState<StatusFilter>("all");
   const [page, setPage] = useState(1);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const { create } = useUserMutations();
+  const [viewingUser, setViewingUser] = useState<User | null>(null);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const { create, update } = useUserMutations();
 
   // role + status are in the query key → changing a filter refetches that slice.
   const { data, isLoading, isError, refetch } = useUsersQuery({
@@ -75,6 +80,47 @@ export function UserManagementScreen() {
           </div>
         </Modal>
       ) : null}
+      {viewingUser ? (
+        <Modal
+          title="تفاصيل الملف الشخصي"
+          description="عرض بيانات المستخدم وصلاحياته وحالته داخل النظام."
+          onClose={() => setViewingUser(null)}
+          widthClassName="max-w-4xl"
+        >
+          <div className="p-5">
+            <UserProfileView
+              user={viewingUser}
+              onEdit={(user) => {
+                setViewingUser(null);
+                setEditingUser(user);
+              }}
+            />
+          </div>
+        </Modal>
+      ) : null}
+      {editingUser ? (
+        <Modal
+          title="تعديل المستخدم"
+          description="تحديث بيانات المستخدم وصلاحياته وحالته."
+          onClose={() => setEditingUser(null)}
+          widthClassName="max-w-5xl"
+        >
+          <div className="p-5">
+            <UserForm
+              mode="edit"
+              user={editingUser}
+              submitting={update.isPending}
+              onCancel={() => setEditingUser(null)}
+              onSubmit={(input: UserUpdateInput) =>
+                update.mutate(
+                  { id: editingUser.id, input },
+                  { onSuccess: () => setEditingUser(null) },
+                )
+              }
+            />
+          </div>
+        </Modal>
+      ) : null}
 
       {/* Table */}
       {isError ? (
@@ -92,6 +138,8 @@ export function UserManagementScreen() {
           page={page}
           pageSize={PAGE_SIZE}
           onPage={setPage}
+          onView={setViewingUser}
+          onEdit={setEditingUser}
         />
       )}
 

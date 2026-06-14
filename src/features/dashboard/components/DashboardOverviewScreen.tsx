@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { ConfirmToast } from "@/components/ui/ConfirmToast";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { TablePagination } from "@/components/ui/TablePagination";
@@ -225,6 +226,7 @@ function OrderModal({
   onSave: (order: RecentOrder) => void;
 }) {
   const [draft, setDraft] = useState(order);
+  const [pendingEditOrder, setPendingEditOrder] = useState<RecentOrder | null>(null);
   const isEdit = mode === "edit";
 
   return (
@@ -325,7 +327,7 @@ function OrderModal({
             فتح في صفحة الطلبات
           </Link>
           {isEdit ? (
-            <Button type="button" onClick={() => onSave(draft)}>
+            <Button type="button" onClick={() => setPendingEditOrder(draft)}>
               حفظ التعديل
             </Button>
           ) : (
@@ -335,6 +337,16 @@ function OrderModal({
           )}
         </div>
       </Card>
+      {pendingEditOrder ? (
+        <ConfirmToast
+          title="تأكيد تعديل الطلب"
+          message={`هل تريد حفظ التعديلات على الطلب ${pendingEditOrder.id}؟`}
+          tone="gold"
+          confirmLabel="تأكيد التعديل"
+          onCancel={() => setPendingEditOrder(null)}
+          onConfirm={() => onSave(pendingEditOrder)}
+        />
+      ) : null}
     </div>
   );
 }
