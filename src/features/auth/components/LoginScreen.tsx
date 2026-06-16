@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { FormEvent } from "react";
 import { useState } from "react";
@@ -76,7 +75,7 @@ export function LoginScreen() {
           }
         />
 
-        <div className="flex items-center justify-between gap-4 text-[13px]">
+        <div className="flex items-center justify-end gap-4 text-[13px]">
           <label className="flex cursor-pointer items-center gap-2 text-[var(--text-muted)]">
             <input
               name="remember"
@@ -85,13 +84,6 @@ export function LoginScreen() {
             />
             <span>تذكرني</span>
           </label>
-
-          <Link
-            href="/forgot-password"
-            className="font-medium text-[var(--gold-active)] transition hover:text-[var(--gold-hover)]"
-          >
-            نسيت كلمة المرور؟
-          </Link>
         </div>
 
         <button

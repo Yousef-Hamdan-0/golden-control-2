@@ -71,20 +71,26 @@ export function UserForm(props: Props) {
   });
 
   const role = watch("role");
+  const canChangePassword = true;
 
   function confirmEdit() {
     if (props.mode !== "edit" || !pendingEditValues) return;
     props.onSubmit(pendingEditValues);
   }
 
+  function sanitizeSubmitValues(values: UserCreateInput & UserUpdateInput) {
+    if (!isEdit) {
+      props.onSubmit(values as UserCreateInput);
+      return;
+    }
+
+    setPendingEditValues(values as UserUpdateInput);
+  }
+
   return (
     <>
       <form
-        onSubmit={handleSubmit((values) =>
-          isEdit
-            ? setPendingEditValues(values as UserUpdateInput)
-            : props.onSubmit(values as UserCreateInput),
-        )}
+        onSubmit={handleSubmit(sanitizeSubmitValues)}
         className="space-y-6"
       >
         <Card>
@@ -152,37 +158,38 @@ export function UserForm(props: Props) {
               )}
             </section>
 
-            {/* Security */}
-            <section>
-              <SectionLabel>الأمان</SectionLabel>
-              <div className="md:w-2/3">
-                <Field
-                  label={isEdit ? "كلمة المرور الجديدة" : "كلمة المرور"}
-                  error={errors.password?.message}
-                >
-                  <div className="relative">
-                    <Input
-                      type={showPassword ? "text" : "password"}
-                      placeholder="••••••••"
-                      {...register("password")}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword((s) => !s)}
-                      aria-label="إظهار كلمة المرور"
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted"
-                    >
-                      <Icon name={showPassword ? "eye-off" : "eye"} size={18} />
-                    </button>
-                  </div>
-                </Field>
-                <p className="mt-1.5 text-xs text-content-muted">
-                  {isEdit
-                    ? "اتركها فارغة للإبقاء على كلمة المرور الحالية. تغييرها متاح للمدير فقط."
-                    : "سيحتاجها المستخدم عند كل تسجيل دخول. يمكن للمدير تغييرها لاحقاً."}
-                </p>
-              </div>
-            </section>
+            {canChangePassword ? (
+              <section>
+                <SectionLabel>الأمان</SectionLabel>
+                <div className="md:w-2/3">
+                  <Field
+                    label={isEdit ? "كلمة المرور الجديدة" : "كلمة المرور"}
+                    error={errors.password?.message}
+                  >
+                    <div className="relative">
+                      <Input
+                        type={showPassword ? "text" : "password"}
+                        placeholder="••••••••"
+                        {...register("password")}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((s) => !s)}
+                        aria-label="إظهار كلمة المرور"
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted"
+                      >
+                        <Icon name={showPassword ? "eye-off" : "eye"} size={18} />
+                      </button>
+                    </div>
+                  </Field>
+                  <p className="mt-1.5 text-xs text-content-muted">
+                    {isEdit
+                      ? "يمكن لمدير النظام تغيير كلمة مرور هذا المستخدم أو تركها فارغة للإبقاء على الحالية."
+                      : "سيحتاجها المستخدم عند كل تسجيل دخول. يمكن لمدير النظام تغييرها لاحقاً."}
+                  </p>
+                </div>
+              </section>
+            ) : null}
           </div>
         </Card>
 

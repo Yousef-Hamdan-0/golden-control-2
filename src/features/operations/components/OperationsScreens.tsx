@@ -15,6 +15,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Icon, type IconName } from "@/lib/icons";
 import { formatMoney, type Currency } from "@/lib/format/currency";
 import { cn } from "@/lib/utils/cn";
+import { CURRENT_USER } from "@/lib/auth/current-user";
 import { PAGE_SIZE } from "@/config/constants";
 
 export type OrderStatus =
@@ -109,9 +110,17 @@ interface InventoryMovement {
 export interface InvoicePayment {
   id: string;
   amount: number;
+  convertedAmount?: number;
   currency: PaymentCurrency;
   method: PaymentMethod;
   paidAt: string;
+}
+
+export interface InvoicePart {
+  id: string;
+  name: string;
+  quantity: number;
+  unitPrice: number;
 }
 
 export interface Invoice {
@@ -120,13 +129,21 @@ export interface Invoice {
   type: InvoiceType;
   client: string;
   clientPhone: string;
+  clientPhone2?: string;
+  clientAddress?: string;
   technician: string;
+  technicianPhone?: string;
   status: PaymentStatus;
   currency: Currency;
   paymentMethod: PaymentMethod;
   total: number;
   paid: number;
   issuedAt: string;
+  warrantyDuration?: string;
+  centerPullItems?: string;
+  notes?: string;
+  returned?: boolean;
+  parts: InvoicePart[];
   payments: InvoicePayment[];
 }
 
@@ -206,6 +223,7 @@ const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
 const USD_TO_SYP_RATE = 14500;
 const INVENTORY_ITEMS_STORAGE_KEY = "golden-control.inventory.items";
 const INVENTORY_MOVEMENTS_STORAGE_KEY = "golden-control.inventory.movements";
+const INVOICES_STORAGE_KEY = "golden-control.invoices";
 
 const ORDERS: Order[] = [
   {
@@ -469,15 +487,25 @@ const INVOICES: Invoice[] = [
     type: "external",
     client: "محمد العتيبي",
     clientPhone: "0991 223 441",
+    clientPhone2: "0988 440 221",
+    clientAddress: "دمشق - المزة",
     technician: "رامي سمير",
+    technicianPhone: "0955 114 220",
     status: "partial",
     currency: "SYP",
     paymentMethod: "cash",
     total: 950000,
     paid: 450000,
     issuedAt: "2026-06-11",
+    warrantyDuration: "3 أشهر",
+    centerPullItems: "لوحة التحكم الرئيسية",
+    notes: "العميل طلب التواصل قبل الزيارة بنصف ساعة.",
+    parts: [
+      { id: "PRT-101", name: "كمبروسر ثلاجة 1/4", quantity: 1, unitPrice: 780000 },
+      { id: "PRT-102", name: "حساس حرارة NTC", quantity: 2, unitPrice: 55000 },
+    ],
     payments: [
-      { id: "PAY-721", amount: 450000, currency: "SYP", method: "cash", paidAt: "2026-06-11" },
+      { id: "PAY-721", amount: 450000, convertedAmount: 450000, currency: "SYP", method: "cash", paidAt: "2026-06-11" },
     ],
   },
   {
@@ -486,16 +514,26 @@ const INVOICES: Invoice[] = [
     type: "external",
     client: "سارة القحطاني",
     clientPhone: "0944 772 118",
+    clientPhone2: "لا يوجد",
+    clientAddress: "دمشق - المالكي",
     technician: "رامي سمير",
+    technicianPhone: "0955 114 220",
     status: "paid",
     currency: "SYP",
     paymentMethod: "sham-cash",
     total: 680000,
     paid: 680000,
     issuedAt: "2026-06-10",
+    warrantyDuration: "شهر واحد",
+    centerPullItems: "",
+    notes: "",
+    parts: [
+      { id: "PRT-103", name: "لوحة تحكم شاشة", quantity: 1, unitPrice: 420000 },
+      { id: "LAB-001", name: "أجور صيانة", quantity: 1, unitPrice: 260000 },
+    ],
     payments: [
-      { id: "PAY-720", amount: 300000, currency: "SYP", method: "sham-cash", paidAt: "2026-06-10" },
-      { id: "PAY-719", amount: 380000, currency: "SYP", method: "sham-cash", paidAt: "2026-06-10" },
+      { id: "PAY-720", amount: 300000, convertedAmount: 300000, currency: "SYP", method: "sham-cash", paidAt: "2026-06-10" },
+      { id: "PAY-719", amount: 380000, convertedAmount: 380000, currency: "SYP", method: "sham-cash", paidAt: "2026-06-10" },
     ],
   },
   {
@@ -504,15 +542,25 @@ const INVOICES: Invoice[] = [
     type: "internal",
     client: "مركز الصفاء التجاري",
     clientPhone: "011 442 0911",
+    clientPhone2: "0933 118 205",
+    clientAddress: "استلام داخل المركز",
     technician: "هاني خالد",
+    technicianPhone: "0944 620 331",
     status: "partial",
     currency: "USD",
     paymentMethod: "cash",
     total: 125,
     paid: 60,
     issuedAt: "2026-06-10",
+    warrantyDuration: "6 أشهر",
+    centerPullItems: "مضخة التصريف",
+    notes: "تم تثبيت الجهاز داخل المركز.",
+    parts: [
+      { id: "PRT-104", name: "موتور جلاية", quantity: 1, unitPrice: 42 },
+      { id: "LAB-002", name: "أجور فحص", quantity: 1, unitPrice: 83 },
+    ],
     payments: [
-      { id: "PAY-718", amount: 60, currency: "USD", method: "cash", paidAt: "2026-06-10" },
+      { id: "PAY-718", amount: 60, convertedAmount: 60, currency: "USD", method: "cash", paidAt: "2026-06-10" },
     ],
   },
   {
@@ -521,16 +569,95 @@ const INVOICES: Invoice[] = [
     type: "internal",
     client: "شركة الربيع",
     clientPhone: "011 889 2020",
+    clientPhone2: "0955 202 889",
+    clientAddress: "استلام داخل المركز",
     technician: "هاني خالد",
+    technicianPhone: "0944 620 331",
     status: "unpaid",
     currency: "SYP",
     paymentMethod: "cash",
     total: 1450000,
     paid: 0,
     issuedAt: "2026-06-09",
+    warrantyDuration: "لا يوجد",
+    centerPullItems: "",
+    notes: "بانتظار موافقة العميل على التكلفة.",
+    parts: [
+      { id: "PRT-105", name: "فلتر مكيف داخلي", quantity: 3, unitPrice: 30000 },
+      { id: "LAB-003", name: "أجور تركيب", quantity: 1, unitPrice: 1360000 },
+    ],
     payments: [],
   },
 ];
+
+function normalizeInvoice(invoice: Partial<Invoice>): Invoice {
+  const total = Number(invoice.total) || 0;
+  const paid = Math.min(total, Math.max(0, Number(invoice.paid) || 0));
+  const status: PaymentStatus =
+    invoice.status === "paid" || invoice.status === "partial" || invoice.status === "unpaid"
+      ? invoice.status
+      : paid >= total && total > 0
+        ? "paid"
+        : paid > 0
+          ? "partial"
+          : "unpaid";
+  const currency: Currency = invoice.currency === "USD" ? "USD" : "SYP";
+  const paymentMethod: PaymentMethod = invoice.paymentMethod === "sham-cash" ? "sham-cash" : "cash";
+  const parts =
+    Array.isArray(invoice.parts) && invoice.parts.length > 0
+      ? invoice.parts.map((part, index) => ({
+          id: part.id || `PRT-${index + 1}`,
+          name: part.name || "قطعة غير محددة",
+          quantity: Math.max(1, Number(part.quantity) || 1),
+          unitPrice: Math.max(0, Number(part.unitPrice) || 0),
+        }))
+      : [
+          {
+            id: `PRT-${(invoice.id ?? "0000").replace(/\D/g, "").slice(-4) || "0000"}`,
+            name: "أجور صيانة",
+            quantity: 1,
+            unitPrice: total,
+          },
+        ];
+  const technician = invoice.technician || "غير محدد";
+
+  return {
+    id: invoice.id || "INV-0000",
+    orderId: invoice.orderId || "ORD-0000",
+    type: invoice.type === "internal" ? "internal" : "external",
+    client: invoice.client || "عميل غير محدد",
+    clientPhone: invoice.clientPhone || "غير محدد",
+    clientPhone2: invoice.clientPhone2 || "لا يوجد",
+    clientAddress: invoice.clientAddress || "غير محدد",
+    technician,
+    technicianPhone: invoice.technicianPhone || getTechnicianPhone(technician),
+    status,
+    currency,
+    paymentMethod,
+    total,
+    paid,
+    issuedAt: invoice.issuedAt || new Date().toISOString().slice(0, 10),
+    warrantyDuration: invoice.warrantyDuration || "غير محددة",
+    centerPullItems: invoice.centerPullItems ?? "",
+    notes: invoice.notes ?? "",
+    returned: Boolean(invoice.returned),
+    parts,
+    payments: Array.isArray(invoice.payments)
+      ? invoice.payments.map((payment, index) => ({
+          id: payment.id || `PAY-${index + 1}`,
+          amount: Math.max(0, Number(payment.amount) || 0),
+          convertedAmount: Math.max(0, Number(payment.convertedAmount ?? payment.amount) || 0),
+          currency: payment.currency === "USD" ? "USD" : "SYP",
+          method: payment.method === "sham-cash" ? "sham-cash" : "cash",
+          paidAt: payment.paidAt || invoice.issuedAt || new Date().toISOString().slice(0, 10),
+        }))
+      : [],
+  };
+}
+
+function readStoredInvoices() {
+  return readStoredList<Partial<Invoice>>(INVOICES_STORAGE_KEY, INVOICES).map(normalizeInvoice);
+}
 
 const FINANCE_RECORDS: FinanceRecord[] = [
   {
@@ -627,6 +754,78 @@ function typeLabel(type: OrderType | InvoiceType) {
 
 function currencyLabel(currency: Currency) {
   return currency === "SYP" ? "ليرة سورية" : "دولار";
+}
+
+function invoicePartTotal(part: InvoicePart) {
+  return part.quantity * part.unitPrice;
+}
+
+function invoicePartsTotal(parts: InvoicePart[]) {
+  return parts.reduce((sum, part) => sum + invoicePartTotal(part), 0);
+}
+
+function isRepairDecisionStatus(status: OrderStatus) {
+  return status === "completed" || status === "incompleted";
+}
+
+function canCreateInvoiceForOrder(order: Order, role: string) {
+  const normalizedRole = role.toLowerCase();
+  if (normalizedRole === "admin") return true;
+  if (order.type === "internal") return normalizedRole === "manager" || normalizedRole === "employee";
+  return false;
+}
+
+function nextInvoiceId(invoices: Invoice[]) {
+  const maxNumber = Math.max(0, ...invoices.map((invoice) => Number(invoice.id.replace(/\D/g, "")) || 0));
+  return `INV-${maxNumber + 1}`;
+}
+
+function createInvoiceDraftFromOrder(order: Order, invoices: Invoice[]): Invoice {
+  const paid = Math.min(order.total, order.paid);
+  const status: PaymentStatus = paid >= order.total && order.total > 0 ? "paid" : paid > 0 ? "partial" : "unpaid";
+
+  return {
+    id: nextInvoiceId(invoices),
+    orderId: order.id,
+    type: order.type,
+    client: order.client,
+    clientPhone: order.phone,
+    clientPhone2: order.phone2 ?? "",
+    clientAddress: order.address,
+    technician: order.technician,
+    technicianPhone: getTechnicianPhone(order.technician),
+    status,
+    currency: "SYP",
+    paymentMethod: "cash",
+    total: order.total,
+    paid,
+    issuedAt: new Date().toISOString().slice(0, 10),
+    warrantyDuration: "",
+    centerPullItems: order.status === "incompleted" ? order.device : "",
+    notes: "",
+    returned: false,
+    parts: [
+      {
+        id: `PRT-${order.id.replace(/\D/g, "").slice(-4) || "0000"}`,
+        name: order.device,
+        quantity: 1,
+        unitPrice: order.total,
+      },
+    ],
+    payments:
+      paid > 0
+        ? [
+            {
+              id: `PAY-${Date.now().toString().slice(-5)}`,
+              amount: paid,
+              convertedAmount: paid,
+              currency: "SYP",
+              method: "cash",
+              paidAt: new Date().toISOString().slice(0, 10),
+            },
+          ]
+        : [],
+  };
 }
 
 function remaining(total: number, paid: number) {
@@ -1363,19 +1562,57 @@ function getTechnicianPhone(name: string) {
 export function OrderDetailsModal({
   order,
   invoice,
+  invoices = INVOICES,
+  onCreateInvoice,
   onClose,
 }: {
   order: Order;
   invoice?: Invoice | null;
+  invoices?: Invoice[];
+  onCreateInvoice?: (invoice: Invoice) => void;
   onClose: () => void;
 }) {
   const [showInvoiceDetails, setShowInvoiceDetails] = useState(false);
+  const [showInvoiceForm, setShowInvoiceForm] = useState(false);
+  const [invoiceNotice, setInvoiceNotice] = useState<string | null>(null);
   const invoiceBalance = invoice ? remaining(invoice.total, invoice.paid) : 0;
   const devices = getOrderDevices(order);
   const extraDevices = devices.slice(1);
   const phone2 = order.phone2?.trim() || "لا يوجد";
   const customerLocation = order.locationUrl?.trim();
   const technicianPhone = getTechnicianPhone(order.technician);
+  const invoiceDraft = createInvoiceDraftFromOrder(order, invoices);
+
+  function handleInvoiceCreateRequest() {
+    setInvoiceNotice(null);
+
+    if (!isRepairDecisionStatus(order.status)) {
+      setInvoiceNotice("لا يمكن إنشاء فاتورة قبل تحديد نتيجة الإصلاح: مكتمل أو غير مكتمل.");
+      return;
+    }
+
+    if (!canCreateInvoiceForOrder(order, CURRENT_USER.role)) {
+      setInvoiceNotice(
+        order.type === "external"
+          ? "إنشاء فاتورة الطلب الخارجي متاح فقط لمدير النظام."
+          : "لا تملك صلاحية إنشاء فاتورة لهذا الطلب.",
+      );
+      return;
+    }
+
+    if (invoice) {
+      setInvoiceNotice("توجد فاتورة مرتبطة بهذا الطلب مسبقاً. يمكنك معاينتها من زر التفاصيل.");
+      setShowInvoiceDetails(true);
+      return;
+    }
+
+    if (!onCreateInvoice) {
+      setInvoiceNotice("إنشاء الفواتير متاح من تفاصيل الطلب داخل صفحة إدارة الطلبات.");
+      return;
+    }
+
+    setShowInvoiceForm(true);
+  }
 
   return (
     <>
@@ -1459,20 +1696,31 @@ export function OrderDetailsModal({
           </Card>
 
           <Card className="bg-surface-2 p-4 shadow-none">
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <h3 className="font-heading text-base font-bold text-content">الفاتورة</h3>
-              {invoice ? (
-                <button
-                  type="button"
-                  aria-label={`تفاصيل الفاتورة ${invoice.id}`}
-                  title="تفاصيل الفاتورة"
-                  onClick={() => setShowInvoiceDetails(true)}
-                  className="rounded-sm p-1.5 text-content-muted hover:bg-surface hover:text-content"
-                >
-                  <Icon name="eye" size={18} />
-                </button>
-              ) : null}
+              <div className="flex items-center gap-2">
+                <Button type="button" size="sm" onClick={handleInvoiceCreateRequest}>
+                  <Icon name="plus" size={16} />
+                  إنشاء فاتورة
+                </Button>
+                {invoice ? (
+                  <button
+                    type="button"
+                    aria-label={`تفاصيل الفاتورة ${invoice.id}`}
+                    title="تفاصيل الفاتورة"
+                    onClick={() => setShowInvoiceDetails(true)}
+                    className="rounded-sm p-1.5 text-content-muted hover:bg-surface hover:text-content"
+                  >
+                    <Icon name="eye" size={18} />
+                  </button>
+                ) : null}
+              </div>
             </div>
+            {invoiceNotice ? (
+              <div className="mt-3 rounded-md border border-gold/30 bg-gold-soft p-3 text-sm font-medium text-gold-active">
+                {invoiceNotice}
+              </div>
+            ) : null}
             {invoice ? (
               <div className="mt-3 grid gap-3 md:grid-cols-4">
                 <DetailItem label="رقم الفاتورة" value={invoice.id} ltr />
@@ -1499,6 +1747,18 @@ export function OrderDetailsModal({
           invoice={invoice}
           order={order}
           onClose={() => setShowInvoiceDetails(false)}
+        />
+      ) : null}
+      {showInvoiceForm ? (
+        <InvoiceFormModal
+          invoice={invoiceDraft}
+          mode="create"
+          onClose={() => setShowInvoiceForm(false)}
+          onSave={(nextInvoice) => {
+            onCreateInvoice?.(nextInvoice);
+            setShowInvoiceForm(false);
+            setShowInvoiceDetails(true);
+          }}
         />
       ) : null}
     </>
@@ -1809,6 +2069,7 @@ export function OrdersScreen() {
   const initialType = params.get("type") as OrderType | null;
   const initialStatus = params.get("status") as OrderStatus | null;
   const [orders, setOrders] = useState<Order[]>(ORDERS);
+  const [orderInvoices, setOrderInvoices] = useState<Invoice[]>(readStoredInvoices);
   const [type, setType] = useState<OrderType | "all">(initialType ?? "all");
   const [status, setStatus] = useState<OrderStatus | "all">(initialStatus ?? "all");
   const [query, setQuery] = useState("");
@@ -1860,6 +2121,10 @@ export function OrdersScreen() {
     });
   }
 
+  useEffect(() => {
+    writeStoredList(INVOICES_STORAGE_KEY, orderInvoices);
+  }, [orderInvoices]);
+
   return (
     <div className="space-y-6">
       <SectionTitle
@@ -1898,7 +2163,15 @@ export function OrdersScreen() {
       {viewingOrder ? (
         <OrderDetailsModal
           order={viewingOrder}
-          invoice={INVOICES.find((invoice) => invoice.orderId === viewingOrder.id) ?? null}
+          invoice={orderInvoices.find((invoice) => invoice.orderId === viewingOrder.id) ?? null}
+          invoices={orderInvoices}
+          onCreateInvoice={(invoice) =>
+            setOrderInvoices((current) =>
+              current.some((item) => item.id === invoice.id)
+                ? current.map((item) => (item.id === invoice.id ? invoice : item))
+                : [invoice, ...current],
+            )
+          }
           onClose={() => setViewingOrder(null)}
         />
       ) : null}
@@ -2439,16 +2712,121 @@ function convertPaymentToInvoiceCurrency(
   return amount / USD_TO_SYP_RATE;
 }
 
+function buildSimpleInvoicePdf(invoice: Invoice): Blob {
+  const lines = [
+    "Golden Control - Invoice",
+    `Invoice: ${invoice.id}`,
+    `Type: ${typeLabel(invoice.type)}`,
+    `Status: ${PAYMENT_LABELS[invoice.status]}`,
+    `Client: ${escapePdfText(invoice.client)}`,
+    `Phone: ${invoice.clientPhone}`,
+    `Technician: ${escapePdfText(invoice.technician)}`,
+    `Total: ${formatMoney(invoice.total, invoice.currency)}`,
+    `Paid: ${formatMoney(invoice.paid, invoice.currency)}`,
+    `Remaining: ${formatMoney(remaining(invoice.total, invoice.paid), invoice.currency)}`,
+    `Warranty: ${escapePdfText(invoice.warrantyDuration || "N/A")}`,
+  ];
+  const objects: string[] = [];
+  const content =
+    "BT /F1 14 Tf 50 780 Td " +
+    lines.map((line, index) => `${index === 0 ? "" : "0 -24 Td "}(${escapePdfText(line)}) Tj`).join(" ") +
+    " ET";
+
+  objects.push("<< /Type /Catalog /Pages 2 0 R >>");
+  objects.push("<< /Type /Pages /Kids [3 0 R] /Count 1 >>");
+  objects.push("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>");
+  objects.push(`<< /Length ${content.length} >>\nstream\n${content}\nendstream`);
+  objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
+
+  let pdf = "%PDF-1.4\n";
+  const offsets = [0];
+  objects.forEach((object, index) => {
+    offsets.push(pdf.length);
+    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  });
+  const xref = pdf.length;
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  offsets.slice(1).forEach((offset) => {
+    pdf += `${String(offset).padStart(10, "0")} 00000 n \n`;
+  });
+  pdf += `trailer << /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+
+  return new Blob([pdf], { type: "application/pdf" });
+}
+
+function downloadInvoicePdf(invoice: Invoice) {
+  const url = URL.createObjectURL(buildSimpleInvoicePdf(invoice));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${invoice.id}.pdf`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function printInvoice(invoice: Invoice) {
+  const printWindow = window.open("", "_blank", "width=900,height=700");
+  if (!printWindow) return;
+
+  const partsRows = invoice.parts
+    .map(
+      (part) => `
+        <tr>
+          <td>${part.name}</td>
+          <td>${part.quantity}</td>
+          <td>${formatMoney(part.unitPrice, invoice.currency)}</td>
+          <td>${formatMoney(invoicePartTotal(part), invoice.currency)}</td>
+        </tr>
+      `,
+    )
+    .join("");
+
+  printWindow.document.write(`
+    <html dir="rtl" lang="ar">
+      <head>
+        <title>${invoice.id}</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 32px; color: #1f1f1f; }
+          h1 { color: #8a6b00; }
+          table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+          th, td { border: 1px solid #ddd; padding: 10px; text-align: right; }
+          .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+          .box { border: 1px solid #ddd; padding: 12px; border-radius: 6px; }
+        </style>
+      </head>
+      <body>
+        <h1>فاتورة ${invoice.id}</h1>
+        <div class="grid">
+          <div class="box">العميل: ${invoice.client}</div>
+          <div class="box">الهاتف: ${invoice.clientPhone}</div>
+          <div class="box">الفني: ${invoice.technician}</div>
+          <div class="box">الحالة: ${PAYMENT_LABELS[invoice.status]}</div>
+          <div class="box">الإجمالي: ${formatMoney(invoice.total, invoice.currency)}</div>
+          <div class="box">المتبقي: ${formatMoney(remaining(invoice.total, invoice.paid), invoice.currency)}</div>
+        </div>
+        <table>
+          <thead><tr><th>القطعة</th><th>الكمية</th><th>سعر القطعة</th><th>الإجمالي</th></tr></thead>
+          <tbody>${partsRows}</tbody>
+        </table>
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.print();
+}
+
 function InvoiceDetailsModal({
   invoice,
   order,
   onClose,
   onAddPayment,
+  onReturnInvoice,
 }: {
   invoice: Invoice;
   order?: Order;
   onClose: () => void;
   onAddPayment?: () => void;
+  onReturnInvoice?: (invoice: Invoice) => void;
 }) {
   const [paymentsPage, setPaymentsPage] = useState(1);
   const paymentPages = Math.max(1, Math.ceil(invoice.payments.length / PAGE_SIZE));
@@ -2457,52 +2835,104 @@ function InvoiceDetailsModal({
     (currentPaymentsPage - 1) * PAGE_SIZE,
     currentPaymentsPage * PAGE_SIZE,
   );
+  const canAddPayment = invoice.status !== "paid" && !invoice.returned;
 
   return (
     <Modal
       title={`تفاصيل الفاتورة ${invoice.id}`}
-      description="تفاصيل الفاتورة، الطلب المرتبط، وسجل المدفوعات."
+      description="معاينة كاملة للفاتورة والقطع والدفعات قبل الطباعة أو التحميل."
       onClose={onClose}
-      widthClassName="max-w-4xl"
+      widthClassName="max-w-6xl"
     >
       <div className="space-y-5 p-5">
-        <div className="grid gap-3 md:grid-cols-4">
-          <DetailItem label="العميل" value={invoice.client} />
-          <DetailItem label="هاتف العميل" value={invoice.clientPhone} ltr />
-          <DetailItem label="رقم الطلب" value={invoice.orderId} ltr />
-          <DetailItem label="الفني" value={invoice.technician} />
-        </div>
-        <div className="grid gap-3 md:grid-cols-4">
-          <DetailItem label="الإجمالي" value={formatMoney(invoice.total, invoice.currency)} />
-          <DetailItem label="المدفوع" value={formatMoney(invoice.paid, invoice.currency)} />
-          <DetailItem
-            label="المتبقي"
-            value={formatMoney(remaining(invoice.total, invoice.paid), invoice.currency)}
-          />
-          <DetailItem label="نوع العملة" value={currencyLabel(invoice.currency)} />
-        </div>
-        <div className="grid gap-3 md:grid-cols-4">
-          <DetailItem
-            label="طريقة الدفع"
-            value={PAYMENT_METHOD_LABELS[invoice.paymentMethod]}
-          />
+        <div className="grid gap-3 md:grid-cols-3">
+          <DetailItem label="رقم الفاتورة" value={invoice.id} ltr />
+          <DetailItem label="نوع الفاتورة" value={typeLabel(invoice.type)} />
           <DetailItem
             label="حالة الفاتورة"
             value={
-              <Badge tone={PAYMENT_TONE[invoice.status]} dot>
-                {PAYMENT_LABELS[invoice.status]}
-              </Badge>
+              <div className="flex flex-wrap gap-2">
+                <Badge tone={PAYMENT_TONE[invoice.status]} dot>
+                  {PAYMENT_LABELS[invoice.status]}
+                </Badge>
+                {invoice.returned ? <Badge tone="danger">مرجعة</Badge> : null}
+              </div>
             }
           />
         </div>
 
+        <Card className="bg-surface-2 p-4 shadow-none">
+          <h3 className="font-heading text-base font-bold text-content">بيانات العميل</h3>
+          <div className="mt-3 grid gap-3 md:grid-cols-4">
+            <DetailItem label="اسم العميل" value={invoice.client} />
+            <DetailItem label="رقم 1" value={invoice.clientPhone} ltr />
+            <DetailItem label="رقم 2" value={invoice.clientPhone2?.trim() || "لا يوجد"} ltr={Boolean(invoice.clientPhone2?.trim() && invoice.clientPhone2 !== "لا يوجد")} />
+            <DetailItem label="العنوان" value={invoice.clientAddress || order?.address || "غير محدد"} />
+          </div>
+        </Card>
+
+        <Card className="bg-surface-2 p-4 shadow-none">
+          <h3 className="font-heading text-base font-bold text-content">بيانات الفني</h3>
+          <div className="mt-3 grid gap-3 md:grid-cols-2">
+            <DetailItem label="اسم الفني" value={invoice.technician} />
+            <DetailItem label="رقم تلفونه" value={invoice.technicianPhone || getTechnicianPhone(invoice.technician)} ltr />
+          </div>
+        </Card>
+
+        <Card className="overflow-hidden shadow-none">
+          <div className="border-b border-border px-4 py-3">
+            <h3 className="font-heading text-base font-bold text-content">القطع المستخدمة</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-[720px] w-full text-right text-sm">
+              <thead>
+                <tr className="bg-surface-2 text-content-muted">
+                  {["اسم القطعة", "الكمية", "سعر كل قطعة", "الإجمالي"].map((header) => (
+                    <th key={header} className="px-4 py-3 font-medium">
+                      {header}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {invoice.parts.map((part) => (
+                  <tr key={part.id} className="border-t border-border">
+                    <td className="px-4 py-3 text-content">{part.name}</td>
+                    <td className="px-4 py-3 text-content-muted">{part.quantity}</td>
+                    <td className="px-4 py-3 text-content-muted">
+                      {formatMoney(part.unitPrice, invoice.currency)}
+                    </td>
+                    <td className="px-4 py-3 font-bold text-gold">
+                      {formatMoney(invoicePartTotal(part), invoice.currency)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {invoice.parts.length === 0 ? <EmptyState title="لا توجد قطع مستخدمة في هذه الفاتورة." /> : null}
+        </Card>
+
+        <div className="grid gap-3 md:grid-cols-4">
+          <DetailItem label="الإجمالي" value={formatMoney(invoice.total, invoice.currency)} />
+          <DetailItem label="المدفوع" value={formatMoney(invoice.paid, invoice.currency)} />
+          <DetailItem label="المتبقي" value={formatMoney(remaining(invoice.total, invoice.paid), invoice.currency)} />
+          <DetailItem label="نوع العملة" value={currencyLabel(invoice.currency)} />
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-3">
+          <DetailItem label="قطع تحتاج سحب للمركز" value={invoice.centerPullItems?.trim() || "لا يوجد"} />
+          <DetailItem label="ملاحظات" value={invoice.notes?.trim() || "لا يوجد"} />
+          <DetailItem label="مدة الكفالة" value={invoice.warrantyDuration?.trim() || "غير محددة"} />
+        </div>
+
         {order ? (
           <Card className="bg-surface-2 p-4 shadow-none">
-            <h3 className="font-heading text-base font-bold text-content">معلومات الطلب</h3>
+            <h3 className="font-heading text-base font-bold text-content">معلومات الطلب المرتبط</h3>
             <div className="mt-3 grid gap-3 md:grid-cols-4">
+              <DetailItem label="رقم الطلب" value={order.id} ltr />
               <DetailItem label="الجهاز" value={order.device} />
               <DetailItem label="حالة الطلب" value={ORDER_STATUS_LABELS[order.status]} />
-              <DetailItem label="الأولوية" value={PRIORITY_LABELS[order.priority]} />
               <DetailItem label="موعد الزيارة" value={order.visitDate} />
             </div>
           </Card>
@@ -2511,7 +2941,7 @@ function InvoiceDetailsModal({
         <Card className="overflow-hidden shadow-none">
           <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
             <h3 className="font-heading text-base font-bold text-content">سجل المدفوعات</h3>
-            {onAddPayment ? (
+            {canAddPayment && onAddPayment ? (
               <Button type="button" size="sm" onClick={onAddPayment}>
                 <Icon name="plus" size={16} />
                 إضافة دفعة
@@ -2523,7 +2953,7 @@ function InvoiceDetailsModal({
               <table className="min-w-[640px] w-full text-right text-sm">
                 <thead>
                   <tr className="bg-surface-2 text-content-muted">
-                    {["رقم الدفعة", "المبلغ", "الطريقة", "نوع العملية", "التاريخ"].map((header) => (
+                    {["المبلغ المدفوع", "المبلغ بعد التحويل", "طريقة الدفع", "نوع العملة", "التاريخ"].map((header) => (
                       <th key={header} className="px-4 py-3 font-medium">
                         {header}
                       </th>
@@ -2533,9 +2963,11 @@ function InvoiceDetailsModal({
                 <tbody>
                   {visiblePayments.map((payment) => (
                     <tr key={payment.id} className="border-t border-border">
-                      <td className="px-4 py-3 font-bold text-gold">{payment.id}</td>
                       <td className="px-4 py-3 text-content-muted">
                         {formatMoney(payment.amount, payment.currency)}
+                      </td>
+                      <td className="px-4 py-3 font-bold text-gold">
+                        {formatMoney(payment.convertedAmount ?? convertPaymentToInvoiceCurrency(payment.amount, payment.currency, invoice.currency), invoice.currency)}
                       </td>
                       <td className="px-4 py-3 text-content-muted">
                         {PAYMENT_METHOD_LABELS[payment.method]}
@@ -2560,6 +2992,26 @@ function InvoiceDetailsModal({
             itemLabel="دفعة"
           />
         </Card>
+
+        <div className="flex flex-wrap items-center justify-end gap-3 border-t border-border pt-4">
+          <Button type="button" variant="outline" onClick={() => printInvoice(invoice)}>
+            <Icon name="file" size={18} />
+            طباعة الفاتورة
+          </Button>
+          <Button type="button" variant="outline" onClick={() => downloadInvoicePdf(invoice)}>
+            <Icon name="file" size={18} />
+            تحميل PDF
+          </Button>
+          <Button
+            type="button"
+            variant="danger"
+            disabled={invoice.returned}
+            onClick={() => onReturnInvoice?.(invoice)}
+          >
+            <Icon name="arrow-left" size={18} />
+            إرجاع الفاتورة
+          </Button>
+        </div>
       </div>
     </Modal>
   );
@@ -2587,6 +3039,7 @@ function AddPaymentModal({
       {
         id: `PAY-${Date.now().toString().slice(-5)}`,
         amount: numericAmount,
+        convertedAmount,
         currency,
         method,
         paidAt: new Date().toISOString().slice(0, 10),
@@ -2654,149 +3107,246 @@ function AddPaymentModal({
   );
 }
 
-function InvoiceEditModal({
+function InvoiceFormModal({
   invoice,
+  mode = "edit",
   onClose,
   onSave,
 }: {
   invoice: Invoice;
+  mode?: "create" | "edit";
   onClose: () => void;
   onSave: (invoice: Invoice) => void;
 }) {
   const [draft, setDraft] = useState<Invoice>(invoice);
   const [pendingInvoice, setPendingInvoice] = useState<Invoice | null>(null);
+  const isCreate = mode === "create";
 
   function patchDraft(patch: Partial<Invoice>) {
     setDraft((current) => ({ ...current, ...patch }));
   }
 
+  function patchPart(index: number, patch: Partial<InvoicePart>) {
+    setDraft((current) => ({
+      ...current,
+      parts: current.parts.map((part, currentIndex) =>
+        currentIndex === index ? { ...part, ...patch } : part,
+      ),
+    }));
+  }
+
+  function addPart() {
+    setDraft((current) => ({
+      ...current,
+      parts: [
+        ...current.parts,
+        {
+          id: `PRT-${Date.now().toString().slice(-4)}`,
+          name: "",
+          quantity: 1,
+          unitPrice: 0,
+        },
+      ],
+    }));
+  }
+
+  function removePart(index: number) {
+    setDraft((current) => ({
+      ...current,
+      parts: current.parts.filter((_, currentIndex) => currentIndex !== index),
+    }));
+  }
+
   function buildInvoice(): Invoice {
-    const total = Math.max(0, Number(draft.total) || 0);
+    const parts = draft.parts.map((part, index) => ({
+      ...part,
+      id: part.id || `PRT-${index + 1}`,
+      name: part.name || "قطعة غير محددة",
+      quantity: Math.max(1, Number(part.quantity) || 1),
+      unitPrice: Math.max(0, Number(part.unitPrice) || 0),
+    }));
+    const partsTotal = invoicePartsTotal(parts);
+    const total = partsTotal > 0 ? partsTotal : Math.max(0, Number(draft.total) || 0);
     const paid = Math.min(total, Math.max(0, Number(draft.paid) || 0));
     const nextStatus: PaymentStatus =
       paid >= total && total > 0 ? "paid" : paid > 0 ? "partial" : draft.status === "paid" ? "partial" : draft.status;
+    const payments =
+      draft.payments.length > 0
+        ? draft.payments
+        : paid > 0
+          ? [
+              {
+                id: `PAY-${Date.now().toString().slice(-5)}`,
+                amount: paid,
+                convertedAmount: paid,
+                currency: draft.currency,
+                method: draft.paymentMethod,
+                paidAt: draft.issuedAt || new Date().toISOString().slice(0, 10),
+              },
+            ]
+          : [];
 
     return {
       ...draft,
       client: draft.client || "عميل غير محدد",
       clientPhone: draft.clientPhone || "غير محدد",
+      clientPhone2: draft.clientPhone2 || "لا يوجد",
+      clientAddress: draft.clientAddress || "غير محدد",
       technician: draft.technician || "غير محدد",
+      technicianPhone: draft.technicianPhone || getTechnicianPhone(draft.technician),
       total,
       paid,
       status: nextStatus,
       issuedAt: draft.issuedAt || new Date().toISOString().slice(0, 10),
+      warrantyDuration: draft.warrantyDuration || "غير محددة",
+      centerPullItems: draft.centerPullItems ?? "",
+      notes: draft.notes ?? "",
+      parts,
+      payments,
     };
   }
 
   return (
     <>
       <Modal
-        title={`تعديل الفاتورة ${invoice.id}`}
-        description="تعديل بيانات الفاتورة الأساسية، العملة، الحالة، وطريقة الدفع."
+        title={isCreate ? "إنشاء فاتورة" : `تعديل الفاتورة ${invoice.id}`}
+        description={isCreate ? "إنشاء فاتورة جديدة ومعاينتها بعد الحفظ." : "تعديل بيانات الفاتورة والقطع والدفعات الأساسية."}
         onClose={onClose}
-        widthClassName="max-w-3xl"
+        widthClassName="max-w-6xl"
       >
-        <form className="grid gap-4 p-5 md:grid-cols-2" onSubmit={(event) => event.preventDefault()}>
-          <Field label="رقم الطلب">
-            <Input
-              value={draft.orderId}
-              onChange={(event) => patchDraft({ orderId: event.target.value })}
-              dir="ltr"
-              placeholder="ORD-0000"
-            />
-          </Field>
-          <Field label="نوع الفاتورة">
-            <Select value={draft.type} onChange={(event) => patchDraft({ type: event.target.value as InvoiceType })}>
-              <option value="external">خارجي</option>
-              <option value="internal">داخلي</option>
-            </Select>
-          </Field>
-          <Field label="اسم العميل">
-            <Input
-              value={draft.client}
-              onChange={(event) => patchDraft({ client: event.target.value })}
-              placeholder="اسم العميل"
-            />
-          </Field>
-          <Field label="هاتف العميل">
-            <Input
-              value={draft.clientPhone}
-              onChange={(event) => patchDraft({ clientPhone: event.target.value })}
-              dir="ltr"
-              placeholder="09xx xxx xxx"
-            />
-          </Field>
-          <Field label="الفني">
-            <Select value={draft.technician} onChange={(event) => patchDraft({ technician: event.target.value })}>
-              {TECHNICIANS.map((tech) => (
-                <option key={tech.id} value={tech.name}>
-                  {tech.name}
-                </option>
+        <form className="space-y-5 p-5" onSubmit={(event) => event.preventDefault()}>
+          <div className="grid gap-4 md:grid-cols-3">
+            <Field label="رقم الفاتورة">
+              <Input value={draft.id} onChange={(event) => patchDraft({ id: event.target.value })} dir="ltr" />
+            </Field>
+            <Field label="رقم الطلب">
+              <Input value={draft.orderId} onChange={(event) => patchDraft({ orderId: event.target.value })} dir="ltr" placeholder="ORD-0000" />
+            </Field>
+            <Field label="نوع الفاتورة">
+              <Select value={draft.type} onChange={(event) => patchDraft({ type: event.target.value as InvoiceType })}>
+                <option value="external">خارجي</option>
+                <option value="internal">داخلي</option>
+              </Select>
+            </Field>
+            <Field label="اسم العميل">
+              <Input value={draft.client} onChange={(event) => patchDraft({ client: event.target.value })} placeholder="اسم العميل" />
+            </Field>
+            <Field label="رقم 1">
+              <Input value={draft.clientPhone} onChange={(event) => patchDraft({ clientPhone: event.target.value })} dir="ltr" placeholder="09xx xxx xxx" />
+            </Field>
+            <Field label="رقم 2">
+              <Input value={draft.clientPhone2 ?? ""} onChange={(event) => patchDraft({ clientPhone2: event.target.value })} dir="ltr" placeholder="اختياري" />
+            </Field>
+            <Field label="العنوان" className="md:col-span-3">
+              <Input value={draft.clientAddress ?? ""} onChange={(event) => patchDraft({ clientAddress: event.target.value })} placeholder="عنوان العميل" />
+            </Field>
+            <Field label="اسم الفني">
+              <Select
+                value={draft.technician}
+                onChange={(event) => {
+                  const technician = event.target.value;
+                  patchDraft({ technician, technicianPhone: getTechnicianPhone(technician) });
+                }}
+              >
+                {TECHNICIANS.map((tech) => (
+                  <option key={tech.id} value={tech.name}>
+                    {tech.name}
+                  </option>
+                ))}
+                <option value="غير محدد">غير محدد</option>
+              </Select>
+            </Field>
+            <Field label="رقم تلفون الفني">
+              <Input value={draft.technicianPhone ?? ""} onChange={(event) => patchDraft({ technicianPhone: event.target.value })} dir="ltr" placeholder="رقم الفني" />
+            </Field>
+            <Field label="نوع العملة المالية">
+              <Select value={draft.currency} onChange={(event) => patchDraft({ currency: event.target.value as Currency })}>
+                <option value="SYP">ليرة سورية</option>
+                <option value="USD">دولار</option>
+              </Select>
+            </Field>
+            <Field label="الحالة">
+              <Select value={draft.status} onChange={(event) => patchDraft({ status: event.target.value as PaymentStatus })}>
+                <option value="paid">مدفوعة بالكامل</option>
+                <option value="partial">مدفوعة جزئياً</option>
+                <option value="unpaid">غير مدفوعة</option>
+              </Select>
+            </Field>
+            <Field label="طريقة الدفع">
+              <Select value={draft.paymentMethod} onChange={(event) => patchDraft({ paymentMethod: event.target.value as PaymentMethod })}>
+                <option value="cash">كاش</option>
+                <option value="sham-cash">شام كاش</option>
+              </Select>
+            </Field>
+            <Field label="تاريخ الإصدار">
+              <Input value={draft.issuedAt} onChange={(event) => patchDraft({ issuedAt: event.target.value })} type="date" />
+            </Field>
+          </div>
+
+          <Card className="overflow-hidden shadow-none">
+            <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+              <h3 className="font-heading text-base font-bold text-content">القطع المستخدمة</h3>
+              <Button type="button" variant="outline" size="sm" onClick={addPart}>
+                <Icon name="plus" size={16} />
+                إضافة قطعة
+              </Button>
+            </div>
+            <div className="space-y-3 p-4">
+              {draft.parts.map((part, index) => (
+                <div key={`${part.id}-${index}`} className="grid gap-3 rounded-md border border-border bg-surface-2 p-3 md:grid-cols-[minmax(180px,2fr)_minmax(90px,1fr)_minmax(130px,1fr)_minmax(130px,1fr)_auto]">
+                  <Field label="اسم القطعة">
+                    <Input value={part.name} onChange={(event) => patchPart(index, { name: event.target.value })} placeholder="اسم القطعة" />
+                  </Field>
+                  <Field label="الكمية">
+                    <Input value={String(part.quantity)} onChange={(event) => patchPart(index, { quantity: Number(event.target.value) })} type="number" min={1} />
+                  </Field>
+                  <Field label="سعر كل قطعة">
+                    <Input value={String(part.unitPrice)} onChange={(event) => patchPart(index, { unitPrice: Number(event.target.value) })} type="number" min={0} />
+                  </Field>
+                  <DetailItem label="الإجمالي" value={formatMoney(invoicePartTotal(part), draft.currency)} />
+                  <div className="flex items-end">
+                    <Button type="button" variant="danger" size="sm" onClick={() => removePart(index)} disabled={draft.parts.length <= 1}>
+                      <Icon name="trash" size={16} />
+                    </Button>
+                  </div>
+                </div>
               ))}
-              <option value="غير محدد">غير محدد</option>
-            </Select>
-          </Field>
-          <Field label="نوع العملة المالية">
-            <Select value={draft.currency} onChange={(event) => patchDraft({ currency: event.target.value as Currency })}>
-              <option value="SYP">ليرة سورية</option>
-              <option value="USD">دولار</option>
-            </Select>
-          </Field>
-          <Field label="الإجمالي">
-            <Input
-              value={String(draft.total)}
-              onChange={(event) => patchDraft({ total: Number(event.target.value) })}
-              type="number"
-              min={0}
-              placeholder="0"
-            />
-          </Field>
-          <Field label="المدفوع">
-            <Input
-              value={String(draft.paid)}
-              onChange={(event) => patchDraft({ paid: Number(event.target.value) })}
-              type="number"
-              min={0}
-              placeholder="0"
-            />
-          </Field>
-          <Field label="الحالة">
-            <Select value={draft.status} onChange={(event) => patchDraft({ status: event.target.value as PaymentStatus })}>
-              <option value="paid">مدفوعة بالكامل</option>
-              <option value="partial">مدفوعة جزئياً</option>
-              <option value="unpaid">غير مدفوعة</option>
-            </Select>
-          </Field>
-          <Field label="طريقة الدفع">
-            <Select value={draft.paymentMethod} onChange={(event) => patchDraft({ paymentMethod: event.target.value as PaymentMethod })}>
-              <option value="cash">كاش</option>
-              <option value="sham-cash">شام كاش</option>
-            </Select>
-          </Field>
-          <Field label="تاريخ الإصدار" className="md:col-span-2">
-            <Input
-              value={draft.issuedAt}
-              onChange={(event) => patchDraft({ issuedAt: event.target.value })}
-              type="date"
-            />
-          </Field>
-          <div className="flex items-center justify-end gap-3 border-t border-border pt-4 md:col-span-2">
+            </div>
+          </Card>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            <DetailItem label="إجمالي القطع" value={formatMoney(invoicePartsTotal(draft.parts), draft.currency)} />
+            <Field label="المدفوع">
+              <Input value={String(draft.paid)} onChange={(event) => patchDraft({ paid: Number(event.target.value) })} type="number" min={0} placeholder="0" />
+            </Field>
+            <Field label="مدة الكفالة">
+              <Input value={draft.warrantyDuration ?? ""} onChange={(event) => patchDraft({ warrantyDuration: event.target.value })} placeholder="مثال: 3 أشهر" />
+            </Field>
+            <Field label="قطع تحتاج سحب للمركز" className="md:col-span-3">
+              <Textarea value={draft.centerPullItems ?? ""} onChange={(event) => patchDraft({ centerPullItems: event.target.value })} className="min-h-20" placeholder="اختياري" />
+            </Field>
+            <Field label="ملاحظات" className="md:col-span-3">
+              <Textarea value={draft.notes ?? ""} onChange={(event) => patchDraft({ notes: event.target.value })} className="min-h-20" placeholder="اختياري" />
+            </Field>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 border-t border-border pt-4">
             <Button type="button" variant="outline" onClick={onClose}>
               إلغاء
             </Button>
             <Button type="button" onClick={() => setPendingInvoice(buildInvoice())}>
-              <Icon name="pencil" size={18} />
-              حفظ التعديل
+              <Icon name={isCreate ? "plus" : "pencil"} size={18} />
+              {isCreate ? "إنشاء ومعاينة" : "حفظ التعديل"}
             </Button>
           </div>
         </form>
       </Modal>
       {pendingInvoice ? (
         <ConfirmToast
-          title="تأكيد تعديل الفاتورة"
-          message={`هل تريد حفظ التعديلات على الفاتورة ${pendingInvoice.id}؟`}
+          title={isCreate ? "تأكيد إنشاء الفاتورة" : "تأكيد تعديل الفاتورة"}
+          message={isCreate ? `هل تريد إنشاء الفاتورة ${pendingInvoice.id} ومعاينتها؟` : `هل تريد حفظ التعديلات على الفاتورة ${pendingInvoice.id}؟`}
           tone="gold"
-          confirmLabel="تأكيد التعديل"
+          confirmLabel={isCreate ? "إنشاء الفاتورة" : "تأكيد التعديل"}
           onCancel={() => setPendingInvoice(null)}
           onConfirm={() => {
             onSave(pendingInvoice);
@@ -2812,7 +3362,7 @@ export function InvoicesScreen() {
   const params = useSearchParams();
   const initialType = params.get("type") as InvoiceType | null;
   const initialCurrency = params.get("currency")?.toUpperCase() as Currency | undefined;
-  const [invoices, setInvoices] = useState<Invoice[]>(INVOICES);
+  const [invoices, setInvoices] = useState<Invoice[]>(readStoredInvoices);
   const [type, setType] = useState<InvoiceType | "all">(initialType ?? "all");
   const [currency, setCurrency] = useState<Currency | "all">(initialCurrency ?? "all");
   const [status, setStatus] = useState<PaymentStatus | "all">("all");
@@ -2885,17 +3435,32 @@ export function InvoicesScreen() {
 
   function saveInvoice(nextInvoice: Invoice) {
     setInvoices((current) =>
-      current.map((invoice) => (invoice.id === nextInvoice.id ? nextInvoice : invoice)),
+      current.some((invoice) => invoice.id === nextInvoice.id)
+        ? current.map((invoice) => (invoice.id === nextInvoice.id ? nextInvoice : invoice))
+        : [nextInvoice, ...current],
     );
     setViewingInvoice((current) => (current?.id === nextInvoice.id ? nextInvoice : current));
     setPaymentInvoice((current) => (current?.id === nextInvoice.id ? nextInvoice : current));
   }
 
+  function returnInvoice(invoiceToReturn: Invoice) {
+    const returnedInvoice = { ...invoiceToReturn, returned: true };
+    setInvoices((current) =>
+      current.map((invoice) => (invoice.id === returnedInvoice.id ? returnedInvoice : invoice)),
+    );
+    setViewingInvoice(returnedInvoice);
+    setPaymentInvoice((current) => (current?.id === returnedInvoice.id ? returnedInvoice : current));
+  }
+
+  useEffect(() => {
+    writeStoredList(INVOICES_STORAGE_KEY, invoices);
+  }, [invoices]);
+
   return (
     <div className="space-y-6">
       <SectionTitle
         title="إدارة الفواتير"
-        subtitle="مراجعة الفواتير الداخلية والخارجية، الدفعات، المتبقي، وتجهيز الطباعة."
+        subtitle="مراجعة الفواتير المرتبطة بالطلبات، الدفعات، المتبقي، وتجهيز الطباعة."
       />
       {showDateFilter ? (
         <DateFilterModal
@@ -2913,10 +3478,11 @@ export function InvoicesScreen() {
           order={ORDERS.find((order) => order.id === viewingInvoice.orderId)}
           onClose={() => setViewingInvoice(null)}
           onAddPayment={() => setPaymentInvoice(viewingInvoice)}
+          onReturnInvoice={returnInvoice}
         />
       ) : null}
       {editingInvoice ? (
-        <InvoiceEditModal
+        <InvoiceFormModal
           invoice={editingInvoice}
           onClose={() => setEditingInvoice(null)}
           onSave={saveInvoice}
@@ -3257,56 +3823,124 @@ export function TechnicianPerformanceScreen() {
 
 export function SettingsCenterScreen() {
   const [centerName, setCenterName] = useState("مركز الصيانة الذهبي");
+  const [secondaryName, setSecondaryName] = useState("Golden Maintenance Center");
+  const [address, setAddress] = useState("دمشق - شارع بغداد");
   const [phone, setPhone] = useState("011 555 2200");
-  const [exchangeRate, setExchangeRate] = useState("14500");
+  const [email, setEmail] = useState("info@golden-control.com");
+  const [term1, setTerm1] = useState("الكفالة لا تشمل سوء الاستخدام أو أعطال الكهرباء الخارجية.");
+  const [term2, setTerm2] = useState("");
+  const [term3, setTerm3] = useState("");
+  const [term4, setTerm4] = useState("");
+  const [logoName, setLogoName] = useState("");
 
   return (
     <div className="space-y-6">
       <SectionTitle
-        title="الإعدادات"
-        subtitle="إعدادات المركز، بيانات التواصل، سعر الصرف، وسلوك النظام العام."
+        title="إدارة بيانات المركز"
+        subtitle="تحديث بيانات المركز التي تظهر على الفواتير، الطلبات، والمستندات الرسمية."
       />
-      <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-        <Card className="overflow-hidden">
-          <CardHeader>
-            <h3 className="text-right font-heading text-lg font-bold text-content">
-              بيانات المركز
-            </h3>
-          </CardHeader>
-          <form className="grid gap-4 p-4 md:grid-cols-2">
-            <Input value={centerName} onChange={(event) => setCenterName(event.target.value)} aria-label="اسم المركز" />
-            <Input value={phone} onChange={(event) => setPhone(event.target.value)} aria-label="هاتف المركز" dir="ltr" />
-            <Input placeholder="العنوان" defaultValue="دمشق - شارع بغداد" aria-label="العنوان" />
-            <Input value={exchangeRate} onChange={(event) => setExchangeRate(event.target.value)} aria-label="سعر الصرف" dir="ltr" />
-            <Textarea
-              className="min-h-24 md:col-span-2"
-              defaultValue="الكفالة لا تشمل سوء الاستخدام أو أعطال الكهرباء الخارجية."
-              aria-label="بنود الفواتير"
-            />
-            <div className="flex justify-end md:col-span-2">
-              <Button type="button">حفظ الإعدادات الوهمية</Button>
-            </div>
-          </form>
-        </Card>
-        <Card className="p-4">
+      <Card className="overflow-hidden">
+        <CardHeader>
           <h3 className="text-right font-heading text-lg font-bold text-content">
-            تفضيلات النظام
+            بيانات المركز
           </h3>
-          <div className="mt-4 space-y-3">
-            {[
-              "كل الصلاحيات مفتوحة في النسخة الحالية",
-              "إظهار تنبيهات نقص المخزون",
-              "تفعيل تحديثات الطلبات اللحظية لاحقًا",
-              "استخدام الليرة السورية كعملة أساسية",
-            ].map((item) => (
-              <label key={item} className="flex items-center justify-between rounded-md bg-surface-2 px-3 py-3 text-sm text-content">
-                <input type="checkbox" defaultChecked className="h-4 w-4 accent-gold" />
-                <span>{item}</span>
-              </label>
-            ))}
+        </CardHeader>
+        <form className="grid gap-4 p-4 md:grid-cols-2" onSubmit={(event) => event.preventDefault()}>
+          <Field label="اسم المركز">
+            <Input value={centerName} onChange={(event) => setCenterName(event.target.value)} placeholder="اسم المركز" />
+          </Field>
+          <Field label="الاسم الثانوي">
+            <Input value={secondaryName} onChange={(event) => setSecondaryName(event.target.value)} placeholder="الاسم الثانوي" />
+          </Field>
+          <Field label="العنوان" className="md:col-span-2">
+            <Input value={address} onChange={(event) => setAddress(event.target.value)} placeholder="عنوان المركز" />
+          </Field>
+          <Field label="رقم الهاتف">
+            <Input value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="رقم الهاتف" dir="ltr" />
+          </Field>
+          <Field label="البريد الإلكتروني">
+            <Input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="البريد الإلكتروني" dir="ltr" type="email" />
+          </Field>
+          <Field label="البند 1 - اختياري" className="md:col-span-2">
+            <Textarea value={term1} onChange={(event) => setTerm1(event.target.value)} className="min-h-20" placeholder="اكتب البند الأول" />
+          </Field>
+          <Field label="البند 2 - اختياري" className="md:col-span-2">
+            <Textarea value={term2} onChange={(event) => setTerm2(event.target.value)} className="min-h-20" placeholder="اكتب البند الثاني" />
+          </Field>
+          <Field label="البند 3 - اختياري" className="md:col-span-2">
+            <Textarea value={term3} onChange={(event) => setTerm3(event.target.value)} className="min-h-20" placeholder="اكتب البند الثالث" />
+          </Field>
+          <Field label="البند 4 - اختياري" className="md:col-span-2">
+            <Textarea value={term4} onChange={(event) => setTerm4(event.target.value)} className="min-h-20" placeholder="اكتب البند الرابع" />
+          </Field>
+          <Field label="اللوجو - اختياري" className="md:col-span-2">
+            <div className="grid gap-3 rounded-md border border-border bg-surface-2 p-3 sm:grid-cols-[1fr_auto] sm:items-center">
+              <Input
+                type="file"
+                accept="image/*"
+                className="bg-surface"
+                onChange={(event) => setLogoName(event.target.files?.[0]?.name ?? "")}
+              />
+              <span className="text-sm text-content-muted">
+                {logoName || "لم يتم اختيار لوجو"}
+              </span>
+            </div>
+          </Field>
+          <div className="flex justify-end md:col-span-2">
+            <Button type="button">حفظ بيانات المركز</Button>
           </div>
-        </Card>
-      </div>
+        </form>
+      </Card>
+    </div>
+  );
+}
+
+export function ExchangeRateSettingsScreen() {
+  const [exchangeRate, setExchangeRate] = useState("14500");
+  const [updatedAt, setUpdatedAt] = useState("لم يتم التحديث بعد");
+
+  function updateExchangeRate() {
+    const now = new Intl.DateTimeFormat("ar-u-nu-latn", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(new Date());
+    setUpdatedAt(now);
+  }
+
+  return (
+    <div className="space-y-6">
+      <SectionTitle
+        title="سعر الصرف"
+        subtitle="تحديد سعر صرف الدولار مقابل الليرة السورية لاستخدامه في الدفعات والتحويلات المالية."
+      />
+      <Card className="overflow-hidden">
+        <CardHeader>
+          <h3 className="text-right font-heading text-lg font-bold text-content">
+            تحديث سعر الصرف
+          </h3>
+        </CardHeader>
+        <form className="grid gap-4 p-4 md:grid-cols-[minmax(240px,1fr)_auto]" onSubmit={(event) => event.preventDefault()}>
+          <Field label="سعر صرف الدولار مقابل الليرة السورية">
+            <Input
+              value={exchangeRate}
+              onChange={(event) => setExchangeRate(event.target.value)}
+              placeholder="مثال: 14500"
+              dir="ltr"
+              inputMode="numeric"
+            />
+          </Field>
+          <div className="flex items-end">
+            <Button type="button" className="w-full md:w-auto" onClick={updateExchangeRate}>
+              <Icon name="exchange" size={18} />
+              تحديث سعر الصرف
+            </Button>
+          </div>
+        </form>
+        <div className="grid gap-3 border-t border-border bg-surface-2 p-4 md:grid-cols-2">
+          <DetailItem label="السعر الحالي" value={`${exchangeRate || "0"} ل.س`} ltr />
+          <DetailItem label="آخر تحديث" value={updatedAt} />
+        </div>
+      </Card>
     </div>
   );
 }

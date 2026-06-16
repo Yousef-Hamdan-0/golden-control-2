@@ -163,7 +163,10 @@ function buildOrderDetails(customer: Customer, customerOrder: CustomerOrder) {
     type: order.type,
     client: customer.name,
     clientPhone: customer.phone1,
+    clientPhone2: customer.phone2 || "لا يوجد",
+    clientAddress: customer.address,
     technician: order.technician,
+    technicianPhone: order.technician === "رامي سمير" ? "0955 114 220" : "لا يوجد",
     status:
       customerOrder.invoiceStatus ??
       (paidAmount >= totalAmount ? "paid" : paidAmount > 0 ? "partial" : "unpaid"),
@@ -172,6 +175,17 @@ function buildOrderDetails(customer: Customer, customerOrder: CustomerOrder) {
     total: totalAmount,
     paid: paidAmount,
     issuedAt: customerOrder.date,
+    warrantyDuration: "3 أشهر",
+    centerPullItems: "",
+    notes: "",
+    parts: [
+      {
+        id: `PRT-${customerOrder.id.replace(/\D/g, "").slice(-4)}`,
+        name: customerOrder.device,
+        quantity: 1,
+        unitPrice: totalAmount,
+      },
+    ],
     payments:
       customerOrder.payments ??
       (paidAmount > 0
@@ -179,6 +193,7 @@ function buildOrderDetails(customer: Customer, customerOrder: CustomerOrder) {
             {
               id: `PAY-${customerOrder.id.replace(/\D/g, "").slice(-4)}`,
               amount: paidAmount,
+              convertedAmount: paidAmount,
               currency: "SYP",
               method: customerOrder.paymentMethod ?? "cash",
               paidAt: customerOrder.date,

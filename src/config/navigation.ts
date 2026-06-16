@@ -94,6 +94,7 @@ export const NAVIGATION: NavItem[] = [
 ];
 
 export const NAV_FOOTER: NavItem[] = [
+  { label: "سعر الصرف", href: "/settings/exchange-rate", icon: "exchange" },
   { label: "الإعدادات", href: "/settings/center", icon: "gear" },
   { label: "تسجيل الخروج", href: "/login", icon: "logout" },
 ];

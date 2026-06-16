@@ -17,6 +17,7 @@ function todayLabel(): string {
 
 function routeTitle(pathname: string, fallback: string): string {
   if (pathname.startsWith("/settings/users")) return "إدارة المستخدمين";
+  if (pathname.startsWith("/settings/exchange-rate")) return "سعر الصرف";
   if (pathname.startsWith("/settings/center")) return "الإعدادات";
   if (pathname.startsWith("/customers")) return "إدارة العملاء";
   if (pathname.startsWith("/technicians/inventory")) return "المخزون اليومي";

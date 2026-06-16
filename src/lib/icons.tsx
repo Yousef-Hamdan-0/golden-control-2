@@ -9,6 +9,7 @@ export type IconName =
   | "box"
   | "file"
   | "wallet"
+  | "exchange"
   | "chart"
   | "gear"
   | "logout"
@@ -43,6 +44,7 @@ const PATHS: Record<IconName, string> = {
   box: "M3 7l9-4 9 4-9 4-9-4zM3 7v10l9 4 9-4V7M12 11v10",
   file: "M7 3h7l5 5v13H7zM14 3v5h5",
   wallet: "M3 7h15a2 2 0 012 2v8a2 2 0 01-2 2H4a1 1 0 01-1-1V7zM16 12h3",
+  exchange: "M7 7h11M15 4l3 3-3 3M17 17H6M9 14l-3 3 3 3",
   chart: "M4 20V10M10 20V4M16 20v-7M22 20H2",
   gear: "M12 9a3 3 0 100 6 3 3 0 000-6zM19 12l2-1-1-3-2 .5a7 7 0 00-1.5-1.5L18 5l-3-1-1 2a7 7 0 00-2 0L11 4 8 5l.5 2A7 7 0 007 8.5L5 8 4 11l2 1a7 7 0 000 2l-2 1 1 3 2-.5A7 7 0 008.5 21L8 23l3 1 1-2a7 7 0 002 0l1 2 3-1-.5-2a7 7 0 001.5-1.5l2 .5 1-3-2-1a7 7 0 000-2z",
   logout: "M14 8V6a2 2 0 00-2-2H5v16h7a2 2 0 002-2v-2M10 12h11M18 9l3 3-3 3",
