@@ -44,7 +44,6 @@ const orderStats = [
   { label: "مسحوبة إلى المركز", value: "24", tone: "gold" },
   { label: "معاد صيانتها", value: "24", tone: "gold" },
   { label: "مؤجلة إلى المركز", value: "24", tone: "gold" },
-  { label: "فاشلة", value: "24", tone: "danger" },
 ];
 
 const chartBars = ["h-16", "h-14", "h-10", "h-12", "h-7", "h-9", "h-5"];

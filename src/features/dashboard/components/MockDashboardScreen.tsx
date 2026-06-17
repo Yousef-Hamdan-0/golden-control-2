@@ -48,7 +48,6 @@ const orderStats = [
   { label: "مسحوبة إلى المركز", value: "24", tone: "gold" },
   { label: "معاد صيانتها", value: "24", tone: "gold" },
   { label: "مؤجلة إلى المركز", value: "24", tone: "gold" },
-  { label: "فاشلة", value: "24", tone: "red" },
 ];
 
 const navItems: NavItem[] = [

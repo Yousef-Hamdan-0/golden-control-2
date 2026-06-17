@@ -12,7 +12,7 @@ export type Role = (typeof Role)[keyof typeof Role];
 export const ROLE_LABELS_AR: Record<Role, string> = {
   admin: "مدير النظام",
   manager: "مدير المركز",
-  employee: "موظف",
+  employee: "موظف خدمة العملاء",
   technician: "فني",
 };
 

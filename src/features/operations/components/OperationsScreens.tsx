@@ -53,6 +53,10 @@ export interface Order {
   status: OrderStatus;
   priority: Priority;
   visitDate: string;
+  faultDescription?: string;
+  notes?: string;
+  audioRecords?: OrderAudioRecord[];
+  statusHistory?: OrderStatusHistoryItem[];
   total: number;
   paid: number;
 }
@@ -62,6 +66,22 @@ interface DeviceDraft {
   name: string;
   brand: string;
   model: string;
+}
+
+interface OrderAudioRecord {
+  id: string;
+  name: string;
+  duration: string;
+  date: string;
+  url: string;
+}
+
+interface OrderStatusHistoryItem {
+  id: string;
+  status: OrderStatus;
+  note: string;
+  owner: string;
+  date: string;
 }
 
 interface MaintenanceOrderDraft {
@@ -175,7 +195,7 @@ const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   arrived: "تم الوصول",
   "under-repair": "قيد الإصلاح",
   completed: "مكتمل",
-  incompleted: "غير مكتمل",
+  incompleted: "قيد الإصلاح",
   "pull-to-center": "مسحوب للمركز",
   postponed: "مؤجل",
   cancelled: "ملغي",
@@ -189,7 +209,7 @@ const ORDER_STATUS_TONE: Record<OrderStatus, BadgeTone> = {
   arrived: "info",
   "under-repair": "gold",
   completed: "success",
-  incompleted: "danger",
+  incompleted: "gold",
   "pull-to-center": "info",
   postponed: "neutral",
   cancelled: "danger",
@@ -224,6 +244,8 @@ const USD_TO_SYP_RATE = 14500;
 const INVENTORY_ITEMS_STORAGE_KEY = "golden-control.inventory.items";
 const INVENTORY_MOVEMENTS_STORAGE_KEY = "golden-control.inventory.movements";
 const INVOICES_STORAGE_KEY = "golden-control.invoices";
+const SILENT_AUDIO_SRC =
+  "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABAAZGF0YQAAAAA=";
 
 const ORDERS: Order[] = [
   {
@@ -320,6 +342,23 @@ const ORDERS: Order[] = [
     visitDate: "2026-06-12 14:15",
     total: 1450000,
     paid: 750000,
+  },
+  {
+    id: "ORD-5536",
+    type: "internal",
+    client: "مؤسسة النور",
+    phone: "011 552 7788",
+    phone2: "0966 214 778",
+    address: "استلام داخل المركز",
+    device: "براد عرض",
+    brand: "Sharp",
+    devices: [{ type: "براد", name: "براد عرض", brand: "Sharp", model: "SC-420" }],
+    technician: "سامر يوسف",
+    status: "completed",
+    priority: "medium",
+    visitDate: "2026-06-13 11:30",
+    total: 825000,
+    paid: 250000,
   },
   {
     id: "ORD-5537",
@@ -765,7 +804,7 @@ function invoicePartsTotal(parts: InvoicePart[]) {
 }
 
 function isRepairDecisionStatus(status: OrderStatus) {
-  return status === "completed" || status === "incompleted";
+  return status === "completed" || status === "incompleted" || status === "under-repair";
 }
 
 function canCreateInvoiceForOrder(order: Order, role: string) {
@@ -875,8 +914,8 @@ function orderToDraft(order: Order): MaintenanceOrderDraft {
     address: order.address,
     locationUrl: order.locationUrl ?? "",
     devices: order.devices?.length ? order.devices : [fallbackDevice],
-    faultDescription: "",
-    notes: "",
+    faultDescription: order.faultDescription ?? "",
+    notes: order.notes ?? "",
     visitDate: order.visitDate.slice(0, 10),
     visitTime: order.visitDate.slice(11, 16),
     priority: order.priority,
@@ -904,6 +943,20 @@ function draftToOrder(draft: MaintenanceOrderDraft, existing?: Order): Order {
     status: existing?.status ?? "new",
     priority: draft.priority,
     visitDate: `${draft.visitDate || "2026-06-11"} ${draft.visitTime || "09:00"}`,
+    faultDescription: draft.faultDescription,
+    notes: draft.notes,
+    audioRecords: existing?.audioRecords ?? [],
+    statusHistory:
+      existing?.statusHistory ??
+      [
+        {
+          id: `HIS-${existing?.id ?? nextNumber}-1`,
+          status: existing?.status ?? "new",
+          note: "تم إنشاء الطلب وتسجيل بيانات العميل.",
+          owner: CURRENT_USER.fullName,
+          date: `${draft.visitDate || "2026-06-11"} ${draft.visitTime || "09:00"}`,
+        },
+      ],
     total: existing?.total ?? 0,
     paid: existing?.paid ?? 0,
   };
@@ -1559,35 +1612,77 @@ function getTechnicianPhone(name: string) {
   return TECHNICIAN_PHONE_BY_NAME[name] ?? "لا يوجد";
 }
 
+function getOrderAudioRecords(order: Order): OrderAudioRecord[] {
+  if (order.audioRecords?.length) return order.audioRecords;
+
+  return [
+    {
+      id: `AUD-${order.id}-1`,
+      name: "مكالمة استلام الطلب",
+      duration: "00:42",
+      date: order.visitDate,
+      url: SILENT_AUDIO_SRC,
+    },
+  ];
+}
+
+function getOrderStatusHistory(order: Order): OrderStatusHistoryItem[] {
+  if (order.statusHistory?.length) return order.statusHistory;
+
+  const createdDate = order.visitDate.slice(0, 10);
+  return [
+    {
+      id: `HIS-${order.id}-1`,
+      status: "new",
+      note: "تم إنشاء الطلب وتسجيل بيانات العميل.",
+      owner: "موظف خدمة العملاء",
+      date: `${createdDate} 09:00`,
+    },
+    {
+      id: `HIS-${order.id}-2`,
+      status: order.status,
+      note: "تم تحديث حالة الطلب حسب متابعة فريق الصيانة.",
+      owner: order.technician || CURRENT_USER.fullName,
+      date: order.visitDate,
+    },
+  ];
+}
+
 export function OrderDetailsModal({
   order,
   invoice,
   invoices = INVOICES,
   onCreateInvoice,
+  onCompleteOrder,
   onClose,
 }: {
   order: Order;
   invoice?: Invoice | null;
   invoices?: Invoice[];
   onCreateInvoice?: (invoice: Invoice) => void;
+  onCompleteOrder?: (order: Order) => void;
   onClose: () => void;
 }) {
   const [showInvoiceDetails, setShowInvoiceDetails] = useState(false);
   const [showInvoiceForm, setShowInvoiceForm] = useState(false);
+  const [createdInvoice, setCreatedInvoice] = useState<Invoice | null>(null);
   const [invoiceNotice, setInvoiceNotice] = useState<string | null>(null);
-  const invoiceBalance = invoice ? remaining(invoice.total, invoice.paid) : 0;
+  const activeInvoice = invoice ?? createdInvoice;
+  const invoiceBalance = activeInvoice ? remaining(activeInvoice.total, activeInvoice.paid) : 0;
   const devices = getOrderDevices(order);
-  const extraDevices = devices.slice(1);
   const phone2 = order.phone2?.trim() || "لا يوجد";
   const customerLocation = order.locationUrl?.trim();
   const technicianPhone = getTechnicianPhone(order.technician);
+  const audioRecords = getOrderAudioRecords(order);
+  const statusHistory = getOrderStatusHistory(order);
+  const faultDescription = order.faultDescription?.trim() || "لا يوجد وصف عطل مسجل لهذا الطلب.";
   const invoiceDraft = createInvoiceDraftFromOrder(order, invoices);
 
   function handleInvoiceCreateRequest() {
     setInvoiceNotice(null);
 
     if (!isRepairDecisionStatus(order.status)) {
-      setInvoiceNotice("لا يمكن إنشاء فاتورة قبل تحديد نتيجة الإصلاح: مكتمل أو غير مكتمل.");
+      setInvoiceNotice("يمكن إنشاء الفاتورة فقط عندما يكون الطلب مكتملًا أو قيد الإصلاح.");
       return;
     }
 
@@ -1600,7 +1695,7 @@ export function OrderDetailsModal({
       return;
     }
 
-    if (invoice) {
+    if (activeInvoice) {
       setInvoiceNotice("توجد فاتورة مرتبطة بهذا الطلب مسبقاً. يمكنك معاينتها من زر التفاصيل.");
       setShowInvoiceDetails(true);
       return;
@@ -1623,128 +1718,192 @@ export function OrderDetailsModal({
         widthClassName="max-w-4xl"
       >
         <div className="space-y-5 p-5">
-          <div className="grid gap-3 md:grid-cols-4">
-            <DetailItem label="العميل" value={order.client} />
-            <DetailItem label="الهاتف الأول" value={order.phone} ltr />
-            <DetailItem label="الهاتف الثاني" value={phone2} ltr={Boolean(order.phone2?.trim())} />
-            <DetailItem label="نوع الطلب" value={typeLabel(order.type)} />
-          </div>
-
-          <div className="grid gap-3 md:grid-cols-4">
-            <DetailItem label="موعد الزيارة" value={order.visitDate} />
-            <DetailItem label="عنوان العميل" value={order.address} />
-            <DetailItem
-              label="موقع العميل"
-              value={
-                customerLocation ? (
-                  <a
-                    href={customerLocation}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-gold hover:text-gold-hover"
-                  >
-                    فتح الموقع
-                  </a>
-                ) : (
-                  "لا يوجد"
-                )
-              }
-            />
-            <DetailItem
-              label="حالة الطلب"
-              value={
-                <Badge tone={ORDER_STATUS_TONE[order.status]} dot>
-                  {ORDER_STATUS_LABELS[order.status]}
-                </Badge>
-              }
-            />
-          </div>
-
-          <div className="grid gap-3 md:grid-cols-3">
-            <DetailItem label="الجهاز الرئيسي" value={order.device} />
-            <DetailItem label="الماركة" value={order.brand} />
-            <DetailItem label="الأولوية" value={PRIORITY_LABELS[order.priority]} />
-          </div>
+          <Card className="bg-surface-2 p-4 shadow-none">
+            <h3 className="font-heading text-base font-bold text-content">بيانات الطلب</h3>
+            <div className="mt-3 grid gap-3 md:grid-cols-3">
+              <DetailItem label="رقم الطلب" value={order.id} ltr />
+              <DetailItem label="نوع الطلب" value={typeLabel(order.type)} />
+              <DetailItem
+                label="حالة الطلب"
+                value={
+                  <Badge tone={ORDER_STATUS_TONE[order.status]} dot>
+                    {ORDER_STATUS_LABELS[order.status]}
+                  </Badge>
+                }
+              />
+            </div>
+          </Card>
 
           <Card className="bg-surface-2 p-4 shadow-none">
-            <h3 className="font-heading text-base font-bold text-content">الأجهزة الأخرى التي يريد العميل صيانتها</h3>
-            {extraDevices.length > 0 ? (
-              <div className="mt-3 grid gap-3 md:grid-cols-2">
-                {extraDevices.map((device, index) => (
-                  <div key={`${device.name}-${index}`} className="rounded-md border border-border bg-surface p-3">
-                    <div className="font-semibold text-content">{formatDeviceName(device)}</div>
-                    <div className="mt-1 text-sm text-content-muted">
-                      الماركة: {device.brand || "غير محدد"}
-                    </div>
-                    <div className="mt-1 text-sm text-content-muted">
-                      الموديل: {device.model || "غير محدد"}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="mt-3 text-sm text-content-muted">لا توجد أجهزة أخرى لهذا الطلب.</p>
-            )}
+            <h3 className="font-heading text-base font-bold text-content">بيانات العميل</h3>
+            <div className="mt-3 grid gap-3 md:grid-cols-3">
+              <DetailItem label="اسم العميل" value={order.client} />
+              <DetailItem label="رقمه 1" value={order.phone} ltr />
+              <DetailItem label="رقمه 2" value={phone2} ltr={Boolean(order.phone2?.trim())} />
+              <DetailItem label="عنوان العميل" value={order.address} />
+              <DetailItem
+                label="رابط موقع العميل"
+                value={
+                  customerLocation ? (
+                    <a href={customerLocation} target="_blank" rel="noreferrer" className="text-gold hover:text-gold-hover">
+                      فتح الموقع
+                    </a>
+                  ) : (
+                    "لا يوجد"
+                  )
+                }
+              />
+              <DetailItem label="وقت الزيارة" value={order.visitDate} />
+            </div>
+          </Card>
+
+          <Card className="overflow-hidden shadow-none">
+            <div className="border-b border-border px-4 py-3">
+              <h3 className="font-heading text-base font-bold text-content">الأجهزة</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-[720px] w-full text-right text-sm">
+                <thead>
+                  <tr className="bg-surface-2 text-content-muted">
+                    {["نوع الجهاز", "اسم الجهاز", "الماركة", "الموديل"].map((header) => (
+                      <th key={header} className="px-4 py-3 font-medium">
+                        {header}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {devices.map((device, index) => (
+                    <tr key={`${device.name}-${index}`} className="border-t border-border">
+                      <td className="px-4 py-3 text-content-muted">{device.type || "غير محدد"}</td>
+                      <td className="px-4 py-3 font-semibold text-content">{device.name || formatDeviceName(device)}</td>
+                      <td className="px-4 py-3 text-content-muted">{device.brand || "غير محدد"}</td>
+                      <td className="px-4 py-3 text-content-muted">{device.model || "غير محدد"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+
+          <Card className="bg-surface-2 p-4 shadow-none">
+            <h3 className="font-heading text-base font-bold text-content">وصف العطل</h3>
+            <p className="mt-3 rounded-md border border-border bg-surface p-3 text-sm leading-7 text-content-muted">
+              {faultDescription}
+            </p>
           </Card>
 
           <Card className="bg-surface-2 p-4 shadow-none">
             <h3 className="font-heading text-base font-bold text-content">معلومات الفني</h3>
             <div className="mt-3 grid gap-3 md:grid-cols-2">
               <DetailItem label="اسم الفني" value={order.technician} />
-              <DetailItem label="رقم الفني" value={technicianPhone} ltr={technicianPhone !== "لا يوجد"} />
+              <DetailItem label="رقم تلفونه" value={technicianPhone} ltr={technicianPhone !== "لا يوجد"} />
+            </div>
+          </Card>
+
+          <Card className="overflow-hidden shadow-none">
+            <div className="border-b border-border px-4 py-3">
+              <h3 className="font-heading text-base font-bold text-content">التسجيلات الصوتية</h3>
+            </div>
+            <div className="divide-y divide-border">
+              {audioRecords.map((record) => (
+                <div key={record.id} className="grid gap-3 p-4 md:grid-cols-[1.2fr_0.6fr_0.8fr_1.4fr] md:items-center">
+                  <DetailItem label="الاسم" value={record.name} />
+                  <DetailItem label="المدة" value={record.duration} ltr />
+                  <DetailItem label="التاريخ" value={record.date} />
+                  <div>
+                    <div className="mb-1.5 text-xs text-content-muted">تشغيل التسجيل</div>
+                    <audio controls preload="none" src={record.url} className="h-10 w-full" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          <Card className="overflow-hidden shadow-none">
+            <div className="border-b border-border px-4 py-3">
+              <h3 className="font-heading text-base font-bold text-content">سجل حالة الطلب</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-[760px] w-full text-right text-sm">
+                <thead>
+                  <tr className="bg-surface-2 text-content-muted">
+                    {["الحالة", "الملاحظة", "المسؤول", "التاريخ"].map((header) => (
+                      <th key={header} className="px-4 py-3 font-medium">
+                        {header}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {statusHistory.map((item) => (
+                    <tr key={item.id} className="border-t border-border">
+                      <td className="px-4 py-3">
+                        <Badge tone={ORDER_STATUS_TONE[item.status]} dot>
+                          {ORDER_STATUS_LABELS[item.status]}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3 text-content-muted">{item.note}</td>
+                      <td className="px-4 py-3 text-content">{item.owner}</td>
+                      <td className="px-4 py-3 text-content-muted">{item.date}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </Card>
 
           <Card className="bg-surface-2 p-4 shadow-none">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h3 className="font-heading text-base font-bold text-content">الفاتورة</h3>
-              <div className="flex items-center gap-2">
+              {activeInvoice ? (
+                <button
+                  type="button"
+                  aria-label={`تفاصيل الفاتورة ${activeInvoice.id}`}
+                  title="تفاصيل الفاتورة"
+                  onClick={() => setShowInvoiceDetails(true)}
+                  className="rounded-sm p-1.5 text-content-muted hover:bg-surface hover:text-content"
+                >
+                  <Icon name="eye" size={18} />
+                </button>
+              ) : (
                 <Button type="button" size="sm" onClick={handleInvoiceCreateRequest}>
                   <Icon name="plus" size={16} />
-                  إنشاء فاتورة
+                  إنهاء الطلب وإنشاء فاتورة
                 </Button>
-                {invoice ? (
-                  <button
-                    type="button"
-                    aria-label={`تفاصيل الفاتورة ${invoice.id}`}
-                    title="تفاصيل الفاتورة"
-                    onClick={() => setShowInvoiceDetails(true)}
-                    className="rounded-sm p-1.5 text-content-muted hover:bg-surface hover:text-content"
-                  >
-                    <Icon name="eye" size={18} />
-                  </button>
-                ) : null}
-              </div>
+              )}
             </div>
             {invoiceNotice ? (
               <div className="mt-3 rounded-md border border-gold/30 bg-gold-soft p-3 text-sm font-medium text-gold-active">
                 {invoiceNotice}
               </div>
             ) : null}
-            {invoice ? (
+            {activeInvoice ? (
               <div className="mt-3 grid gap-3 md:grid-cols-4">
-                <DetailItem label="رقم الفاتورة" value={invoice.id} ltr />
+                <DetailItem label="رقم الفاتورة" value={activeInvoice.id} ltr />
                 <DetailItem
                   label="حالة الفاتورة"
                   value={
-                    <Badge tone={PAYMENT_TONE[invoice.status]} dot>
-                      {PAYMENT_LABELS[invoice.status]}
+                    <Badge tone={PAYMENT_TONE[activeInvoice.status]} dot>
+                      {PAYMENT_LABELS[activeInvoice.status]}
                     </Badge>
                   }
                 />
-                <DetailItem label="الإجمالي" value={formatMoney(invoice.total, invoice.currency)} />
-                <DetailItem label="المتبقي" value={formatMoney(invoiceBalance, invoice.currency)} />
+                <DetailItem label="الإجمالي" value={formatMoney(activeInvoice.total, activeInvoice.currency)} />
+                <DetailItem label="المتبقي" value={formatMoney(invoiceBalance, activeInvoice.currency)} />
               </div>
             ) : (
-              <p className="mt-3 text-sm text-content-muted">لا توجد فاتورة مرتبطة بهذا الطلب حالياً.</p>
+              <p className="mt-3 text-sm text-content-muted">
+                لا توجد فاتورة مرتبطة بهذا الطلب حالياً.
+              </p>
             )}
           </Card>
         </div>
       </Modal>
 
-      {showInvoiceDetails && invoice ? (
+      {showInvoiceDetails && activeInvoice ? (
         <InvoiceDetailsModal
-          invoice={invoice}
+          invoice={activeInvoice}
           order={order}
           onClose={() => setShowInvoiceDetails(false)}
         />
@@ -1755,7 +1914,24 @@ export function OrderDetailsModal({
           mode="create"
           onClose={() => setShowInvoiceForm(false)}
           onSave={(nextInvoice) => {
+            setCreatedInvoice(nextInvoice);
             onCreateInvoice?.(nextInvoice);
+            if (order.status !== "completed") {
+              onCompleteOrder?.({
+                ...order,
+                status: "completed",
+                statusHistory: [
+                  ...statusHistory,
+                  {
+                    id: `HIS-${order.id}-invoice`,
+                    status: "completed",
+                    note: `تم إنهاء الطلب وإنشاء الفاتورة ${nextInvoice.id}.`,
+                    owner: CURRENT_USER.fullName,
+                    date: new Date().toISOString().slice(0, 16).replace("T", " "),
+                  },
+                ],
+              });
+            }
             setShowInvoiceForm(false);
             setShowInvoiceDetails(true);
           }}
@@ -2142,7 +2318,7 @@ export function OrdersScreen() {
         cards={[
           { label: "إجمالي الطلبات", value: String(orders.length), icon: "clipboard" },
           { label: "مكتملة", value: String(completed), icon: "shield", tone: "success" },
-          { label: "غير مكتملة", value: String(incompleted), icon: "alert", tone: "danger" },
+          { label: "قيد الإصلاح", value: String(incompleted), icon: "wrench", tone: "gold" },
           { label: "مسحوبة للمركز", value: String(pulled), icon: "box", tone: "info" },
         ]}
       />
@@ -2172,6 +2348,12 @@ export function OrdersScreen() {
                 : [invoice, ...current],
             )
           }
+          onCompleteOrder={(nextOrder) => {
+            setOrders((current) =>
+              current.map((item) => (item.id === nextOrder.id ? nextOrder : item)),
+            );
+            setViewingOrder(nextOrder);
+          }}
           onClose={() => setViewingOrder(null)}
         />
       ) : null}
@@ -3121,9 +3303,29 @@ function InvoiceFormModal({
   const [draft, setDraft] = useState<Invoice>(invoice);
   const [pendingInvoice, setPendingInvoice] = useState<Invoice | null>(null);
   const isCreate = mode === "create";
+  const draftTotal = invoicePartsTotal(draft.parts) || Math.max(0, Number(draft.total) || 0);
+  const draftPaid = Math.min(draftTotal, Math.max(0, Number(draft.paid) || 0));
+  const draftRemaining = Math.max(0, draftTotal - draftPaid);
 
   function patchDraft(patch: Partial<Invoice>) {
     setDraft((current) => ({ ...current, ...patch }));
+  }
+
+  function patchPaymentStatus(status: PaymentStatus) {
+    const total = invoicePartsTotal(draft.parts) || Math.max(0, Number(draft.total) || 0);
+    patchDraft({
+      status,
+      paid: status === "paid" ? total : status === "unpaid" ? 0 : Math.min(Number(draft.paid) || 0, total),
+    });
+  }
+
+  function patchPaid(value: string) {
+    const total = invoicePartsTotal(draft.parts) || Math.max(0, Number(draft.total) || 0);
+    const paid = Math.min(total, Math.max(0, Number(value) || 0));
+    patchDraft({
+      paid,
+      status: paid >= total && total > 0 ? "paid" : paid > 0 ? "partial" : "unpaid",
+    });
   }
 
   function patchPart(index: number, patch: Partial<InvoicePart>) {
@@ -3157,6 +3359,11 @@ function InvoiceFormModal({
     }));
   }
 
+  function stepPartQuantity(index: number, step: number) {
+    const currentQuantity = Math.max(1, Number(draft.parts[index]?.quantity) || 1);
+    patchPart(index, { quantity: Math.max(1, currentQuantity + step) });
+  }
+
   function buildInvoice(): Invoice {
     const parts = draft.parts.map((part, index) => ({
       ...part,
@@ -3171,7 +3378,7 @@ function InvoiceFormModal({
     const nextStatus: PaymentStatus =
       paid >= total && total > 0 ? "paid" : paid > 0 ? "partial" : draft.status === "paid" ? "partial" : draft.status;
     const payments =
-      draft.payments.length > 0
+      !isCreate && draft.payments.length > 0
         ? draft.payments
         : paid > 0
           ? [
@@ -3210,24 +3417,21 @@ function InvoiceFormModal({
     <>
       <Modal
         title={isCreate ? "إنشاء فاتورة" : `تعديل الفاتورة ${invoice.id}`}
-        description={isCreate ? "إنشاء فاتورة جديدة ومعاينتها بعد الحفظ." : "تعديل بيانات الفاتورة والقطع والدفعات الأساسية."}
+        description={isCreate ? "إنشاء فاتورة مرتبطة بالطلب مع القطع، المبالغ، الدفع، والكفالة." : "تعديل بيانات الفاتورة والقطع والدفعات الأساسية."}
         onClose={onClose}
         widthClassName="max-w-6xl"
       >
         <form className="space-y-5 p-5" onSubmit={(event) => event.preventDefault()}>
-          <div className="grid gap-4 md:grid-cols-3">
-            <Field label="رقم الفاتورة">
-              <Input value={draft.id} onChange={(event) => patchDraft({ id: event.target.value })} dir="ltr" />
-            </Field>
-            <Field label="رقم الطلب">
-              <Input value={draft.orderId} onChange={(event) => patchDraft({ orderId: event.target.value })} dir="ltr" placeholder="ORD-0000" />
-            </Field>
-            <Field label="نوع الفاتورة">
-              <Select value={draft.type} onChange={(event) => patchDraft({ type: event.target.value as InvoiceType })}>
-                <option value="external">خارجي</option>
-                <option value="internal">داخلي</option>
-              </Select>
-            </Field>
+          <Card className="bg-surface-2 p-4 shadow-none">
+            <div className="grid gap-3 md:grid-cols-4">
+              <DetailItem label="رقم الفاتورة" value={draft.id} ltr />
+              <DetailItem label="رقم الطلب" value={draft.orderId} ltr />
+              <DetailItem label="نوع الفاتورة" value={typeLabel(draft.type)} />
+              <DetailItem label="تاريخ الإصدار" value={draft.issuedAt} />
+            </div>
+          </Card>
+
+          <div className="grid gap-4 md:grid-cols-2">
             <Field label="اسم العميل">
               <Input value={draft.client} onChange={(event) => patchDraft({ client: event.target.value })} placeholder="اسم العميل" />
             </Field>
@@ -3237,7 +3441,7 @@ function InvoiceFormModal({
             <Field label="رقم 2">
               <Input value={draft.clientPhone2 ?? ""} onChange={(event) => patchDraft({ clientPhone2: event.target.value })} dir="ltr" placeholder="اختياري" />
             </Field>
-            <Field label="العنوان" className="md:col-span-3">
+            <Field label="العنوان">
               <Input value={draft.clientAddress ?? ""} onChange={(event) => patchDraft({ clientAddress: event.target.value })} placeholder="عنوان العميل" />
             </Field>
             <Field label="اسم الفني">
@@ -3259,33 +3463,36 @@ function InvoiceFormModal({
             <Field label="رقم تلفون الفني">
               <Input value={draft.technicianPhone ?? ""} onChange={(event) => patchDraft({ technicianPhone: event.target.value })} dir="ltr" placeholder="رقم الفني" />
             </Field>
-            <Field label="نوع العملة المالية">
-              <Select value={draft.currency} onChange={(event) => patchDraft({ currency: event.target.value as Currency })}>
-                <option value="SYP">ليرة سورية</option>
-                <option value="USD">دولار</option>
-              </Select>
-            </Field>
-            <Field label="الحالة">
-              <Select value={draft.status} onChange={(event) => patchDraft({ status: event.target.value as PaymentStatus })}>
-                <option value="paid">مدفوعة بالكامل</option>
-                <option value="partial">مدفوعة جزئياً</option>
-                <option value="unpaid">غير مدفوعة</option>
-              </Select>
-            </Field>
-            <Field label="طريقة الدفع">
-              <Select value={draft.paymentMethod} onChange={(event) => patchDraft({ paymentMethod: event.target.value as PaymentMethod })}>
-                <option value="cash">كاش</option>
-                <option value="sham-cash">شام كاش</option>
-              </Select>
-            </Field>
-            <Field label="تاريخ الإصدار">
-              <Input value={draft.issuedAt} onChange={(event) => patchDraft({ issuedAt: event.target.value })} type="date" />
-            </Field>
+          </div>
+
+          <div className="space-y-3">
+            <h3 className="font-heading text-base font-bold text-gold">حالة الفاتورة</h3>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {([
+                ["paid", "مدفوعة بالكامل"],
+                ["partial", "مدفوعة جزئياً"],
+                ["unpaid", "غير مدفوعة"],
+              ] as Array<[PaymentStatus, string]>).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => patchPaymentStatus(value)}
+                  className={cn(
+                    "rounded-md border px-4 py-3 text-center font-heading text-base font-bold transition",
+                    draft.status === value
+                      ? "border-gold bg-gold-soft text-gold-active"
+                      : "border-border bg-surface text-content-muted hover:bg-gold-soft hover:text-gold",
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
 
           <Card className="overflow-hidden shadow-none">
             <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
-              <h3 className="font-heading text-base font-bold text-content">القطع المستخدمة</h3>
+              <h3 className="font-heading text-base font-bold text-gold">قطع الغيار المستخدمة</h3>
               <Button type="button" variant="outline" size="sm" onClick={addPart}>
                 <Icon name="plus" size={16} />
                 إضافة قطعة
@@ -3293,40 +3500,114 @@ function InvoiceFormModal({
             </div>
             <div className="space-y-3 p-4">
               {draft.parts.map((part, index) => (
-                <div key={`${part.id}-${index}`} className="grid gap-3 rounded-md border border-border bg-surface-2 p-3 md:grid-cols-[minmax(180px,2fr)_minmax(90px,1fr)_minmax(130px,1fr)_minmax(130px,1fr)_auto]">
-                  <Field label="اسم القطعة">
-                    <Input value={part.name} onChange={(event) => patchPart(index, { name: event.target.value })} placeholder="اسم القطعة" />
-                  </Field>
-                  <Field label="الكمية">
-                    <Input value={String(part.quantity)} onChange={(event) => patchPart(index, { quantity: Number(event.target.value) })} type="number" min={1} />
-                  </Field>
-                  <Field label="سعر كل قطعة">
-                    <Input value={String(part.unitPrice)} onChange={(event) => patchPart(index, { unitPrice: Number(event.target.value) })} type="number" min={0} />
-                  </Field>
-                  <DetailItem label="الإجمالي" value={formatMoney(invoicePartTotal(part), draft.currency)} />
-                  <div className="flex items-end">
+                <div key={`${part.id}-${index}`} className="rounded-md border border-border bg-surface p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <Field label="اسم القطعة" className="flex-1">
+                      <Input value={part.name} onChange={(event) => patchPart(index, { name: event.target.value })} placeholder="اسم القطعة" />
+                    </Field>
                     <Button type="button" variant="danger" size="sm" onClick={() => removePart(index)} disabled={draft.parts.length <= 1}>
                       <Icon name="trash" size={16} />
                     </Button>
+                  </div>
+                  <div className="mt-4 grid gap-4 md:grid-cols-[1fr_auto_auto] md:items-end">
+                    <Field label="السعر لكل قطعة حسب العملة">
+                      <Input
+                        value={String(part.unitPrice)}
+                        onChange={(event) => patchPart(index, { unitPrice: Number(event.target.value) })}
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        dir="ltr"
+                        placeholder={draft.currency === "USD" ? "دولار" : "ليرة سورية"}
+                      />
+                    </Field>
+                    <div>
+                      <div className="mb-1.5 text-sm text-content-muted">الكمية</div>
+                      <div className="flex items-center gap-2">
+                        <Button type="button" variant="outline" size="sm" className="h-9 w-9 px-0" onClick={() => stepPartQuantity(index, 1)}>
+                          +
+                        </Button>
+                        <span className="min-w-8 text-center font-heading text-lg font-bold text-content">{part.quantity}</span>
+                        <Button type="button" variant="outline" size="sm" className="h-9 w-9 px-0" onClick={() => stepPartQuantity(index, -1)}>
+                          -
+                        </Button>
+                      </div>
+                    </div>
+                    <DetailItem label="إجمالي القطعة" value={formatMoney(invoicePartTotal(part), draft.currency)} />
                   </div>
                 </div>
               ))}
             </div>
           </Card>
 
-          <div className="grid gap-4 md:grid-cols-3">
-            <DetailItem label="إجمالي القطع" value={formatMoney(invoicePartsTotal(draft.parts), draft.currency)} />
-            <Field label="المدفوع">
-              <Input value={String(draft.paid)} onChange={(event) => patchDraft({ paid: Number(event.target.value) })} type="number" min={0} placeholder="0" />
+          <p className="text-sm font-medium text-content-muted">
+            **ملاحظة سعر الصرف الحالي لكل 1 دولار = {formatMoney(USD_TO_SYP_RATE, "SYP")}
+          </p>
+
+          <Card className="space-y-4 p-4 shadow-none">
+            <h3 className="font-heading text-base font-bold text-gold">تفاصيل المبالغ</h3>
+            <div className="grid gap-4 md:grid-cols-3">
+              <DetailItem label="المبلغ الكلي" value={formatMoney(draftTotal, draft.currency)} />
+              <Field label="المبلغ المدفوع">
+                <Input value={String(draftPaid)} onChange={(event) => patchPaid(event.target.value)} type="number" min={0} placeholder="0.00" dir="ltr" />
+              </Field>
+              <DetailItem label="المبلغ المتبقي" value={formatMoney(draftRemaining, draft.currency)} />
+            </div>
+          </Card>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field label="نوع الدفع">
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  ["cash", "كاش"],
+                  ["sham-cash", "شام كاش"],
+                ] as Array<[PaymentMethod, string]>).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => patchDraft({ paymentMethod: value })}
+                    className={cn(
+                      "rounded-md border px-4 py-3 font-heading font-bold transition",
+                      draft.paymentMethod === value
+                        ? "border-gold bg-gold-soft text-gold-active"
+                        : "border-border bg-surface text-content-muted hover:bg-gold-soft hover:text-gold",
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             </Field>
-            <Field label="مدة الكفالة">
-              <Input value={draft.warrantyDuration ?? ""} onChange={(event) => patchDraft({ warrantyDuration: event.target.value })} placeholder="مثال: 3 أشهر" />
+            <Field label="نوع العملة">
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  ["USD", "دولار"],
+                  ["SYP", "ليرة سورية"],
+                ] as Array<[Currency, string]>).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => patchDraft({ currency: value })}
+                    className={cn(
+                      "rounded-md border px-4 py-3 font-heading font-bold transition",
+                      draft.currency === value
+                        ? "border-gold bg-gold-soft text-gold-active"
+                        : "border-border bg-surface text-content-muted hover:bg-gold-soft hover:text-gold",
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             </Field>
-            <Field label="قطع تحتاج سحب للمركز" className="md:col-span-3">
-              <Textarea value={draft.centerPullItems ?? ""} onChange={(event) => patchDraft({ centerPullItems: event.target.value })} className="min-h-20" placeholder="اختياري" />
+            <Field label="مدة الكفالة" className="md:col-span-2">
+              <Input value={draft.warrantyDuration ?? ""} onChange={(event) => patchDraft({ warrantyDuration: event.target.value })} placeholder="مثال: 6 أشهر" />
             </Field>
-            <Field label="ملاحظات" className="md:col-span-3">
-              <Textarea value={draft.notes ?? ""} onChange={(event) => patchDraft({ notes: event.target.value })} className="min-h-20" placeholder="اختياري" />
+            <Field label="الأجهزة أو القطع التي تحتاج صيانة في المركز (اختياري)" className="md:col-span-2">
+              <Textarea value={draft.centerPullItems ?? ""} onChange={(event) => patchDraft({ centerPullItems: event.target.value })} className="min-h-24" placeholder="اكتب أي ملاحظات تتعلق بالأجهزة والقطع التي تم سحبها إلى المركز هنا..." />
+            </Field>
+            <Field label="ملاحظات إضافية (اختياري)" className="md:col-span-2">
+              <Textarea value={draft.notes ?? ""} onChange={(event) => patchDraft({ notes: event.target.value })} className="min-h-24" placeholder="اكتب أي ملاحظات تتعلق بالصيانة هنا..." />
             </Field>
           </div>
 
@@ -3336,7 +3617,7 @@ function InvoiceFormModal({
             </Button>
             <Button type="button" onClick={() => setPendingInvoice(buildInvoice())}>
               <Icon name={isCreate ? "plus" : "pencil"} size={18} />
-              {isCreate ? "إنشاء ومعاينة" : "حفظ التعديل"}
+              {isCreate ? "إنشاء وإرسال الفاتورة" : "حفظ التعديل"}
             </Button>
           </div>
         </form>

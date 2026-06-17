@@ -149,7 +149,7 @@ export function UserForm(props: Props) {
                   </div>
                 </Field>
               </div>
-              {role === "technician" && (
+              {!isEdit && role === "technician" && (
                 <div className="mt-4 md:w-1/3">
                   <Field label="الخصم (%)" error={errors.discount?.message}>
                     <Input type="number" step="0.1" {...register("discount")} />

@@ -26,7 +26,7 @@ export const NAVIGATION: NavItem[] = [
     roles: ["admin"],
     children: [
       { label: "المدراء", href: "/settings/users?role=manager" },
-      { label: "الموظفين", href: "/settings/users?role=employee" },
+      { label: "موظفو خدمة العملاء", href: "/settings/users?role=employee" },
       { label: "الفنيين", href: "/settings/users?role=technician" },
     ],
   },
@@ -50,7 +50,7 @@ export const NAVIGATION: NavItem[] = [
       { label: "طلبات خارجية", href: "/orders?type=external" },
       { label: "طلبات داخلية", href: "/orders?type=internal" },
       { label: "محولة للمركز", href: "/orders?status=pull-to-center" },
-      { label: "غير مكتملة", href: "/orders?status=incompleted" },
+      { label: "قيد الإصلاح", href: "/orders?status=incompleted" },
       { label: "مكتملة", href: "/orders?status=completed" },
     ],
   },

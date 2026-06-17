@@ -486,13 +486,6 @@ export function CustomersScreen() {
         />
       ) : null}
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card className="p-4">
-          <div className="text-sm text-content-muted">إجمالي العملاء</div>
-          <div className="mt-2 font-heading text-2xl font-bold text-content">{customers.length}</div>
-        </Card>
-      </div>
-
       <Card className="p-4">
         <Input value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} placeholder="بحث باسم العميل أو هاتف العميل أو المعرف" aria-label="بحث العملاء" />
       </Card>
@@ -542,6 +535,21 @@ export function CustomersScreen() {
           onPage={setPage}
           itemLabel="عميل"
         />
+      </Card>
+
+      <Card className="p-5">
+        <div className="flex flex-col gap-4 text-right sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <span className="flex size-11 items-center justify-center rounded-sm bg-gold-soft text-gold">
+              <Icon name="users" size={22} />
+            </span>
+            <div>
+              <div className="text-sm text-content-muted">إجمالي العملاء</div>
+              <div className="mt-1 text-xs text-content-muted">العدد الكامل للعملاء المسجلين في النظام</div>
+            </div>
+          </div>
+          <div className="font-heading text-3xl font-bold text-content">{customers.length}</div>
+        </div>
       </Card>
     </div>
   );

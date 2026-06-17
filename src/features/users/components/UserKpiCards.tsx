@@ -23,7 +23,7 @@ export function UserKpiCards() {
       tint: "bg-info-soft text-info",
     },
     {
-      label: "موظفين",
+      label: "موظفو خدمة العملاء",
       value: data?.employees,
       icon: "users",
       tint: "bg-success-soft text-success",
