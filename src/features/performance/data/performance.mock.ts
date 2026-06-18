@@ -1,7 +1,5 @@
 import type { TechnicianDailyPerformance } from "@/features/performance/models/performance.model";
 
-export const PERFORMANCE_REPORT_DATE = "2026-06-18";
-
 export const DAILY_TECHNICIAN_PERFORMANCE = [
   {
     id: "TEC-01",

@@ -18,7 +18,7 @@ const STATUS_DETAILS: Record<
 > = {
   completed: { label: "مكتمل", tone: "success" },
   incomplete: { label: "غير مكتمل", tone: "danger" },
-  returned: { label: "معاد إلى المركز", tone: "info" },
+  returned: { label: "مسحوبة إلى المركز", tone: "info" },
   active: { label: "نشط", tone: "gold" },
 };
 
@@ -34,7 +34,7 @@ export function TechnicianPerformanceCard({
     { label: "مكتملة", value: summary.completedOrders, className: "text-success" },
     { label: "غير مكتملة", value: summary.incompleteOrders, className: "text-danger" },
     { label: "نشطة", value: summary.activeOrders, className: "text-gold" },
-    { label: "معادة للمركز", value: summary.returnedOrders, className: "text-info" },
+    { label: "مسحوبة إلى المركز", value: summary.returnedOrders, className: "text-info" },
   ] as const;
 
   return (
@@ -57,15 +57,29 @@ export function TechnicianPerformanceCard({
       </CardHeader>
 
       <div className="p-4 sm:p-5">
-        <div className="grid grid-cols-2 gap-px overflow-hidden rounded-md border border-border bg-border lg:grid-cols-4">
-          {breakdown.map((item) => (
-            <div key={item.label} className="bg-surface-2 p-3 text-center">
-              <p className="text-xs text-content-muted">{item.label}</p>
-              <p className={`mt-1 font-heading text-xl font-bold ${item.className}`}>
-                {item.value}
-              </p>
-            </div>
-          ))}
+        <div className="grid grid-cols-2 lg:grid-cols-4">
+          {breakdown.map((item, index) => {
+            const dividerClass =
+              index === 0
+                ? "border-b border-l lg:border-b-0"
+                : index === 1
+                  ? "border-b lg:border-b-0 lg:border-l"
+                  : index === 2
+                    ? "border-l"
+                    : "";
+
+            return (
+              <div
+                key={item.label}
+                className={`border-border p-3 text-center ${dividerClass}`}
+              >
+                <p className="text-xs text-content-muted">{item.label}</p>
+                <p className={`mt-1 font-heading text-xl font-bold ${item.className}`}>
+                  {item.value}
+                </p>
+              </div>
+            );
+          })}
         </div>
       </div>
 

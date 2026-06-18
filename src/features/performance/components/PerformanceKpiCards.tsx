@@ -29,7 +29,7 @@ export function PerformanceKpiCards({ summary }: PerformanceKpiCardsProps) {
       iconClassName: "bg-danger-soft text-danger",
     },
     {
-      label: "المعادة إلى المركز",
+      label: "الطلبات المسحوبة إلى المركز",
       value: String(summary.returnedOrders),
       icon: "home",
       iconClassName: "bg-info-soft text-info",
