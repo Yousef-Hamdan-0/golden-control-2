@@ -124,21 +124,6 @@ export function ExpensesScreen({ initialCategory = "all" }: ExpensesScreenProps)
         />
       ) : null}
 
-      <div className="flex justify-start">
-        <Card className="flex w-full items-center justify-between gap-4 p-4 sm:w-96">
-          <div>
-            <p className="text-sm text-content-muted">مجموع المصروفات الثابتة الشهري</p>
-            <p className="mt-2 font-heading text-2xl font-bold text-content">
-              {formatMoney(monthlyFixedTotal, "SYP")}
-            </p>
-            <p className="mt-1 text-xs text-content-muted">عن شهر {formatExpenseMonth(month)}</p>
-          </div>
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-gold-soft text-gold">
-            <Icon name="wallet" size={21} />
-          </span>
-        </Card>
-      </div>
-
       <Card className="grid gap-4 p-4 sm:grid-cols-2">
         <Field label="تصنيف المصروف" htmlFor="expense-filter-category">
           <Select
@@ -242,6 +227,21 @@ export function ExpensesScreen({ initialCategory = "all" }: ExpensesScreenProps)
           itemLabel="مصروف"
         />
       </Card>
+
+      <div className="flex justify-start">
+        <Card className="flex w-full items-center justify-between gap-4 p-4 sm:w-96">
+          <div>
+            <p className="text-sm text-content-muted">مجموع المصروفات الثابتة الشهري</p>
+            <p className="mt-2 font-heading text-2xl font-bold text-content">
+              {formatMoney(monthlyFixedTotal, "SYP")}
+            </p>
+            <p className="mt-1 text-xs text-content-muted">عن شهر {formatExpenseMonth(month)}</p>
+          </div>
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-gold-soft text-gold">
+            <Icon name="wallet" size={21} />
+          </span>
+        </Card>
+      </div>
     </div>
   );
 }

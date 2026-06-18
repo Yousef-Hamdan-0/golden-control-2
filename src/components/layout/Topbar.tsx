@@ -26,6 +26,7 @@ function routeTitle(pathname: string, fallback: string): string {
   if (pathname.startsWith("/inventory")) return "إدارة المخزون";
   if (pathname.startsWith("/invoices")) return "إدارة الفواتير";
   if (pathname.startsWith("/finance/expenses")) return "المصروفات";
+  if (pathname.startsWith("/finance/payroll-adjustments")) return "تسويات الرواتب";
   if (pathname.startsWith("/finance/reports")) return "التقارير والإحصائيات";
   if (pathname.startsWith("/finance")) return "الإدارة المالية";
   if (pathname.startsWith("/dashboard")) return "نظرة عامة";

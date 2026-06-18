@@ -77,6 +77,7 @@ export const NAVIGATION: NavItem[] = [
     icon: "wallet",
     children: [
       { label: "المصروفات", href: "/finance/expenses" },
+      { label: "تسويات الرواتب", href: "/finance/payroll-adjustments" },
       { label: "المبيعات", href: "/finance/sales" },
       { label: "الأرباح", href: "/finance/profits" },
     ],
