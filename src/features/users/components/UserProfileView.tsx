@@ -12,6 +12,7 @@ import {
   type User,
 } from "@/models/auth/user.model";
 import { useUserQuery } from "@/features/users/hooks/use-users-query";
+import { UserAvatar } from "@/features/users/components/UserAvatar";
 
 function ReadField({ label, value }: { label: string; value: string }) {
   return (
@@ -61,6 +62,14 @@ export function UserProfileView({
       </Button>
 
       <Card className="space-y-6 p-6">
+        <div className="flex flex-col gap-4 border-b border-border pb-6 sm:flex-row sm:items-center">
+          <UserAvatar name={u.fullName} imageUrl={u.imageUrl} size="lg" />
+          <div>
+            <h2 className="font-heading text-xl font-bold text-content">{u.fullName}</h2>
+            <p className="mt-1 text-sm text-content-muted">{u.jobTitle}</p>
+            <p className="mt-1 text-xs text-gold">{u.id}</p>
+          </div>
+        </div>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <ReadField label="الاسم بالكامل" value={u.fullName} />
           <ReadField label="البريد الإلكتروني" value={u.email} />

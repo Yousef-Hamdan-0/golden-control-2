@@ -1,12 +1,23 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Icon, type IconName } from "@/lib/icons";
 import { formatMoney } from "@/lib/format/currency";
 import { cn } from "@/lib/utils/cn";
-import { USD_TO_SYP_RATE } from "../../constants";
-import { FINANCE_RECORDS, INVENTORY, INVOICES } from "../../data/seed";
+import {
+  EXPENSES_STORAGE_KEY,
+  INITIAL_EXPENSES,
+} from "@/features/expenses/data/expenses.mock";
+import type { ExpenseRecord } from "@/features/expenses/models/expense.model";
+import {
+  INVENTORY_ITEMS_STORAGE_KEY,
+  INVOICES_STORAGE_KEY,
+  USD_TO_SYP_RATE,
+} from "../../constants";
+import { INVENTORY, INVOICES } from "../../data/seed";
+import type { InventoryItem, Invoice } from "../../types";
+import { readStoredInvoices, readStoredList } from "../../utils/storage";
 import { SectionTitle } from "../shared/SectionTitle";
 
 const MONTHS = [
@@ -202,36 +213,81 @@ function SelectFilter({
 
 export function SalesProfitsScreen() {
   const [filters, setFilters] = useState<DateParts>({ day: "", month: "", year: "" });
+  const [invoices, setInvoices] = useState<Invoice[]>(readStoredInvoices);
+  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>(() =>
+    readStoredList(INVENTORY_ITEMS_STORAGE_KEY, INVENTORY),
+  );
+  const [expenses, setExpenses] = useState<ExpenseRecord[]>(() =>
+    readStoredList(EXPENSES_STORAGE_KEY, [...INITIAL_EXPENSES]),
+  );
+
+  useEffect(() => {
+    const syncData = (event?: Event) => {
+      const key =
+        event instanceof StorageEvent
+          ? event.key
+          : event instanceof CustomEvent
+            ? event.detail?.key
+            : null;
+
+      if (!key || key === INVOICES_STORAGE_KEY) {
+        setInvoices(readStoredInvoices());
+      }
+      if (!key || key === INVENTORY_ITEMS_STORAGE_KEY) {
+        setInventoryItems(readStoredList(INVENTORY_ITEMS_STORAGE_KEY, INVENTORY));
+      }
+      if (!key || key === EXPENSES_STORAGE_KEY) {
+        setExpenses(readStoredList(EXPENSES_STORAGE_KEY, [...INITIAL_EXPENSES]));
+      }
+    };
+
+    window.addEventListener("storage", syncData);
+    window.addEventListener("golden-control:data-updated", syncData);
+    window.addEventListener("focus", syncData);
+
+    return () => {
+      window.removeEventListener("storage", syncData);
+      window.removeEventListener("golden-control:data-updated", syncData);
+      window.removeEventListener("focus", syncData);
+    };
+  }, []);
 
   const years = useMemo(
     () =>
       Array.from(
         new Set([
-          ...INVOICES.map((invoice) => invoice.issuedAt.slice(0, 4)),
-          ...FINANCE_RECORDS.map((record) => record.date.slice(0, 4)),
+          ...invoices.map((invoice) => invoice.issuedAt.slice(0, 4)),
+          ...expenses.map((expense) => expense.month.slice(0, 4)),
         ]),
       ).sort((a, b) => Number(b) - Number(a)),
-    [],
+    [expenses, invoices],
   );
+  const hasSpecificDate = Boolean(filters.day && filters.month && filters.year);
 
   const dashboard = useMemo(() => {
-    const invoices = INVOICES.filter((invoice) => matchesDate(invoice.issuedAt, filters));
-    const expenseRecords = FINANCE_RECORDS.filter(
-      (record) => record.category !== "sales" && matchesDate(record.date, filters),
+    const activeFilters =
+      filters.day && filters.month && filters.year
+        ? filters
+        : { day: "", month: "", year: "" };
+    const filteredInvoices = invoices.filter((invoice) =>
+      matchesDate(invoice.issuedAt, activeFilters),
     );
-    const inventoryCost = new Map(INVENTORY.map((item) => [item.id, item.unitCost]));
+    const expenseRecords = expenses.filter(
+      (expense) => matchesDate(`${expense.month}-01`, activeFilters),
+    );
+    const inventoryCost = new Map(inventoryItems.map((item) => [item.id, item.unitCost]));
     const dateKeys = Array.from(
       new Set([
-        ...invoices.map((invoice) => invoice.issuedAt.slice(0, 10)),
-        ...expenseRecords.map((record) => record.date.slice(0, 10)),
+        ...filteredInvoices.map((invoice) => invoice.issuedAt.slice(0, 10)),
+        ...expenseRecords.map((expense) => `${expense.month}-01`),
       ]),
     ).sort();
     const chartDates = dateKeys.length > 1 ? dateKeys : ["قبل", ...(dateKeys.length ? dateKeys : ["الآن"])];
 
     const invoiceTotals = (date?: string) => {
       const scoped = date
-        ? invoices.filter((invoice) => invoice.issuedAt.slice(0, 10) === date)
-        : invoices;
+        ? filteredInvoices.filter((invoice) => invoice.issuedAt.slice(0, 10) === date)
+        : filteredInvoices;
       const sales = scoped.reduce(
         (sum, invoice) => sum + toSyp(invoice.total, invoice.currency),
         0,
@@ -257,12 +313,12 @@ export function SalesProfitsScreen() {
 
     const expenseTotal = (date?: string) =>
       expenseRecords
-        .filter((record) => !date || record.date.slice(0, 10) === date)
-        .reduce((sum, record) => sum + toSyp(record.amount, record.currency), 0);
+        .filter((expense) => !date || `${expense.month}-01` === date)
+        .reduce((sum, expense) => sum + expense.amount, 0);
 
     const totals = invoiceTotals();
-    const expenses = expenseTotal();
-    const netProfit = totals.sales - expenses - totals.parts;
+    const totalExpenses = expenseTotal();
+    const netProfit = totals.sales - totalExpenses - totals.parts;
     const seriesFor = (
       pick: (invoice: ReturnType<typeof invoiceTotals>, expenses: number) => number,
     ) =>
@@ -272,8 +328,8 @@ export function SalesProfitsScreen() {
       });
 
     return {
-      invoiceCount: invoices.length,
-      totals: { ...totals, expenses, netProfit },
+      invoiceCount: filteredInvoices.length,
+      totals: { ...totals, expenses: totalExpenses, netProfit },
       series: {
         sales: seriesFor((invoice) => invoice.sales),
         paid: seriesFor((invoice) => invoice.paid),
@@ -285,16 +341,14 @@ export function SalesProfitsScreen() {
         ),
       },
     };
-  }, [filters]);
+  }, [expenses, filters, inventoryItems, invoices]);
 
-  const hasFilters = Boolean(filters.day || filters.month || filters.year);
-  const filterDescription = [
-    filters.day ? `اليوم ${filters.day}` : "",
-    filters.month ? MONTHS[Number(filters.month) - 1] : "",
-    filters.year || "",
-  ]
-    .filter(Boolean)
-    .join(" / ");
+  const hasFilterSelection = Boolean(filters.day || filters.month || filters.year);
+  const filterDescription = hasSpecificDate
+    ? `${filters.day} / ${MONTHS[Number(filters.month) - 1]} / ${filters.year}`
+    : hasFilterSelection
+      ? "أكمل اختيار اليوم والشهر والسنة"
+      : "عرض كل البيانات";
 
   const metrics: MetricCardProps[] = [
     {
@@ -361,9 +415,9 @@ export function SalesProfitsScreen() {
               <Icon name="calendar" size={20} />
             </span>
             <div>
-              <h2 className="font-heading text-base font-bold text-content">الفترة المالية</h2>
+              <h2 className="font-heading text-base font-bold text-content">تاريخ التقرير</h2>
               <p className="mt-1 text-xs leading-5 text-content-muted">
-                اختر أي حقل منفردًا أو اجمع اليوم والشهر والسنة للحصول على نطاق أدق.
+                اختر اليوم والشهر والسنة معًا لعرض بيانات يوم واحد محدد.
               </p>
             </div>
           </div>
@@ -374,7 +428,7 @@ export function SalesProfitsScreen() {
               value={filters.day}
               onChange={(day) => setFilters((current) => ({ ...current, day }))}
             >
-              <option value="">كل الأيام</option>
+              <option value="">اختر اليوم</option>
               {Array.from({ length: 31 }, (_, index) => index + 1).map((day) => (
                 <option key={day} value={day}>{day}</option>
               ))}
@@ -384,7 +438,7 @@ export function SalesProfitsScreen() {
               value={filters.month}
               onChange={(month) => setFilters((current) => ({ ...current, month }))}
             >
-              <option value="">كل الأشهر</option>
+              <option value="">اختر الشهر</option>
               {MONTHS.map((month, index) => (
                 <option key={month} value={index + 1}>{month}</option>
               ))}
@@ -394,24 +448,24 @@ export function SalesProfitsScreen() {
               value={filters.year}
               onChange={(year) => setFilters((current) => ({ ...current, year }))}
             >
-              <option value="">كل السنوات</option>
+              <option value="">اختر السنة</option>
               {years.map((year) => (
                 <option key={year} value={year}>{year}</option>
               ))}
             </SelectFilter>
             <button
               type="button"
-              disabled={!hasFilters}
+              disabled={!hasFilterSelection}
               onClick={() => setFilters({ day: "", month: "", year: "" })}
               className="h-11 self-end rounded-md border border-border bg-surface px-4 text-sm font-medium text-content transition hover:border-gold hover:text-gold disabled:cursor-not-allowed disabled:opacity-40"
             >
-              مسح الفلاتر
+              عرض الكل
             </button>
           </div>
         </div>
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-4 text-xs text-content-muted">
-          <span>النطاق الحالي: <strong className="font-semibold text-content">{filterDescription || "كل الفترات"}</strong></span>
+          <span>العرض الحالي: <strong className="font-semibold text-content">{filterDescription}</strong></span>
           <span>{dashboard.invoiceCount} فواتير مطابقة</span>
         </div>
       </Card>

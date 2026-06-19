@@ -82,12 +82,13 @@ export const NAVIGATION: NavItem[] = [
     ],
   },
   {
-    label: "التقارير والإحصائيات",
+    label: "التقارير",
     icon: "chart",
     children: [
-      { label: "تقارير الصيانة", href: "/finance/reports/maintenance" },
-      { label: "تقارير الفنيين", href: "/finance/reports/technicians" },
-      { label: "التقارير المالية", href: "/finance/reports/financial" },
+      { label: "تقرير الطلبات", href: "/reports/orders" },
+      { label: "تقارير الفنيين", href: "/reports/technicians" },
+      { label: "تقارير حركة المخزون", href: "/reports/inventory-movements" },
+      { label: "التقارير المالية", href: "/reports/financial" },
     ],
   },
 ];

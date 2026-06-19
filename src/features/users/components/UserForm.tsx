@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState, type ChangeEvent } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Card, CardHeader } from "@/components/ui/Card";
@@ -19,6 +19,10 @@ import {
   UserUpdateSchema,
   type UserUpdateInput,
 } from "@/models/users/user-update.schema";
+import { UserAvatar } from "@/features/users/components/UserAvatar";
+
+const MAX_IMAGE_SIZE = 2 * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 type CreateProps = {
   mode: "create";
@@ -47,11 +51,14 @@ function SectionLabel({ children }: { children: string }) {
 export function UserForm(props: Props) {
   const [showPassword, setShowPassword] = useState(false);
   const [pendingEditValues, setPendingEditValues] = useState<UserUpdateInput | null>(null);
+  const [imageError, setImageError] = useState("");
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const isEdit = props.mode === "edit";
 
   const {
     register,
     handleSubmit,
+    setValue,
     watch,
     formState: { errors },
   } = useForm<UserCreateInput & UserUpdateInput>({
@@ -65,13 +72,43 @@ export function UserForm(props: Props) {
           salary: props.user.salary,
           role: props.user.role,
           status: props.user.status,
+          imageUrl: props.user.imageUrl ?? "",
           password: "",
         }
-      : { role: "employee" as Role, salary: 0 },
+      : { role: "employee" as Role, salary: 0, imageUrl: "" },
   });
 
   const role = watch("role");
+  const imageUrl = watch("imageUrl");
   const canChangePassword = true;
+
+  function selectImage(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      setImageError("الصيغ المدعومة هي JPG وPNG وWebP فقط.");
+      return;
+    }
+
+    if (file.size > MAX_IMAGE_SIZE) {
+      setImageError("يجب ألا يتجاوز حجم الصورة 2MB.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result !== "string") {
+        setImageError("تعذر قراءة الصورة المختارة.");
+        return;
+      }
+      setValue("imageUrl", reader.result, { shouldDirty: true, shouldValidate: true });
+      setImageError("");
+    };
+    reader.onerror = () => setImageError("تعذر قراءة الصورة المختارة.");
+    reader.readAsDataURL(file);
+  }
 
   function confirmEdit() {
     if (props.mode !== "edit" || !pendingEditValues) return;
@@ -99,13 +136,64 @@ export function UserForm(props: Props) {
               <Icon name="users" size={16} className="text-gold" />
               بيانات الحساب الجديد
             </span>
-            <span className="text-xs text-content-muted">* جميع الحقول مطلوبة</span>
+            <span className="text-xs text-content-muted">* الصورة اختيارية</span>
           </CardHeader>
 
           <div className="space-y-8 p-6">
             {/* Personal */}
             <section>
               <SectionLabel>المعلومات الشخصية</SectionLabel>
+              <input type="hidden" {...register("imageUrl")} />
+              <div className="mb-5 flex flex-col gap-4 rounded-md border border-border bg-surface-2 p-4 sm:flex-row sm:items-center">
+                <UserAvatar
+                  name={watch("fullName") || "المستخدم"}
+                  imageUrl={imageUrl || undefined}
+                  size="lg"
+                />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-content">صورة المستخدم</p>
+                  <p className="mt-1 text-xs leading-5 text-content-muted">
+                    اختيارية — JPG أو PNG أو WebP، وبحجم لا يتجاوز 2MB.
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => imageInputRef.current?.click()}
+                    >
+                      <Icon name={imageUrl ? "pencil" : "plus"} size={16} />
+                      {imageUrl ? "تغيير الصورة" : "اختيار صورة"}
+                    </Button>
+                    {imageUrl ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="danger"
+                        onClick={() => {
+                          setValue("imageUrl", "", { shouldDirty: true, shouldValidate: true });
+                          setImageError("");
+                        }}
+                      >
+                        <Icon name="trash" size={16} />
+                        إزالة الصورة
+                      </Button>
+                    ) : null}
+                  </div>
+                  <input
+                    ref={imageInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="sr-only"
+                    onChange={selectImage}
+                  />
+                  {imageError || errors.imageUrl?.message ? (
+                    <p role="alert" className="mt-2 text-xs text-danger">
+                      {imageError || errors.imageUrl?.message}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <Field label="الاسم الكامل" error={errors.fullName?.message}>
                   <Input placeholder="مثال: محمد أحمد" {...register("fullName")} />

@@ -1,6 +1,7 @@
 import type { ExpenseRecord } from "@/features/expenses/models/expense.model";
 
 export const DEFAULT_EXPENSE_MONTH = "2026-06";
+export const EXPENSES_STORAGE_KEY = "golden-control.expenses";
 
 export const INITIAL_EXPENSES: readonly ExpenseRecord[] = [
   {

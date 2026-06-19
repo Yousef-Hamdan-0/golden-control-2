@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -13,6 +13,7 @@ import { PAGE_SIZE } from "@/config/constants";
 import { ExpenseFormModal } from "@/features/expenses/components/ExpenseFormModal";
 import {
   DEFAULT_EXPENSE_MONTH,
+  EXPENSES_STORAGE_KEY,
   INITIAL_EXPENSES,
 } from "@/features/expenses/data/expenses.mock";
 import {
@@ -25,19 +26,26 @@ import {
 } from "@/features/expenses/models/expense.model";
 import { formatMoney } from "@/lib/format/currency";
 import { Icon } from "@/lib/icons";
+import { readStoredList, writeStoredList } from "@/features/operations/utils/storage";
 
 interface ExpensesScreenProps {
   initialCategory?: ExpenseCategoryFilter;
 }
 
 export function ExpensesScreen({ initialCategory = "all" }: ExpensesScreenProps) {
-  const [expenses, setExpenses] = useState<ExpenseRecord[]>([...INITIAL_EXPENSES]);
+  const [expenses, setExpenses] = useState<ExpenseRecord[]>(() =>
+    readStoredList(EXPENSES_STORAGE_KEY, [...INITIAL_EXPENSES]),
+  );
   const [category, setCategory] = useState<ExpenseCategoryFilter>(initialCategory);
   const [month, setMonth] = useState(DEFAULT_EXPENSE_MONTH);
   const [page, setPage] = useState(1);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingExpense, setEditingExpense] = useState<ExpenseRecord | null>(null);
   const [expenseToDelete, setExpenseToDelete] = useState<ExpenseRecord | null>(null);
+
+  useEffect(() => {
+    writeStoredList(EXPENSES_STORAGE_KEY, expenses);
+  }, [expenses]);
 
   const monthlyFixedTotal = useMemo(
     () =>

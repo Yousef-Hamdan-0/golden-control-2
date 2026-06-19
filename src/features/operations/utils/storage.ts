@@ -19,6 +19,9 @@ export function readStoredList<T>(key: string, fallback: T[]): T[] {
 export function writeStoredList<T>(key: string, items: T[]) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(key, JSON.stringify(items));
+  window.dispatchEvent(
+    new CustomEvent("golden-control:data-updated", { detail: { key } }),
+  );
 }
 
 export function readStoredInvoices(): Invoice[] {

@@ -13,6 +13,7 @@ import {
   type User,
 } from "@/models/auth/user.model";
 import { useUserMutations } from "@/features/users/hooks/use-user-mutations";
+import { UserAvatar } from "@/features/users/components/UserAvatar";
 
 interface Props {
   users: User[];
@@ -121,7 +122,12 @@ export function UsersTable({ users, isLoading, total, page, pageSize, onPage, on
                         {u.id}
                       </button>
                     </td>
-                    <td className="px-4 py-4 text-content">{u.fullName}</td>
+                    <td className="px-4 py-4 text-content">
+                      <div className="flex items-center gap-2.5">
+                        <UserAvatar name={u.fullName} imageUrl={u.imageUrl} size="sm" />
+                        <span>{u.fullName}</span>
+                      </div>
+                    </td>
                     <td className="px-4 py-4 text-content-muted">{u.email}</td>
                     <td className="px-4 py-4 text-content-muted" dir="ltr">
                       {u.phone}
@@ -152,7 +158,10 @@ export function UsersTable({ users, isLoading, total, page, pageSize, onPage, on
                 </button>
                 <StatusBadge status={u.status} />
               </div>
-              <div className="text-right text-content">{u.fullName}</div>
+              <div className="flex items-center justify-start gap-2.5 text-right text-content">
+                <UserAvatar name={u.fullName} imageUrl={u.imageUrl} size="sm" />
+                <span>{u.fullName}</span>
+              </div>
               <div className="text-right text-sm text-content-muted">{u.email}</div>
               <div className="text-right text-sm text-content-muted" dir="ltr">
                 {u.phone}

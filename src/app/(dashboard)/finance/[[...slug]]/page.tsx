@@ -5,6 +5,7 @@ import {
 } from "@/features/expenses";
 import { PayrollAdjustmentsScreen } from "@/features/payroll-adjustments";
 import { SalesProfitsScreen } from "@/features/operations/components/finance/SalesProfitsScreen";
+import { redirect } from "next/navigation";
 
 export default async function FinancePage({
   params,
@@ -30,6 +31,16 @@ export default async function FinancePage({
     slug?.[0] === "sales-profits"
   ) {
     return <SalesProfitsScreen />;
+  }
+
+  if (slug?.[0] === "reports") {
+    const legacyReportRoutes: Record<string, string> = {
+      maintenance: "orders",
+      technicians: "technicians",
+      inventory: "inventory-movements",
+      financial: "financial",
+    };
+    redirect(`/reports/${legacyReportRoutes[slug[1]] ?? "orders"}`);
   }
 
   return <FinanceScreen section={slug} />;
