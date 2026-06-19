@@ -4,6 +4,7 @@ import {
   type ExpenseCategoryFilter,
 } from "@/features/expenses";
 import { PayrollAdjustmentsScreen } from "@/features/payroll-adjustments";
+import { SalesProfitsScreen } from "@/features/operations/components/finance/SalesProfitsScreen";
 
 export default async function FinancePage({
   params,
@@ -21,6 +22,14 @@ export default async function FinancePage({
 
   if (slug?.[0] === "payroll-adjustments") {
     return <PayrollAdjustmentsScreen />;
+  }
+
+  if (
+    slug?.[0] === "sales" ||
+    slug?.[0] === "profits" ||
+    slug?.[0] === "sales-profits"
+  ) {
+    return <SalesProfitsScreen />;
   }
 
   return <FinanceScreen section={slug} />;

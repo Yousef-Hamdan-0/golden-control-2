@@ -34,9 +34,18 @@ export function DailyPerformanceScreen() {
           </span>
         </div>
 
-        <div className="space-y-4">
-          {DAILY_TECHNICIAN_PERFORMANCE.map((technician) => (
-            <TechnicianPerformanceCard key={technician.id} technician={technician} />
+        <div className="space-y-7 sm:space-y-8">
+          {DAILY_TECHNICIAN_PERFORMANCE.map((technician, index) => (
+            <div key={technician.id} className="space-y-7 sm:space-y-8">
+              {index > 0 && (
+                <div aria-hidden="true" className="flex items-center gap-3 px-2">
+                  <span className="h-px flex-1 bg-border" />
+                  <span className="h-1 w-12 rounded-sm bg-gold/30" />
+                  <span className="h-px flex-1 bg-border" />
+                </div>
+              )}
+              <TechnicianPerformanceCard technician={technician} />
+            </div>
           ))}
         </div>
       </section>
