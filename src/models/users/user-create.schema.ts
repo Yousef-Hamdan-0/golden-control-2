@@ -14,6 +14,11 @@ export const UserCreateSchema = z
     jobTitle: z.string().min(2, "المسمى الوظيفي مطلوب"),
     salary: z.coerce.number().nonnegative("الراتب يجب أن يكون رقماً موجباً"),
     imageUrl: z.string().max(4_000_000, "حجم الصورة كبير جدًا").optional().or(z.literal("")),
+    identityDocumentUrl: z
+      .string()
+      .max(4_000_000, "حجم صورة الوثيقة كبير جدًا")
+      .optional()
+      .or(z.literal("")),
     password: z.string().min(8, "كلمة المرور 8 أحرف على الأقل"),
     /** Technician-only. */
     discount: z.coerce.number().nonnegative().optional(),

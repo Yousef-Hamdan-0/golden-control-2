@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -83,6 +84,25 @@ export function UserProfileView({
           <Badge tone={u.status === "available" ? "success" : "danger"}>
             {STATUS_LABELS_AR[u.status]}
           </Badge>
+        </div>
+        <div className="border-t border-border pt-5">
+          <h3 className="font-heading text-base font-bold text-content">الوثيقة الشخصية</h3>
+          {u.identityDocumentUrl ? (
+            <div className="relative mt-4 aspect-[16/10] w-full max-w-2xl overflow-hidden rounded-md border border-border bg-surface-2">
+              <Image
+                src={u.identityDocumentUrl}
+                alt={`الوثيقة الشخصية للمستخدم ${u.fullName}`}
+                fill
+                sizes="(max-width: 768px) 100vw, 672px"
+                className="object-contain"
+                unoptimized
+              />
+            </div>
+          ) : (
+            <div className="mt-3 flex min-h-28 items-center justify-center rounded-md border border-dashed border-border bg-surface-2 px-4 text-sm text-content-muted">
+              لم تتم إضافة صورة للوثيقة الشخصية.
+            </div>
+          )}
         </div>
       </Card>
     </div>

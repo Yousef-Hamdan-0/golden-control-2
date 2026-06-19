@@ -64,12 +64,13 @@ export const userRepository = {
   },
 
   async create(input: UserCreateInput): Promise<User> {
-    const { password: _password, imageUrl, ...rest } = input;
+    const { password: _password, imageUrl, identityDocumentUrl, ...rest } = input;
     const user: User = {
       id: nextId(),
       status: "available",
       ...rest,
       ...(imageUrl ? { imageUrl } : {}),
+      ...(identityDocumentUrl ? { identityDocumentUrl } : {}),
     };
     store = [user, ...store];
     return latency(UserSchema.parse(user));
@@ -78,11 +79,12 @@ export const userRepository = {
   async update(id: string, input: UserUpdateInput): Promise<User> {
     const idx = store.findIndex((u) => u.id === id);
     if (idx === -1) throw new Error("NOT_FOUND");
-    const { password: _password, imageUrl, ...rest } = input;
+    const { password: _password, imageUrl, identityDocumentUrl, ...rest } = input;
     const updated: User = {
       ...store[idx],
       ...rest,
       imageUrl: imageUrl || undefined,
+      identityDocumentUrl: identityDocumentUrl || undefined,
     };
     store[idx] = updated;
     return latency(UserSchema.parse(updated));

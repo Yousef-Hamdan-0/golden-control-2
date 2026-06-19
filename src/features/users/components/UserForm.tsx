@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useRef, useState, type ChangeEvent } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -48,11 +49,122 @@ function SectionLabel({ children }: { children: string }) {
   );
 }
 
+function ImageUploadField({
+  title,
+  value,
+  error,
+  preview,
+  userName,
+  onChange,
+}: {
+  title: string;
+  value?: string;
+  error?: string;
+  preview: "avatar" | "document";
+  userName: string;
+  onChange: (value: string) => void;
+}) {
+  const [fileError, setFileError] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  function selectImage(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      setFileError("الصيغ المدعومة هي JPG وPNG وWebP فقط.");
+      return;
+    }
+
+    if (file.size > MAX_IMAGE_SIZE) {
+      setFileError("يجب ألا يتجاوز حجم الصورة 2MB.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result !== "string") {
+        setFileError("تعذر قراءة الصورة المختارة.");
+        return;
+      }
+      onChange(reader.result);
+      setFileError("");
+    };
+    reader.onerror = () => setFileError("تعذر قراءة الصورة المختارة.");
+    reader.readAsDataURL(file);
+  }
+
+  return (
+    <div className="flex flex-col gap-4 rounded-md border border-border bg-surface-2 p-4 sm:flex-row sm:items-center">
+      {preview === "avatar" ? (
+        <UserAvatar name={userName} imageUrl={value || undefined} size="lg" />
+      ) : (
+        <span className="relative flex h-24 w-40 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-surface text-gold">
+          {value ? (
+            <Image
+              src={value}
+              alt="معاينة الوثيقة الشخصية"
+              fill
+              sizes="160px"
+              className="object-cover"
+              unoptimized
+            />
+          ) : (
+            <Icon name="file" size={28} />
+          )}
+        </span>
+      )}
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold text-content">{title}</p>
+        <p className="mt-1 text-xs leading-5 text-content-muted">
+          اختيارية — JPG أو PNG أو WebP، وبحجم لا يتجاوز 2MB.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => inputRef.current?.click()}
+          >
+            <Icon name={value ? "pencil" : "plus"} size={16} />
+            {value ? "تغيير الصورة" : "اختيار صورة"}
+          </Button>
+          {value ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="danger"
+              onClick={() => {
+                onChange("");
+                setFileError("");
+              }}
+            >
+              <Icon name="trash" size={16} />
+              إزالة الصورة
+            </Button>
+          ) : null}
+        </div>
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="sr-only"
+          onChange={selectImage}
+        />
+        {fileError || error ? (
+          <p role="alert" className="mt-2 text-xs text-danger">
+            {fileError || error}
+          </p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export function UserForm(props: Props) {
   const [showPassword, setShowPassword] = useState(false);
   const [pendingEditValues, setPendingEditValues] = useState<UserUpdateInput | null>(null);
-  const [imageError, setImageError] = useState("");
-  const imageInputRef = useRef<HTMLInputElement>(null);
   const isEdit = props.mode === "edit";
 
   const {
@@ -73,42 +185,21 @@ export function UserForm(props: Props) {
           role: props.user.role,
           status: props.user.status,
           imageUrl: props.user.imageUrl ?? "",
+          identityDocumentUrl: props.user.identityDocumentUrl ?? "",
           password: "",
         }
-      : { role: "employee" as Role, salary: 0, imageUrl: "" },
+      : {
+          role: "employee" as Role,
+          salary: 0,
+          imageUrl: "",
+          identityDocumentUrl: "",
+        },
   });
 
   const role = watch("role");
   const imageUrl = watch("imageUrl");
+  const identityDocumentUrl = watch("identityDocumentUrl");
   const canChangePassword = true;
-
-  function selectImage(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-
-    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
-      setImageError("الصيغ المدعومة هي JPG وPNG وWebP فقط.");
-      return;
-    }
-
-    if (file.size > MAX_IMAGE_SIZE) {
-      setImageError("يجب ألا يتجاوز حجم الصورة 2MB.");
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result !== "string") {
-        setImageError("تعذر قراءة الصورة المختارة.");
-        return;
-      }
-      setValue("imageUrl", reader.result, { shouldDirty: true, shouldValidate: true });
-      setImageError("");
-    };
-    reader.onerror = () => setImageError("تعذر قراءة الصورة المختارة.");
-    reader.readAsDataURL(file);
-  }
 
   function confirmEdit() {
     if (props.mode !== "edit" || !pendingEditValues) return;
@@ -136,7 +227,7 @@ export function UserForm(props: Props) {
               <Icon name="users" size={16} className="text-gold" />
               بيانات الحساب الجديد
             </span>
-            <span className="text-xs text-content-muted">* الصورة اختيارية</span>
+            <span className="text-xs text-content-muted">* الصور اختيارية</span>
           </CardHeader>
 
           <div className="space-y-8 p-6">
@@ -144,55 +235,31 @@ export function UserForm(props: Props) {
             <section>
               <SectionLabel>المعلومات الشخصية</SectionLabel>
               <input type="hidden" {...register("imageUrl")} />
-              <div className="mb-5 flex flex-col gap-4 rounded-md border border-border bg-surface-2 p-4 sm:flex-row sm:items-center">
-                <UserAvatar
-                  name={watch("fullName") || "المستخدم"}
-                  imageUrl={imageUrl || undefined}
-                  size="lg"
+              <input type="hidden" {...register("identityDocumentUrl")} />
+              <div className="mb-5 grid gap-4 lg:grid-cols-2">
+                <ImageUploadField
+                  title="صورة المستخدم"
+                  value={imageUrl}
+                  error={errors.imageUrl?.message}
+                  preview="avatar"
+                  userName={watch("fullName") || "المستخدم"}
+                  onChange={(value) =>
+                    setValue("imageUrl", value, { shouldDirty: true, shouldValidate: true })
+                  }
                 />
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-content">صورة المستخدم</p>
-                  <p className="mt-1 text-xs leading-5 text-content-muted">
-                    اختيارية — JPG أو PNG أو WebP، وبحجم لا يتجاوز 2MB.
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => imageInputRef.current?.click()}
-                    >
-                      <Icon name={imageUrl ? "pencil" : "plus"} size={16} />
-                      {imageUrl ? "تغيير الصورة" : "اختيار صورة"}
-                    </Button>
-                    {imageUrl ? (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="danger"
-                        onClick={() => {
-                          setValue("imageUrl", "", { shouldDirty: true, shouldValidate: true });
-                          setImageError("");
-                        }}
-                      >
-                        <Icon name="trash" size={16} />
-                        إزالة الصورة
-                      </Button>
-                    ) : null}
-                  </div>
-                  <input
-                    ref={imageInputRef}
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    className="sr-only"
-                    onChange={selectImage}
-                  />
-                  {imageError || errors.imageUrl?.message ? (
-                    <p role="alert" className="mt-2 text-xs text-danger">
-                      {imageError || errors.imageUrl?.message}
-                    </p>
-                  ) : null}
-                </div>
+                <ImageUploadField
+                  title="صورة الوثيقة الشخصية"
+                  value={identityDocumentUrl}
+                  error={errors.identityDocumentUrl?.message}
+                  preview="document"
+                  userName={watch("fullName") || "المستخدم"}
+                  onChange={(value) =>
+                    setValue("identityDocumentUrl", value, {
+                      shouldDirty: true,
+                      shouldValidate: true,
+                    })
+                  }
+                />
               </div>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <Field label="الاسم الكامل" error={errors.fullName?.message}>

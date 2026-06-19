@@ -50,11 +50,11 @@ export const REPORT_TYPES = Object.keys(REPORT_DEFINITIONS) as ReportType[];
 
 export function ReportPdfScreen({ type }: { type: ReportType }) {
   const report = REPORT_DEFINITIONS[type];
-  const [filterMode, setFilterMode] = useState<"all" | "range">("all");
+  const [showDateFilter, setShowDateFilter] = useState(false);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [pdfUrl, setPdfUrl] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loadingAction, setLoadingAction] = useState<"view" | "download" | null>(null);
   const [error, setError] = useState("");
 
   useEffect(
@@ -64,26 +64,22 @@ export function ReportPdfScreen({ type }: { type: ReportType }) {
     [pdfUrl],
   );
 
-  async function loadReport(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    if (filterMode === "range" && (!from || !to)) {
+  async function loadReport(action: "view" | "download") {
+    if (!from || !to) {
       setError("يرجى اختيار تاريخ البداية وتاريخ النهاية.");
       return;
     }
 
-    if (filterMode === "range" && from > to) {
+    if (from > to) {
       setError("يجب أن يكون تاريخ البداية قبل تاريخ النهاية أو مساويًا له.");
       return;
     }
 
-    setLoading(true);
+    setLoadingAction(action);
     setError("");
 
     try {
-      const search = new URLSearchParams(
-        filterMode === "all" ? { scope: "all" } : { from, to },
-      );
+      const search = new URLSearchParams({ from, to });
       const response = await fetch(`${REPORTS_API_BASE}/${type}?${search.toString()}`, {
         headers: { Accept: "application/pdf" },
       });
@@ -99,10 +95,21 @@ export function ReportPdfScreen({ type }: { type: ReportType }) {
 
       const blob = await response.blob();
       const nextPdfUrl = URL.createObjectURL(blob);
-      setPdfUrl((current) => {
-        if (current) URL.revokeObjectURL(current);
-        return nextPdfUrl;
-      });
+
+      if (action === "download") {
+        const downloadLink = document.createElement("a");
+        downloadLink.href = nextPdfUrl;
+        downloadLink.download = report.fileName;
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        downloadLink.remove();
+        window.setTimeout(() => URL.revokeObjectURL(nextPdfUrl), 1_000);
+      } else {
+        setPdfUrl((current) => {
+          if (current) URL.revokeObjectURL(current);
+          return nextPdfUrl;
+        });
+      }
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -110,7 +117,7 @@ export function ReportPdfScreen({ type }: { type: ReportType }) {
           : "حدث خطأ غير متوقع أثناء تحميل التقرير.",
       );
     } finally {
-      setLoading(false);
+      setLoadingAction(null);
     }
   }
 
@@ -119,52 +126,40 @@ export function ReportPdfScreen({ type }: { type: ReportType }) {
       <PageHeader title={report.title} subtitle={report.subtitle} />
 
       <Card className="p-4 sm:p-5">
-        <form className="space-y-5" onSubmit={loadReport}>
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <form
+          className="space-y-5"
+          onSubmit={(event: FormEvent<HTMLFormElement>) => {
+            event.preventDefault();
+            void loadReport("view");
+          }}
+        >
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h2 className="font-heading text-base font-bold text-content">فترة التقرير</h2>
               <p className="mt-1 text-xs text-content-muted">
-                اعرض كل البيانات أو حدد تاريخ البداية والنهاية للفترة المطلوبة.
+                اضغط زر الفترة الزمنية لتحديد تاريخ البداية والنهاية.
               </p>
             </div>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <button
-                type="button"
-                aria-pressed={filterMode === "all"}
-                onClick={() => {
-                  setFilterMode("all");
-                  setError("");
-                }}
-                className={cn(
-                  "h-11 min-w-32 rounded-md border px-4 text-sm font-medium transition",
-                  filterMode === "all"
-                    ? "border-gold bg-gold-soft text-gold"
-                    : "border-border bg-surface text-content-muted hover:border-gold",
-                )}
-              >
-                عرض الكل
-              </button>
-              <button
-                type="button"
-                aria-pressed={filterMode === "range"}
-                onClick={() => {
-                  setFilterMode("range");
-                  setError("");
-                }}
-                className={cn(
-                  "h-11 min-w-32 rounded-md border px-4 text-sm font-medium transition",
-                  filterMode === "range"
-                    ? "border-gold bg-gold-soft text-gold"
-                    : "border-border bg-surface text-content-muted hover:border-gold",
-                )}
-              >
-                فترة زمنية
-              </button>
-            </div>
+            <button
+              type="button"
+              aria-expanded={showDateFilter}
+              onClick={() => {
+                setShowDateFilter((current) => !current);
+                setError("");
+              }}
+              className={cn(
+                "inline-flex h-11 items-center justify-center gap-2 rounded-md border px-5 text-sm font-medium transition",
+                showDateFilter
+                  ? "border-gold bg-gold-soft text-gold"
+                  : "border-border bg-surface text-content-muted hover:border-gold hover:text-gold",
+              )}
+            >
+              <Icon name="calendar" size={17} />
+              فترة زمنية
+            </button>
           </div>
 
-          {filterMode === "range" ? (
+          {showDateFilter ? (
             <div className="grid gap-4 border-t border-border pt-5 sm:grid-cols-2">
               <Field label="من تاريخ" htmlFor={`${type}-report-from`}>
                 <Input
@@ -173,6 +168,7 @@ export function ReportPdfScreen({ type }: { type: ReportType }) {
                   dir="ltr"
                   value={from}
                   max={to || undefined}
+                  required
                   onChange={(event) => setFrom(event.target.value)}
                 />
               </Field>
@@ -183,6 +179,7 @@ export function ReportPdfScreen({ type }: { type: ReportType }) {
                   dir="ltr"
                   value={to}
                   min={from || undefined}
+                  required
                   onChange={(event) => setTo(event.target.value)}
                 />
               </Field>
@@ -195,10 +192,19 @@ export function ReportPdfScreen({ type }: { type: ReportType }) {
             </div>
           ) : null}
 
-          <div className="flex justify-end">
-            <Button type="submit" disabled={loading}>
-              <Icon name={loading ? "clock" : "file"} size={18} />
-              {loading ? "جارٍ تحميل التقرير..." : "عرض تقرير PDF"}
+          <div className="flex flex-wrap justify-end gap-3">
+            <Button type="submit" disabled={!showDateFilter || loadingAction !== null}>
+              <Icon name={loadingAction === "view" ? "clock" : "eye"} size={18} />
+              {loadingAction === "view" ? "جارٍ عرض التقرير..." : "عرض التقرير"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!showDateFilter || loadingAction !== null}
+              onClick={() => void loadReport("download")}
+            >
+              <Icon name={loadingAction === "download" ? "clock" : "file"} size={18} />
+              {loadingAction === "download" ? "جارٍ تحميل التقرير..." : "تحميل التقرير"}
             </Button>
           </div>
         </form>
@@ -210,15 +216,6 @@ export function ReportPdfScreen({ type }: { type: ReportType }) {
             <Icon name="file" size={18} className="text-gold" />
             <h2 className="font-heading text-sm font-bold text-content">معاينة التقرير</h2>
           </div>
-          {pdfUrl ? (
-            <a
-              href={pdfUrl}
-              download={report.fileName}
-              className="inline-flex h-9 items-center gap-2 rounded-md border border-gold px-4 text-sm font-medium text-gold transition hover:bg-gold-soft"
-            >
-              تنزيل PDF
-            </a>
-          ) : null}
         </div>
 
         {pdfUrl ? (
@@ -235,7 +232,7 @@ export function ReportPdfScreen({ type }: { type: ReportType }) {
             <div>
               <p className="font-heading font-bold text-content">لم يتم تحميل تقرير بعد</p>
               <p className="mt-1 text-sm text-content-muted">
-                اختر نطاق البيانات ثم اضغط «عرض تقرير PDF» لاستلامه من الـ API.
+                افتح «فترة زمنية» وحدد التاريخ، ثم اعرض التقرير أو حمّله مباشرة.
               </p>
             </div>
           </div>

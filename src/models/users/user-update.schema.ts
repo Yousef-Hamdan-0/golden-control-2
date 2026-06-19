@@ -12,6 +12,11 @@ export const UserUpdateSchema = z.object({
   jobTitle: z.string().min(2, "المسمى الوظيفي مطلوب"),
   salary: z.coerce.number().nonnegative("الراتب يجب أن يكون رقماً موجباً"),
   imageUrl: z.string().max(4_000_000, "حجم الصورة كبير جدًا").optional().or(z.literal("")),
+  identityDocumentUrl: z
+    .string()
+    .max(4_000_000, "حجم صورة الوثيقة كبير جدًا")
+    .optional()
+    .or(z.literal("")),
   role: RoleSchema,
   status: UserStatusSchema,
   password: z

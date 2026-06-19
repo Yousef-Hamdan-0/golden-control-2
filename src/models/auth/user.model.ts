@@ -43,6 +43,8 @@ export const UserSchema = z.object({
   salary: z.number().nonnegative(), // Syrian Lira (ل.س)
   /** Optional profile photo URL or locally encoded image in the mock repository. */
   imageUrl: z.string().max(4_000_000).optional(),
+  /** Optional personal identity document image. */
+  identityDocumentUrl: z.string().max(4_000_000).optional(),
   /** Technician-only discount (خصم), per PRD. */
   discount: z.number().nonnegative().optional(),
 });
