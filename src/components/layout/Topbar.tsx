@@ -2,21 +2,25 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { Icon } from "@/lib/icons";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 function todayLabel(): string {
-  const date = new Intl.DateTimeFormat("ar-u-nu-latn", {
+  const parts = new Intl.DateTimeFormat("ar-u-nu-latn", {
     day: "numeric",
     month: "long",
     year: "numeric",
-  }).format(new Date());
+    timeZone: "Asia/Amman",
+  }).formatToParts(new Date());
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((item) => item.type === type)?.value ?? "";
 
-  return `اليوم، ${date}`;
+  return `اليوم، ${part("day")} ${part("month")} ${part("year")}`;
 }
 
 function routeTitle(pathname: string, fallback: string): string {
-  if (pathname.startsWith("/settings/users")) return "إدارة المستخدمين";
+  if (pathname.startsWith("/users")) return "إدارة المستخدمين";
   if (pathname.startsWith("/settings/exchange-rate")) return "سعر الصرف";
   if (pathname.startsWith("/settings/center")) return "الإعدادات";
   if (pathname.startsWith("/customers")) return "إدارة العملاء";
@@ -42,6 +46,11 @@ export function Topbar({
 }) {
   const pathname = usePathname();
   const currentTitle = routeTitle(pathname, title);
+  const [dateLabel, setDateLabel] = useState("");
+
+  useEffect(() => {
+    setDateLabel(todayLabel());
+  }, []);
 
   return (
     <header className="sticky top-0 z-20 h-16 border-b border-border bg-surface relative">
@@ -74,7 +83,7 @@ export function Topbar({
         dir="ltr"
         className="absolute left-4 top-1/2 hidden -translate-y-1/2 items-center gap-3 text-sm text-content-muted md:flex lg:left-8"
       >
-        <span dir="rtl">{todayLabel()}</span>
+        <span dir="rtl">{dateLabel || "\u00a0"}</span>
         <Icon name="calendar" size={16} />
         <span className="h-6 w-px bg-border" aria-hidden="true" />
       </div>

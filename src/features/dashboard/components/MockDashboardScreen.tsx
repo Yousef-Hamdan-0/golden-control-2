@@ -5,10 +5,10 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import {
-  clearMockSession,
-  readMockSession,
-  type MockSession,
-} from "@/lib/auth/mock-session";
+  clearAuthSession,
+  readAuthSession,
+  type AuthSession,
+} from "@/helpers/auth-session.helper";
 import { MaintenanceOrderModal } from "@/features/operations/components/OperationsScreens";
 
 type IconName =
@@ -52,7 +52,7 @@ const orderStats = [
 
 const navItems: NavItem[] = [
   { icon: "shield", label: "الرئيسية", href: "/dashboard", active: true },
-  { icon: "users", label: "إدارة المستخدمين", href: "/settings/users" },
+  { icon: "users", label: "إدارة المستخدمين", href: "/users" },
   { icon: "users", label: "إدارة الفنيين", href: "/technicians/inventory" },
   {
     icon: "tools",
@@ -298,7 +298,7 @@ function Sidebar({
   session,
 }: {
   onLogout: () => void;
-  session: MockSession | null;
+  session: AuthSession | null;
 }) {
   const displayName = session?.name === "admin" ? "أحمد العتيبي" : session?.name;
 
@@ -621,12 +621,12 @@ function RecentOrdersTable() {
 
 export function MockDashboardScreen() {
   const router = useRouter();
-  const [session, setSession] = useState<MockSession | null>(null);
+  const [session, setSession] = useState<AuthSession | null>(null);
   const [isChecking, setIsChecking] = useState(true);
   const [showOrderModal, setShowOrderModal] = useState(false);
 
   useEffect(() => {
-    const storedSession = readMockSession();
+    const storedSession = readAuthSession();
 
     if (!storedSession) {
       router.replace("/login");
@@ -638,7 +638,7 @@ export function MockDashboardScreen() {
   }, [router]);
 
   function handleLogout() {
-    clearMockSession();
+    clearAuthSession();
     router.replace("/login");
   }
 

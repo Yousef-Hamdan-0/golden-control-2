@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { QueryProvider } from "@/providers/QueryProvider";
 import { ThemeProvider } from "@/providers/ThemeProvider";
+import { ToastProvider } from "@/components/ui/Toast";
 
 /**
  * Compose app-wide providers. In the full app this also wraps Auth + Socket
@@ -11,7 +12,9 @@ import { ThemeProvider } from "@/providers/ThemeProvider";
 export function AppProviders({ children }: { children: ReactNode }) {
   return (
     <ThemeProvider>
-      <QueryProvider>{children}</QueryProvider>
+      <ToastProvider>
+        <QueryProvider>{children}</QueryProvider>
+      </ToastProvider>
     </ThemeProvider>
   );
 }

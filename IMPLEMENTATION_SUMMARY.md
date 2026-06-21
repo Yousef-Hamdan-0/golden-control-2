@@ -306,10 +306,10 @@ npm run build
 
 المسارات الجديدة:
 
-- `/settings/users`
-- `/settings/users/new`
-- `/settings/users/[userId]`
-- `/settings/users/[userId]/edit`
+- `/users`
+- `/users/new`
+- `/users/[userId]`
+- `/users/[userId]/edit`
 - `/technicians/inventory`
 - `/technicians/inventory/new`
 
@@ -345,5 +345,5 @@ npm run build
 - TypeScript نجح.
 - ESLint نجح بدون تحذيرات.
 - `next build` نجح.
-- تم فحص `/login`, `/dashboard`, `/settings/users`, `/technicians/inventory` في المتصفح المحلي.
+- تم فحص `/login`, `/dashboard`, `/users`, `/technicians/inventory` في المتصفح المحلي.
 - لا توجد أخطاء أو تحذيرات في Console أثناء الفحص.

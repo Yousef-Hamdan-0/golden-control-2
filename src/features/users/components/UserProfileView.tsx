@@ -58,7 +58,7 @@ export function UserProfileView({
 
   return (
     <div className="space-y-4">
-      <Button onClick={() => (onEdit ? onEdit(u) : router.push(`/settings/users/${encodeURIComponent(u.id)}/edit`))}>
+      <Button onClick={() => (onEdit ? onEdit(u) : router.push(`/users/${encodeURIComponent(u.id)}/edit`))}>
         تعديل البيانات
       </Button>
 

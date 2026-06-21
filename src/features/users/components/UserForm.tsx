@@ -11,7 +11,13 @@ import { Field, Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Icon } from "@/lib/icons";
 import { CURRENCY_SYMBOL } from "@/config/constants";
-import { ROLE_LABELS_AR, type Role, type User } from "@/models/auth/user.model";
+import {
+  ROLE_LABELS_AR,
+  STATUS_LABELS_AR,
+  type Role,
+  type User,
+  type UserStatus,
+} from "@/models/auth/user.model";
 import {
   UserCreateSchema,
   type UserCreateInput,
@@ -27,8 +33,10 @@ const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 type CreateProps = {
   mode: "create";
+  defaultRole?: Role;
   onSubmit: (input: UserCreateInput) => void;
   submitting?: boolean;
+  submitError?: string;
   onCancel: () => void;
 };
 type EditProps = {
@@ -36,6 +44,7 @@ type EditProps = {
   user: User;
   onSubmit: (input: UserUpdateInput) => void;
   submitting?: boolean;
+  submitError?: string;
   onCancel: () => void;
 };
 type Props = CreateProps | EditProps;
@@ -186,20 +195,21 @@ export function UserForm(props: Props) {
           status: props.user.status,
           imageUrl: props.user.imageUrl ?? "",
           identityDocumentUrl: props.user.identityDocumentUrl ?? "",
+          profileImagePath: props.user.profileImagePath ?? "",
+          documentImagePath: props.user.documentImagePath ?? "",
           password: "",
         }
       : {
-          role: "employee" as Role,
+          role: props.mode === "create" ? (props.defaultRole ?? "employee") : "employee",
           salary: 0,
           imageUrl: "",
           identityDocumentUrl: "",
         },
   });
 
-  const role = watch("role");
   const imageUrl = watch("imageUrl");
   const identityDocumentUrl = watch("identityDocumentUrl");
-  const canChangePassword = true;
+  const canChangePassword = !isEdit;
 
   function confirmEdit() {
     if (props.mode !== "edit" || !pendingEditValues) return;
@@ -225,7 +235,7 @@ export function UserForm(props: Props) {
           <CardHeader className="flex items-center justify-between">
             <span className="flex items-center gap-2 text-sm font-semibold text-content">
               <Icon name="users" size={16} className="text-gold" />
-              بيانات الحساب الجديد
+              {isEdit ? "بيانات المستخدم" : "بيانات الحساب الجديد"}
             </span>
             <span className="text-xs text-content-muted">* الصور اختيارية</span>
           </CardHeader>
@@ -236,6 +246,12 @@ export function UserForm(props: Props) {
               <SectionLabel>المعلومات الشخصية</SectionLabel>
               <input type="hidden" {...register("imageUrl")} />
               <input type="hidden" {...register("identityDocumentUrl")} />
+              {isEdit ? (
+                <>
+                  <input type="hidden" {...register("profileImagePath")} />
+                  <input type="hidden" {...register("documentImagePath")} />
+                </>
+              ) : null}
               <div className="mb-5 grid gap-4 lg:grid-cols-2">
                 <ImageUploadField
                   title="صورة المستخدم"
@@ -243,9 +259,12 @@ export function UserForm(props: Props) {
                   error={errors.imageUrl?.message}
                   preview="avatar"
                   userName={watch("fullName") || "المستخدم"}
-                  onChange={(value) =>
-                    setValue("imageUrl", value, { shouldDirty: true, shouldValidate: true })
-                  }
+                  onChange={(value) => {
+                    setValue("imageUrl", value, { shouldDirty: true, shouldValidate: true });
+                    if (isEdit && !value) {
+                      setValue("profileImagePath", "", { shouldDirty: true });
+                    }
+                  }}
                 />
                 <ImageUploadField
                   title="صورة الوثيقة الشخصية"
@@ -253,12 +272,15 @@ export function UserForm(props: Props) {
                   error={errors.identityDocumentUrl?.message}
                   preview="document"
                   userName={watch("fullName") || "المستخدم"}
-                  onChange={(value) =>
+                  onChange={(value) => {
                     setValue("identityDocumentUrl", value, {
                       shouldDirty: true,
                       shouldValidate: true,
-                    })
-                  }
+                    });
+                    if (isEdit && !value) {
+                      setValue("documentImagePath", "", { shouldDirty: true });
+                    }
+                  }}
                 />
               </div>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -274,7 +296,12 @@ export function UserForm(props: Props) {
                   />
                 </Field>
                 <Field label="رقم الهاتف" error={errors.phone?.message}>
-                  <Input dir="ltr" placeholder="+966 50 000 0000" {...register("phone")} />
+                  <Input
+                    dir="ltr"
+                    placeholder="+966 50 000 0000"
+                    disabled={isEdit}
+                    {...register("phone")}
+                  />
                 </Field>
               </div>
             </section>
@@ -303,14 +330,18 @@ export function UserForm(props: Props) {
                     </span>
                   </div>
                 </Field>
-              </div>
-              {!isEdit && role === "technician" && (
-                <div className="mt-4 md:w-1/3">
-                  <Field label="الخصم (%)" error={errors.discount?.message}>
-                    <Input type="number" step="0.1" {...register("discount")} />
+                {isEdit ? (
+                  <Field label="حالة المستخدم" error={errors.status?.message}>
+                    <Select {...register("status")}>
+                      {(Object.keys(STATUS_LABELS_AR) as UserStatus[]).map((status) => (
+                        <option key={status} value={status}>
+                          {STATUS_LABELS_AR[status]}
+                        </option>
+                      ))}
+                    </Select>
                   </Field>
-                </div>
-              )}
+                ) : null}
+              </div>
             </section>
 
             {canChangePassword ? (
@@ -318,7 +349,7 @@ export function UserForm(props: Props) {
                 <SectionLabel>الأمان</SectionLabel>
                 <div className="md:w-2/3">
                   <Field
-                    label={isEdit ? "كلمة المرور الجديدة" : "كلمة المرور"}
+                    label="كلمة المرور"
                     error={errors.password?.message}
                   >
                     <div className="relative">
@@ -338,15 +369,22 @@ export function UserForm(props: Props) {
                     </div>
                   </Field>
                   <p className="mt-1.5 text-xs text-content-muted">
-                    {isEdit
-                      ? "يمكن لمدير النظام تغيير كلمة مرور هذا المستخدم أو تركها فارغة للإبقاء على الحالية."
-                      : "سيحتاجها المستخدم عند كل تسجيل دخول. يمكن لمدير النظام تغييرها لاحقاً."}
+                    سيحتاجها المستخدم عند كل تسجيل دخول.
                   </p>
                 </div>
               </section>
             ) : null}
           </div>
         </Card>
+
+        {props.submitError ? (
+          <div
+            role="alert"
+            className="rounded-md border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-danger"
+          >
+            {props.submitError}
+          </div>
+        ) : null}
 
         <div className="flex items-center justify-end gap-3">
           <Button type="button" variant="outline" onClick={props.onCancel}>

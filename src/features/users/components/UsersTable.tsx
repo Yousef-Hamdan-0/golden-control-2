@@ -1,10 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { ConfirmToast } from "@/components/ui/ConfirmToast";
 import { SkeletonRow } from "@/components/ui/Spinner";
 import { Icon } from "@/lib/icons";
 import {
@@ -12,7 +10,6 @@ import {
   STATUS_LABELS_AR,
   type User,
 } from "@/models/auth/user.model";
-import { useUserMutations } from "@/features/users/hooks/use-user-mutations";
 import { UserAvatar } from "@/features/users/components/UserAvatar";
 
 interface Props {
@@ -45,51 +42,25 @@ function RowActions({
   onView: (user: User) => void;
   onEdit: (user: User) => void;
 }) {
-  const { remove } = useUserMutations();
-  const [confirmDelete, setConfirmDelete] = useState(false);
-
   return (
-    <>
-      <div className="flex items-center justify-start gap-2" dir="rtl">
-        <button
-          type="button"
-          aria-label="عرض"
-          onClick={() => onView(user)}
-          className="rounded-sm p-1.5 text-content-muted hover:bg-surface-2"
-        >
-          <Icon name="eye" size={18} />
-        </button>
-        <button
-          type="button"
-          aria-label="تعديل"
-          onClick={() => onEdit(user)}
-          className="rounded-sm p-1.5 text-content-muted hover:bg-surface-2"
-        >
-          <Icon name="pencil" size={18} />
-        </button>
-        <button
-          type="button"
-          aria-label="حذف"
-          onClick={() => setConfirmDelete(true)}
-          className="rounded-sm p-1.5 text-danger hover:bg-danger-soft"
-        >
-          <Icon name="trash" size={18} />
-        </button>
-      </div>
-      {confirmDelete ? (
-        <ConfirmToast
-          title="تأكيد حذف المستخدم"
-          message={`هل تريد حذف المستخدم ${user.fullName}؟ لا يمكن التراجع عن هذه العملية.`}
-          isLoading={remove.isPending}
-          onCancel={() => setConfirmDelete(false)}
-          onConfirm={() =>
-            remove.mutate(user.id, {
-              onSuccess: () => setConfirmDelete(false),
-            })
-          }
-        />
-      ) : null}
-    </>
+    <div className="flex items-center justify-start gap-2" dir="rtl">
+      <button
+        type="button"
+        aria-label="عرض"
+        onClick={() => onView(user)}
+        className="rounded-sm p-1.5 text-content-muted hover:bg-surface-2"
+      >
+        <Icon name="eye" size={18} />
+      </button>
+      <button
+        type="button"
+        aria-label="تعديل"
+        onClick={() => onEdit(user)}
+        className="rounded-sm p-1.5 text-content-muted hover:bg-surface-2"
+      >
+        <Icon name="pencil" size={18} />
+      </button>
+    </div>
   );
 }
 
@@ -119,7 +90,7 @@ export function UsersTable({ users, isLoading, total, page, pageSize, onPage, on
                   <tr key={u.id} className="border-b border-border last:border-0 hover:bg-gold-soft">
                     <td className="px-4 py-4 font-medium text-gold">
                       <button type="button" onClick={() => onView(u)} className="font-medium text-gold hover:text-gold-hover">
-                        {u.id}
+                        {u.userNumber ?? "—"}
                       </button>
                     </td>
                     <td className="px-4 py-4 text-content">
@@ -154,7 +125,7 @@ export function UsersTable({ users, isLoading, total, page, pageSize, onPage, on
             <div key={u.id} className="space-y-2 p-4">
               <div className="flex items-center justify-between">
                 <button type="button" onClick={() => onView(u)} className="font-medium text-gold hover:text-gold-hover">
-                  {u.id}
+                  {u.userNumber ?? "—"}
                 </button>
                 <StatusBadge status={u.status} />
               </div>

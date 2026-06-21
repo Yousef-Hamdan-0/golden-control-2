@@ -23,6 +23,13 @@ export function useUserCountsQuery() {
   });
 }
 
+export function useCurrentUserQuery() {
+  return useQuery({
+    queryKey: queryKeys.users.me(),
+    queryFn: () => userService.getCurrent(),
+  });
+}
+
 export function useUserQuery(id: string) {
   return useQuery({
     queryKey: queryKeys.users.detail(id),

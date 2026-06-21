@@ -3,7 +3,9 @@
 import { useRouter } from "next/navigation";
 import type { FormEvent } from "react";
 import { useState } from "react";
-import { createMockSession, writeMockSession } from "@/lib/auth/mock-session";
+import { getApiErrorMessage } from "@/helpers/api.helper";
+import { getDeviceToken } from "@/helpers/device-token.helper";
+import { authService } from "@/services/auth.service";
 import {
   AuthInput,
   LockIcon,
@@ -17,8 +19,9 @@ export function LoginScreen() {
   const router = useRouter();
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
     const email = String(formData.get("email") ?? "").trim();
@@ -26,12 +29,29 @@ export function LoginScreen() {
     const remember = formData.get("remember") === "on";
 
     if (!email || !password) {
+      setError("يرجى إدخال البريد الإلكتروني وكلمة المرور.");
       return;
     }
 
     setIsSubmitting(true);
-    writeMockSession(createMockSession(email), remember);
-    router.push("/dashboard");
+    setError("");
+
+    try {
+      await authService.login(
+        {
+          email,
+          password,
+          tokenDevice: getDeviceToken(),
+        },
+        remember,
+      );
+      router.replace("/dashboard");
+      router.refresh();
+    } catch (loginError) {
+      setError(getApiErrorMessage(loginError));
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -55,6 +75,7 @@ export function LoginScreen() {
           autoComplete="email"
           placeholder="example@gold.com"
           required
+          disabled={isSubmitting}
           rightSlot={<UserIcon />}
         />
 
@@ -66,6 +87,7 @@ export function LoginScreen() {
           autoComplete="current-password"
           placeholder="••••••••"
           required
+          disabled={isSubmitting}
           rightSlot={<LockIcon />}
           leftSlot={
             <PasswordVisibilityButton
@@ -80,11 +102,22 @@ export function LoginScreen() {
             <input
               name="remember"
               type="checkbox"
+              disabled={isSubmitting}
               className="h-4 w-4 rounded-sm border-[var(--border)] accent-[var(--gold-active)]"
             />
             <span>تذكرني</span>
           </label>
         </div>
+
+        {error ? (
+          <div
+            role="alert"
+            aria-live="polite"
+            className="rounded-sm border border-danger/30 bg-danger-soft px-4 py-3 text-right text-[13px] text-danger"
+          >
+            {error}
+          </div>
+        ) : null}
 
         <button
           type="submit"

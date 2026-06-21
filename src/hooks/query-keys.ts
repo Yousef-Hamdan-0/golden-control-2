@@ -8,6 +8,7 @@ import type { UserListParams } from "@/repositories/user.repository";
 export const queryKeys = {
   users: {
     all: ["users"] as const,
+    me: () => ["users", "me"] as const,
     list: (params: UserListParams) => ["users", "list", params] as const,
     counts: () => ["users", "counts"] as const,
     detail: (id: string) => ["users", "detail", id] as const,

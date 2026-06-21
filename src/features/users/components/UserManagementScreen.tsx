@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
+import { useToast } from "@/components/ui/Toast";
 import { Icon } from "@/lib/icons";
 import { PAGE_SIZE } from "@/config/constants";
+import { getApiErrorMessage } from "@/helpers/api.helper";
 import { useUsersQuery } from "@/features/users/hooks/use-users-query";
 import { UserFilters, type RoleFilter, type StatusFilter } from "@/features/users/components/UserFilters";
 import { UsersTable } from "@/features/users/components/UsersTable";
@@ -13,34 +15,75 @@ import { UserKpiCards } from "@/features/users/components/UserKpiCards";
 import { UserForm } from "@/features/users/components/UserForm";
 import { UserProfileView } from "@/features/users/components/UserProfileView";
 import { useUserMutations } from "@/features/users/hooks/use-user-mutations";
-import type { User } from "@/models/auth/user.model";
+import { RoleSchema, type User } from "@/models/auth/user.model";
 import type { UserCreateInput } from "@/models/users/user-create.schema";
 import type { UserUpdateInput } from "@/models/users/user-update.schema";
 
+function statusFromParam(value: string | null): StatusFilter {
+  if (value === "false") return "unavailable";
+  if (value === "all") return "all";
+  return "available";
+}
+
+function usersUrl(role: RoleFilter, status: StatusFilter) {
+  const query = new URLSearchParams();
+  query.set("role", role);
+  query.set(
+    "isActive",
+    status === "available" ? "true" : status === "unavailable" ? "false" : "all",
+  );
+  return `/users?${query}`;
+}
+
 export function UserManagementScreen() {
+  const router = useRouter();
+  const toast = useToast();
   const params = useSearchParams();
-  const initialRole = (params.get("role") as RoleFilter) || "all";
+  const roleParam = params.get("role");
+  const activeParam = params.get("isActive");
+  const parsedRole = RoleSchema.safeParse(roleParam);
+  const initialRole: RoleFilter = parsedRole.success ? parsedRole.data : "all";
 
   const [role, setRole] = useState<RoleFilter>(initialRole);
-  const [status, setStatus] = useState<StatusFilter>("all");
+  const [status, setStatus] = useState<StatusFilter>(statusFromParam(activeParam));
   const [page, setPage] = useState(1);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [viewingUser, setViewingUser] = useState<User | null>(null);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const { create, update } = useUserMutations();
 
+  useEffect(() => {
+    const nextRole = RoleSchema.safeParse(roleParam);
+    setRole(nextRole.success ? nextRole.data : "all");
+    setStatus(statusFromParam(activeParam));
+    setPage(1);
+  }, [activeParam, roleParam]);
+
   // role + status are in the query key → changing a filter refetches that slice.
-  const { data, isLoading, isError, refetch } = useUsersQuery({
+  const { data, error: listError, isLoading, isError, refetch } = useUsersQuery({
     role,
     status,
     page,
     pageSize: PAGE_SIZE,
   });
 
-  const resetPageThen = <T,>(setter: (v: T) => void) => (v: T) => {
+  useEffect(() => {
+    if (isError && listError) {
+      toast.error("تعذر تحميل المستخدمين", getApiErrorMessage(listError));
+    }
+  }, [isError, listError, toast]);
+
+  function handleRoleChange(nextRole: RoleFilter) {
     setPage(1);
-    setter(v);
-  };
+    setRole(nextRole);
+    router.replace(usersUrl(nextRole, status));
+  }
+
+  function handleStatusChange(nextStatus: StatusFilter) {
+    setPage(1);
+    setStatus(nextStatus);
+    router.replace(usersUrl(role, nextStatus));
+  }
 
   return (
     <div className="space-y-6">
@@ -51,10 +94,16 @@ export function UserManagementScreen() {
           <UserFilters
             role={role}
             status={status}
-            onRole={resetPageThen(setRole)}
-            onStatus={resetPageThen(setStatus)}
+            onRole={handleRoleChange}
+            onStatus={handleStatusChange}
           />
-          <Button className="shrink-0" onClick={() => setShowCreateModal(true)}>
+          <Button
+            className="shrink-0"
+            onClick={() => {
+              create.reset();
+              setShowCreateModal(true);
+            }}
+          >
             <Icon name="plus" size={18} />
             مستخدم جديد
           </Button>
@@ -64,17 +113,33 @@ export function UserManagementScreen() {
       {showCreateModal ? (
         <Modal
           title="إنشاء مستخدم جديد"
-          description="إضافة مستخدم وهمي إلى نظام الصلاحيات."
+          description="إضافة مستخدم جديد إلى نظام الصلاحيات."
           onClose={() => setShowCreateModal(false)}
           widthClassName="max-w-5xl"
         >
           <div className="p-5">
             <UserForm
               mode="create"
+              defaultRole={role === "all" ? "employee" : role}
               submitting={create.isPending}
+              submitError={create.error ? getApiErrorMessage(create.error) : undefined}
               onCancel={() => setShowCreateModal(false)}
               onSubmit={(input: UserCreateInput) =>
-                create.mutate(input, { onSuccess: () => setShowCreateModal(false) })
+                create.mutate(input, {
+                  onSuccess: () => {
+                    setRole(input.role);
+                    setStatus("available");
+                    setPage(1);
+                    setShowCreateModal(false);
+                    router.replace(usersUrl(input.role, "available"));
+                    toast.success(
+                      "تم إنشاء المستخدم",
+                      `تمت إضافة ${input.fullName} إلى جدول المستخدمين بنجاح.`,
+                    );
+                  },
+                  onError: (error) =>
+                    toast.error("تعذر إنشاء المستخدم", getApiErrorMessage(error)),
+                })
               }
             />
           </div>
@@ -110,11 +175,22 @@ export function UserManagementScreen() {
               mode="edit"
               user={editingUser}
               submitting={update.isPending}
+              submitError={update.error ? getApiErrorMessage(update.error) : undefined}
               onCancel={() => setEditingUser(null)}
               onSubmit={(input: UserUpdateInput) =>
                 update.mutate(
                   { id: editingUser.id, input },
-                  { onSuccess: () => setEditingUser(null) },
+                  {
+                    onSuccess: () => {
+                      setEditingUser(null);
+                      toast.success(
+                        "تم تحديث المستخدم",
+                        `تم حفظ تعديلات ${input.fullName} بنجاح.`,
+                      );
+                    },
+                    onError: (error) =>
+                      toast.error("تعذر تحديث المستخدم", getApiErrorMessage(error)),
+                  },
                 )
               }
             />

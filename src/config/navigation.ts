@@ -25,9 +25,9 @@ export const NAVIGATION: NavItem[] = [
     icon: "users",
     roles: ["admin"],
     children: [
-      { label: "المدراء", href: "/settings/users?role=manager" },
-      { label: "موظفو خدمة العملاء", href: "/settings/users?role=employee" },
-      { label: "الفنيين", href: "/settings/users?role=technician" },
+      { label: "المدراء", href: "/users?role=manager" },
+      { label: "موظفو خدمة العملاء", href: "/users?role=employee" },
+      { label: "الفنيين", href: "/users?role=technician" },
     ],
   },
   {

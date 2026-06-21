@@ -1,15 +1,17 @@
+import { API_ENDPOINTS } from "@/config/api-endpoints";
+import { PAGE_SIZE } from "@/config/constants";
+import { ApiError, requestApi } from "@/helpers/api.helper";
+import { getAuthorizationHeaders } from "@/helpers/auth-session.helper";
 import type { Role, User, UserCounts, UserStatus } from "@/models/auth/user.model";
-import { UserSchema } from "@/models/auth/user.model";
 import type { UserCreateInput } from "@/models/users/user-create.schema";
 import type { UserUpdateInput } from "@/models/users/user-update.schema";
-import { MOCK_USERS } from "@/mocks/users.mock";
-import { PAGE_SIZE } from "@/config/constants";
-
-/**
- * MOCK repository. The only layer that "knows" the data source.
- * Replace each method body with an Axios call + UserSchema parse to go live;
- * nothing above this file changes.
- */
+import {
+  CreateUserRequestModel,
+  UpdateUserRequestModel,
+  UserListQuerySchema,
+  normalizeUserListResponse,
+  normalizeUserResponse,
+} from "@/models/users/user-api.model";
 
 export interface UserListParams {
   role?: Role | "all";
@@ -25,73 +27,99 @@ export interface Paginated<T> {
   pageSize: number;
 }
 
-// Mutable in-memory store so create/update/delete persist for the session.
-let store: User[] = [...MOCK_USERS];
+function authenticatedHeaders(): Record<string, string> {
+  const authorization = getAuthorizationHeaders();
+  if (!authorization.Authorization) {
+    throw new ApiError("يجب تسجيل الدخول أولاً.", 401);
+  }
 
-const latency = <T>(value: T, ms = 350): Promise<T> =>
-  new Promise((resolve) => setTimeout(() => resolve(value), ms));
+  return { Accept: "application/json", ...authorization };
+}
 
-function nextId(): string {
-  const n = Math.floor(100 + Math.random() * 900);
-  return `#USR-${n}`;
+function listQuery(params: UserListParams) {
+  return UserListQuerySchema.parse({
+    page: params.page ?? 1,
+    limit: params.pageSize ?? PAGE_SIZE,
+    role: params.role ?? "all",
+    isActive:
+      params.status === "available"
+        ? true
+        : params.status === "unavailable"
+          ? false
+          : "all",
+  });
 }
 
 export const userRepository = {
   async list(params: UserListParams = {}): Promise<Paginated<User>> {
-    const { role = "all", status = "all", page = 1, pageSize = PAGE_SIZE } = params;
-    let rows = store;
-    if (role !== "all") rows = rows.filter((u) => u.role === role);
-    if (status !== "all") rows = rows.filter((u) => u.status === status);
+    const query = listQuery(params);
+    const searchParams = new URLSearchParams({
+      page: String(query.page),
+      limit: String(query.limit),
+    });
+    if (query.role !== "all") searchParams.set("role", query.role);
+    if (query.isActive !== "all") {
+      searchParams.set("isActive", String(query.isActive));
+    }
+    const payload = await requestApi(`${API_ENDPOINTS.users.root}?${searchParams}`, {
+      method: "GET",
+      headers: authenticatedHeaders(),
+    });
+    const result = normalizeUserListResponse(payload, query);
 
-    const total = rows.length;
-    const start = (page - 1) * pageSize;
-    const items = rows.slice(start, start + pageSize).map((u) => UserSchema.parse(u));
-    return latency({ items, total, page, pageSize });
+    return {
+      items: result.items,
+      total: result.total,
+      page: result.page,
+      pageSize: result.limit,
+    };
   },
 
   async counts(): Promise<UserCounts> {
-    const certifiedTechnicians = store.filter(
-      (u) => u.role === "technician" && u.status === "available",
-    ).length;
-    const employees = store.filter((u) => u.role === "employee").length;
-    return latency({ certifiedTechnicians, employees, total: store.length });
+    const [technicians, employees, allUsers] = await Promise.all([
+      this.list({ role: "technician", status: "available", page: 1, pageSize: 1 }),
+      this.list({ role: "employee", status: "all", page: 1, pageSize: 1 }),
+      this.list({ role: "all", status: "all", page: 1, pageSize: 1 }),
+    ]);
+
+    return {
+      certifiedTechnicians: technicians.total,
+      employees: employees.total,
+      total: allUsers.total,
+    };
+  },
+
+  async getCurrent(): Promise<User> {
+    const payload = await requestApi(API_ENDPOINTS.users.me, {
+      method: "GET",
+      headers: authenticatedHeaders(),
+    });
+    return normalizeUserResponse(payload);
   },
 
   async getById(id: string): Promise<User> {
-    const found = store.find((u) => u.id === id);
-    if (!found) throw new Error("NOT_FOUND");
-    return latency(UserSchema.parse(found));
+    const payload = await requestApi(API_ENDPOINTS.users.byId(id), {
+      method: "GET",
+      headers: authenticatedHeaders(),
+    });
+    return normalizeUserResponse(payload);
   },
 
-  async create(input: UserCreateInput): Promise<User> {
-    const { password: _password, imageUrl, identityDocumentUrl, ...rest } = input;
-    const user: User = {
-      id: nextId(),
-      status: "available",
-      ...rest,
-      ...(imageUrl ? { imageUrl } : {}),
-      ...(identityDocumentUrl ? { identityDocumentUrl } : {}),
-    };
-    store = [user, ...store];
-    return latency(UserSchema.parse(user));
+  async create(input: UserCreateInput): Promise<void> {
+    const body = new CreateUserRequestModel(input).toFormData();
+    await requestApi(API_ENDPOINTS.users.root, {
+      method: "POST",
+      headers: authenticatedHeaders(),
+      body,
+    });
   },
 
-  async update(id: string, input: UserUpdateInput): Promise<User> {
-    const idx = store.findIndex((u) => u.id === id);
-    if (idx === -1) throw new Error("NOT_FOUND");
-    const { password: _password, imageUrl, identityDocumentUrl, ...rest } = input;
-    const updated: User = {
-      ...store[idx],
-      ...rest,
-      imageUrl: imageUrl || undefined,
-      identityDocumentUrl: identityDocumentUrl || undefined,
-    };
-    store[idx] = updated;
-    return latency(UserSchema.parse(updated));
-  },
-
-  async remove(id: string): Promise<{ id: string }> {
-    store = store.filter((u) => u.id !== id);
-    return latency({ id });
+  async update(id: string, input: UserUpdateInput): Promise<void> {
+    const body = new UpdateUserRequestModel(input).toFormData();
+    await requestApi(API_ENDPOINTS.users.byId(id), {
+      method: "PATCH",
+      headers: authenticatedHeaders(),
+      body,
+    });
   },
 };

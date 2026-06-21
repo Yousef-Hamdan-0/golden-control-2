@@ -5,7 +5,11 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { NAVIGATION, NAV_FOOTER, type NavItem } from "@/config/navigation";
 import { Icon } from "@/lib/icons";
-import { clearMockSession } from "@/lib/auth/mock-session";
+import {
+  readAuthSession,
+  type AuthSession,
+} from "@/helpers/auth-session.helper";
+import { authService } from "@/services/auth.service";
 import { CURRENT_USER } from "@/lib/auth/current-user";
 import { cn } from "@/lib/utils/cn";
 
@@ -46,6 +50,12 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const searchParams = useSearchParams();
   const initiallyOpen = NAVIGATION.find((i) => groupActive(pathname, searchParams, i))?.label ?? null;
   const [open, setOpen] = useState<string | null>(initiallyOpen);
+  const [session, setSession] = useState<AuthSession | null>(null);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  useEffect(() => {
+    setSession(readAuthSession());
+  }, []);
 
   useEffect(() => {
     const activeGroup = NAVIGATION.find((i) => groupActive(pathname, searchParams, i))?.label ?? null;
@@ -67,10 +77,18 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
     onClose?.();
   }
 
-  function handleLogout() {
+  async function handleLogout() {
     closeSidebar();
-    clearMockSession();
-    router.replace("/login");
+    setIsLoggingOut(true);
+
+    try {
+      await authService.logout();
+    } catch {
+      // The local session is cleared by the service even when the API is unavailable.
+    } finally {
+      router.replace("/login");
+      router.refresh();
+    }
   }
 
   return (
@@ -95,10 +113,12 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
           <div className="flex min-w-0 items-center justify-start gap-3">
             <div className="text-right leading-tight">
               <div className="max-w-36 truncate text-sm font-bold text-content">
-                {CURRENT_USER.fullName}
+                {session?.name ?? CURRENT_USER.fullName}
               </div>
               <div className="mt-1 max-w-36 truncate text-xs text-content-muted">
-                {CURRENT_USER.jobTitle}
+                {session?.role === "admin" || session?.role === "Admin"
+                  ? "مدير النظام"
+                  : session?.role ?? CURRENT_USER.jobTitle}
               </div>
             </div>
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm border border-border bg-surface-2 text-content shadow-card">
@@ -228,10 +248,11 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                 key={item.label}
                 type="button"
                 onClick={handleLogout}
+                disabled={isLoggingOut}
                 className="flex w-full items-center justify-start gap-3 rounded-md px-4 py-2.5 text-right text-sm text-danger transition hover:bg-danger-soft"
               >
                 {item.icon && <Icon name={item.icon} />}
-                <span>{item.label}</span>
+                <span>{isLoggingOut ? "جار تسجيل الخروج..." : item.label}</span>
               </button>
             ) : (
               <Link

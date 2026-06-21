@@ -33,7 +33,10 @@ export const UserStatusSchema = z.enum(["available", "unavailable"]);
 
 /** The full user entity as returned by the server. */
 export const UserSchema = z.object({
-  id: z.string(), // e.g. "#USR-841"
+  /** Internal database identifier used by GET/PATCH /api/users/{id}. */
+  id: z.string(),
+  /** Human-readable staff identifier displayed in the users table. */
+  userNumber: z.string().optional(),
   fullName: z.string(),
   email: z.string().email(),
   phone: z.string(),
@@ -41,11 +44,13 @@ export const UserSchema = z.object({
   role: RoleSchema,
   status: UserStatusSchema,
   salary: z.number().nonnegative(), // Syrian Lira (ل.س)
-  /** Optional profile photo URL or locally encoded image in the mock repository. */
+  /** Resolved profile photo URL used by the UI. */
   imageUrl: z.string().max(4_000_000).optional(),
   /** Optional personal identity document image. */
   identityDocumentUrl: z.string().max(4_000_000).optional(),
-  /** Technician-only discount (خصم), per PRD. */
+  profileImagePath: z.string().optional(),
+  documentImagePath: z.string().optional(),
+  /** Used by legacy technician/payroll screens; not part of the Users API request. */
   discount: z.number().nonnegative().optional(),
 });
 export type User = z.infer<typeof UserSchema>;

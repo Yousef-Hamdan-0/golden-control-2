@@ -1,31 +1,25 @@
 import { z } from "zod";
 import { RoleSchema } from "@/models/auth/user.model";
 
-/** Validated input for creating a user (screen 12a). All fields required. */
-export const UserCreateSchema = z
-  .object({
-    fullName: z.string().min(2, "الاسم مطلوب"),
-    email: z.string().email("بريد إلكتروني غير صالح"),
-    phone: z
-      .string()
-      .min(7, "رقم هاتف غير صالح")
-      .regex(/^[+0-9\s-]+$/, "رقم هاتف غير صالح"),
-    role: RoleSchema,
-    jobTitle: z.string().min(2, "المسمى الوظيفي مطلوب"),
-    salary: z.coerce.number().nonnegative("الراتب يجب أن يكون رقماً موجباً"),
-    imageUrl: z.string().max(4_000_000, "حجم الصورة كبير جدًا").optional().or(z.literal("")),
-    identityDocumentUrl: z
-      .string()
-      .max(4_000_000, "حجم صورة الوثيقة كبير جدًا")
-      .optional()
-      .or(z.literal("")),
-    password: z.string().min(8, "كلمة المرور 8 أحرف على الأقل"),
-    /** Technician-only. */
-    discount: z.coerce.number().nonnegative().optional(),
-  })
-  .refine((v) => v.role !== "technician" || v.discount !== undefined, {
-    message: "الخصم مطلوب للفني",
-    path: ["discount"],
-  });
+/** Form input mapped to POST /api/users multipart fields. */
+export const UserCreateSchema = z.object({
+  fullName: z.string().trim().min(2, "الاسم مطلوب"),
+  email: z.string().trim().email("بريد إلكتروني غير صالح"),
+  phone: z
+    .string()
+    .trim()
+    .min(7, "رقم هاتف غير صالح")
+    .regex(/^[+0-9\s-]+$/, "رقم هاتف غير صالح"),
+  role: RoleSchema,
+  jobTitle: z.string().trim().optional().or(z.literal("")),
+  salary: z.coerce.number().nonnegative("الراتب يجب أن يكون رقماً موجباً"),
+  imageUrl: z.string().max(4_000_000, "حجم الصورة كبير جدًا").optional().or(z.literal("")),
+  identityDocumentUrl: z
+    .string()
+    .max(4_000_000, "حجم صورة الوثيقة كبير جدًا")
+    .optional()
+    .or(z.literal("")),
+  password: z.string().min(8, "كلمة المرور 8 أحرف على الأقل"),
+});
 
 export type UserCreateInput = z.infer<typeof UserCreateSchema>;

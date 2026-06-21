@@ -38,10 +38,10 @@
 
 المسارات:
 
-- `/settings/users`
-- `/settings/users/new`
-- `/settings/users/[userId]`
-- `/settings/users/[userId]/edit`
+- `/users`
+- `/users/new`
+- `/users/[userId]`
+- `/users/[userId]/edit`
 
 الموجود:
 

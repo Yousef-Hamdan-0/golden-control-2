@@ -12,7 +12,7 @@ import { Select } from "@/components/ui/Select";
 import { TablePagination } from "@/components/ui/TablePagination";
 import { Textarea } from "@/components/ui/Textarea";
 import { Icon } from "@/lib/icons";
-import { readMockSession } from "@/lib/auth/mock-session";
+import { readAuthSession } from "@/helpers/auth-session.helper";
 import { formatMoney } from "@/lib/format/currency";
 import { MaintenanceOrderModal } from "@/features/operations/components/OperationsScreens";
 import { PAGE_SIZE } from "@/config/constants";
@@ -444,7 +444,7 @@ export function DashboardOverviewScreen() {
   const [showOrderModal, setShowOrderModal] = useState(false);
 
   useEffect(() => {
-    const storedSession = readMockSession();
+    const storedSession = readAuthSession();
 
     if (!storedSession) {
       router.replace("/login");

@@ -20,24 +20,19 @@ export const userService = {
     return userRepository.counts();
   },
 
+  getCurrent(): Promise<User> {
+    return userRepository.getCurrent();
+  },
+
   getById(id: string): Promise<User> {
     return userRepository.getById(id);
   },
 
-  create(input: UserCreateInput): Promise<User> {
-    // Domain rule example: technicians must carry a discount.
-    if (input.role === "technician" && input.discount === undefined) {
-      throw new Error("DISCOUNT_REQUIRED");
-    }
+  create(input: UserCreateInput): Promise<void> {
     return userRepository.create(input);
   },
 
-  update(id: string, input: UserUpdateInput): Promise<User> {
-    // If a new password was supplied, a real impl would call setPassword here.
+  update(id: string, input: UserUpdateInput): Promise<void> {
     return userRepository.update(id, input);
-  },
-
-  remove(id: string): Promise<{ id: string }> {
-    return userRepository.remove(id);
   },
 };

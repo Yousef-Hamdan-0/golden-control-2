@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { TablePagination } from "@/components/ui/TablePagination";
@@ -32,13 +32,14 @@ export function FinanceScreen({ section }: { section?: string[] }) {
   const isReport = section?.[0] === "reports";
   const [page, setPage] = useState(1);
 
-  const records = useMemo(() => {
-    const key = section?.join("/") ?? "";
-    if (key.includes("fixed")) return FINANCE_RECORDS.filter((record) => record.category === "fixed");
-    if (key.includes("variable")) return FINANCE_RECORDS.filter((record) => record.category === "variable");
-    if (key.includes("sales")) return sales;
-    return FINANCE_RECORDS;
-  }, [sales, section]);
+  const sectionKey = section?.join("/") ?? "";
+  const records = sectionKey.includes("fixed")
+    ? expenses.filter((record) => record.category === "fixed")
+    : sectionKey.includes("variable")
+      ? expenses.filter((record) => record.category === "variable")
+      : sectionKey.includes("sales")
+        ? sales
+        : FINANCE_RECORDS;
   const pages = Math.max(1, Math.ceil(records.length / PAGE_SIZE));
   const currentPage = Math.min(page, pages);
   const visibleRecords = records.slice(
