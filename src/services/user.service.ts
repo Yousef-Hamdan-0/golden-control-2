@@ -5,7 +5,7 @@ import {
 } from "@/repositories/user.repository";
 import type { User, UserCounts } from "@/models/auth/user.model";
 import type { UserCreateInput } from "@/models/users/user-create.schema";
-import type { UserUpdateInput } from "@/models/users/user-update.schema";
+import type { UserUpdatePatchInput } from "@/models/users/user-update.schema";
 
 /**
  * Business layer. Orchestrates repositories and enforces domain rules.
@@ -32,7 +32,7 @@ export const userService = {
     return userRepository.create(input);
   },
 
-  update(id: string, input: UserUpdateInput): Promise<void> {
+  update(id: string, input: UserUpdatePatchInput): Promise<void> {
     return userRepository.update(id, input);
   },
 };

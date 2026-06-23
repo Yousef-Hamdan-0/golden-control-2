@@ -108,7 +108,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 <span className="block font-heading text-sm font-bold text-content">
                   {toast.title}
                 </span>
-                <span className="mt-1 block text-xs leading-6 text-content-muted">
+                <span className="mt-1 block whitespace-pre-line text-xs leading-6 text-content-muted">
                   {toast.message}
                 </span>
               </span>

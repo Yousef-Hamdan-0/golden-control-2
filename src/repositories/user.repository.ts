@@ -1,17 +1,18 @@
 import { API_ENDPOINTS } from "@/config/api-endpoints";
 import { PAGE_SIZE } from "@/config/constants";
-import { ApiError, requestApi } from "@/helpers/api.helper";
-import { getAuthorizationHeaders } from "@/helpers/auth-session.helper";
+import { requestAuthenticatedApi } from "@/helpers/authenticated-api.helper";
 import type { Role, User, UserCounts, UserStatus } from "@/models/auth/user.model";
 import type { UserCreateInput } from "@/models/users/user-create.schema";
 import type { UserUpdateInput } from "@/models/users/user-update.schema";
 import {
   CreateUserRequestModel,
   UpdateUserRequestModel,
+  hasUserUpdatePatch,
   UserListQuerySchema,
   normalizeUserListResponse,
   normalizeUserResponse,
 } from "@/models/users/user-api.model";
+import type { UserUpdatePatchInput } from "@/models/users/user-update.schema";
 
 export interface UserListParams {
   role?: Role | "all";
@@ -25,15 +26,6 @@ export interface Paginated<T> {
   total: number;
   page: number;
   pageSize: number;
-}
-
-function authenticatedHeaders(): Record<string, string> {
-  const authorization = getAuthorizationHeaders();
-  if (!authorization.Authorization) {
-    throw new ApiError("يجب تسجيل الدخول أولاً.", 401);
-  }
-
-  return { Accept: "application/json", ...authorization };
 }
 
 function listQuery(params: UserListParams) {
@@ -61,10 +53,10 @@ export const userRepository = {
     if (query.isActive !== "all") {
       searchParams.set("isActive", String(query.isActive));
     }
-    const payload = await requestApi(`${API_ENDPOINTS.users.root}?${searchParams}`, {
-      method: "GET",
-      headers: authenticatedHeaders(),
-    });
+    const payload = await requestAuthenticatedApi(
+      `${API_ENDPOINTS.users.root}?${searchParams}`,
+      { method: "GET" },
+    );
     const result = normalizeUserListResponse(payload, query);
 
     return {
@@ -90,35 +82,33 @@ export const userRepository = {
   },
 
   async getCurrent(): Promise<User> {
-    const payload = await requestApi(API_ENDPOINTS.users.me, {
+    const payload = await requestAuthenticatedApi(API_ENDPOINTS.users.me, {
       method: "GET",
-      headers: authenticatedHeaders(),
     });
     return normalizeUserResponse(payload);
   },
 
   async getById(id: string): Promise<User> {
-    const payload = await requestApi(API_ENDPOINTS.users.byId(id), {
+    const payload = await requestAuthenticatedApi(API_ENDPOINTS.users.byId(id), {
       method: "GET",
-      headers: authenticatedHeaders(),
     });
     return normalizeUserResponse(payload);
   },
 
   async create(input: UserCreateInput): Promise<void> {
     const body = new CreateUserRequestModel(input).toFormData();
-    await requestApi(API_ENDPOINTS.users.root, {
+    await requestAuthenticatedApi(API_ENDPOINTS.users.root, {
       method: "POST",
-      headers: authenticatedHeaders(),
       body,
     });
   },
 
-  async update(id: string, input: UserUpdateInput): Promise<void> {
+  async update(id: string, input: UserUpdatePatchInput): Promise<void> {
+    if (!hasUserUpdatePatch(input)) return;
+
     const body = new UpdateUserRequestModel(input).toFormData();
-    await requestApi(API_ENDPOINTS.users.byId(id), {
+    await requestAuthenticatedApi(API_ENDPOINTS.users.byId(id), {
       method: "PATCH",
-      headers: authenticatedHeaders(),
       body,
     });
   },

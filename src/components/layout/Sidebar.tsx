@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { NAVIGATION, NAV_FOOTER, type NavItem } from "@/config/navigation";
+import { useCurrentUserQuery } from "@/features/users/hooks/use-users-query";
+import { UserAvatar } from "@/features/users/components/UserAvatar";
 import { Icon } from "@/lib/icons";
 import {
   readAuthSession,
@@ -52,6 +54,8 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const [open, setOpen] = useState<string | null>(initiallyOpen);
   const [session, setSession] = useState<AuthSession | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const currentUserQuery = useCurrentUserQuery();
+  const currentUser = currentUserQuery.data;
 
   useEffect(() => {
     setSession(readAuthSession());
@@ -121,9 +125,12 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                   : session?.role ?? CURRENT_USER.jobTitle}
               </div>
             </div>
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm border border-border bg-surface-2 text-content shadow-card">
-              <Icon name="users" size={22} />
-            </div>
+            <UserAvatar
+              name={currentUser?.fullName ?? session?.name ?? CURRENT_USER.fullName}
+              imageUrl={currentUser?.imageUrl}
+              size="sm"
+              className="h-10 w-10 bg-surface-2 text-content shadow-card"
+            />
           </div>
 
           <button

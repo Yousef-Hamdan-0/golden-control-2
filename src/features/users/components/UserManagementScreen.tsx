@@ -18,6 +18,10 @@ import { useUserMutations } from "@/features/users/hooks/use-user-mutations";
 import { RoleSchema, type User } from "@/models/auth/user.model";
 import type { UserCreateInput } from "@/models/users/user-create.schema";
 import type { UserUpdateInput } from "@/models/users/user-update.schema";
+import {
+  createUserUpdatePatch,
+  hasUserUpdatePatch,
+} from "@/models/users/user-api.model";
 
 function statusFromParam(value: string | null): StatusFilter {
   if (value === "false") return "unavailable";
@@ -177,9 +181,16 @@ export function UserManagementScreen() {
               submitting={update.isPending}
               submitError={update.error ? getApiErrorMessage(update.error) : undefined}
               onCancel={() => setEditingUser(null)}
-              onSubmit={(input: UserUpdateInput) =>
+              onSubmit={(input: UserUpdateInput) => {
+                const patch = createUserUpdatePatch(input, editingUser);
+                if (!hasUserUpdatePatch(patch)) {
+                  setEditingUser(null);
+                  toast.success("لا توجد تغييرات", "لم يتم إرسال طلب تعديل للمستخدم.");
+                  return;
+                }
+
                 update.mutate(
-                  { id: editingUser.id, input },
+                  { id: editingUser.id, input: patch },
                   {
                     onSuccess: () => {
                       setEditingUser(null);
@@ -191,15 +202,15 @@ export function UserManagementScreen() {
                     onError: (error) =>
                       toast.error("تعذر تحديث المستخدم", getApiErrorMessage(error)),
                   },
-                )
-              }
+                );
+              }}
             />
           </div>
         </Modal>
       ) : null}
 
       {/* Table */}
-      {isError ? (
+      {isError && !data ? (
         <div className="rounded-md border border-danger/30 bg-danger-soft p-6 text-center text-sm text-danger">
           تعذّر تحميل المستخدمين.{" "}
           <button onClick={() => refetch()} className="underline">

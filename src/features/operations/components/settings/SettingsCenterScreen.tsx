@@ -1,29 +1,155 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
+import Image from "next/image";
 import { Button } from "@/components/ui/Button";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { Field, Input } from "@/components/ui/Input";
+import { Spinner } from "@/components/ui/Spinner";
 import { Textarea } from "@/components/ui/Textarea";
+import { useToast } from "@/components/ui/Toast";
+import { useSettingsMutations, useSettingsQuery } from "@/features/settings/hooks/use-settings";
+import { getApiErrorMessage } from "@/helpers/api.helper";
+import { Icon } from "@/lib/icons";
+import {
+  createSettingsPatch,
+  hasSettingsPatch,
+  SettingsInputSchema,
+  settingsMediaUrl,
+  settingsToInput,
+  type SettingsInput,
+} from "@/models/settings/settings.model";
 import { SectionTitle } from "../shared/SectionTitle";
 
+type SettingsField = keyof SettingsInput;
+type SettingsErrors = Partial<Record<SettingsField, string>>;
+
 export function SettingsCenterScreen() {
-  const [centerName, setCenterName] = useState("مركز الصيانة الذهبي");
-  const [secondaryName, setSecondaryName] = useState("Golden Maintenance Center");
-  const [address, setAddress] = useState("دمشق - شارع بغداد");
-  const [phone, setPhone] = useState("011 555 2200");
-  const [email, setEmail] = useState("info@golden-control.com");
-  const [term1, setTerm1] = useState("الكفالة لا تشمل سوء الاستخدام أو أعطال الكهرباء الخارجية.");
-  const [term2, setTerm2] = useState("");
-  const [term3, setTerm3] = useState("");
-  const [term4, setTerm4] = useState("");
-  const [logoName, setLogoName] = useState("");
+  const toast = useToast();
+  const settingsQuery = useSettingsQuery();
+  const { update, uploadLogo } = useSettingsMutations();
+  const [draft, setDraft] = useState<SettingsInput | null>(null);
+  const [errors, setErrors] = useState<SettingsErrors>({});
+  const [logo, setLogo] = useState<File | null>(null);
+  const [logoInputKey, setLogoInputKey] = useState(0);
+  const [logoPreviewFailed, setLogoPreviewFailed] = useState(false);
+  const logoUrl = settingsMediaUrl(settingsQuery.data?.logoPath);
+
+  useEffect(() => {
+    if (settingsQuery.data && !draft) setDraft(settingsToInput(settingsQuery.data));
+  }, [draft, settingsQuery.data]);
+
+  useEffect(() => {
+    if (settingsQuery.isError && settingsQuery.error) {
+      toast.error("تعذر تحميل الإعدادات", getApiErrorMessage(settingsQuery.error));
+    }
+  }, [settingsQuery.error, settingsQuery.isError, toast]);
+
+  useEffect(() => {
+    setLogoPreviewFailed(false);
+  }, [logoUrl]);
+
+  function patchDraft(field: SettingsField, value: string) {
+    update.reset();
+    setDraft((current) => (current ? { ...current, [field]: value } : current));
+    setErrors((current) => ({ ...current, [field]: undefined }));
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!draft) return;
+
+    const parsed = SettingsInputSchema.safeParse(draft);
+    if (!parsed.success) {
+      const nextErrors: SettingsErrors = {};
+      for (const issue of parsed.error.issues) {
+        const field = issue.path[0] as SettingsField | undefined;
+        if (field && !nextErrors[field]) nextErrors[field] = issue.message;
+      }
+      setErrors(nextErrors);
+      return;
+    }
+
+    setErrors({});
+    if (!settingsQuery.data) return;
+    const patch = createSettingsPatch(parsed.data, settingsQuery.data);
+    if (!hasSettingsPatch(patch)) {
+      toast.success("لا توجد تغييرات", "لم يتم إرسال طلب تعديل للإعدادات.");
+      return;
+    }
+
+    update.mutate(patch, {
+      onSuccess: (settings) => {
+        setDraft(settingsToInput(settings));
+        toast.success("تم حفظ الإعدادات", "تم تحديث بيانات المركز بنجاح.");
+      },
+      onError: (error) =>
+        toast.error("تعذر حفظ الإعدادات", getApiErrorMessage(error)),
+    });
+  }
+
+  function handleLogoUpload() {
+    if (!logo) {
+      toast.error("لم يتم اختيار شعار", "اختر ملف صورة أولاً ثم اضغط رفع الشعار.");
+      return;
+    }
+
+    uploadLogo.mutate(logo, {
+      onSuccess: () => {
+        setLogo(null);
+        setLogoInputKey((current) => current + 1);
+        toast.success("تم رفع الشعار", "تم تحديث شعار المركز بنجاح.");
+      },
+      onError: (error) =>
+        toast.error("تعذر رفع الشعار", getApiErrorMessage(error)),
+    });
+  }
+
+  if (settingsQuery.isLoading && !draft) {
+    return (
+      <Card className="flex min-h-64 items-center justify-center">
+        <Spinner />
+      </Card>
+    );
+  }
+
+  if (settingsQuery.isError && !draft) {
+    return (
+      <Card className="space-y-4 p-6 text-center">
+        <p className="text-sm text-danger">{getApiErrorMessage(settingsQuery.error)}</p>
+        <Button type="button" variant="outline" onClick={() => settingsQuery.refetch()}>
+          إعادة المحاولة
+        </Button>
+      </Card>
+    );
+  }
+
+  if (!draft) return null;
 
   return (
     <div className="space-y-6">
       <SectionTitle
         title="إدارة بيانات المركز"
         subtitle="تحديث بيانات المركز التي تظهر على الفواتير، الطلبات، والمستندات الرسمية."
+        action={
+          <div className="flex min-w-40 items-center justify-center rounded-md border border-border bg-surface p-3 shadow-card">
+            {logoUrl && !logoPreviewFailed ? (
+              <Image
+                src={logoUrl}
+                alt={settingsQuery.data?.centerName || "شعار المركز"}
+                width={120}
+                height={64}
+                unoptimized
+                className="max-h-16 w-auto object-contain"
+                onError={() => setLogoPreviewFailed(true)}
+              />
+            ) : (
+              <span className="flex h-16 w-28 items-center justify-center rounded-sm bg-gold-soft text-gold">
+                <Icon name="file" size={28} />
+              </span>
+            )}
+          </div>
+        }
       />
       <Card className="overflow-hidden">
         <CardHeader>
@@ -31,51 +157,123 @@ export function SettingsCenterScreen() {
             بيانات المركز
           </h3>
         </CardHeader>
-        <form className="grid gap-4 p-4 md:grid-cols-2" onSubmit={(event) => event.preventDefault()}>
-          <Field label="اسم المركز">
-            <Input value={centerName} onChange={(event) => setCenterName(event.target.value)} placeholder="اسم المركز" />
+        <form className="grid gap-4 p-4 md:grid-cols-2" onSubmit={handleSubmit}>
+          {update.error ? (
+            <div className="rounded-md border border-danger/30 bg-danger-soft p-3 text-sm text-danger md:col-span-2">
+              {getApiErrorMessage(update.error)}
+            </div>
+          ) : null}
+          <Field label="اسم المركز" error={errors.centerName}>
+            <Input
+              value={draft.centerName}
+              onChange={(event) => patchDraft("centerName", event.target.value)}
+              placeholder="اسم المركز"
+              aria-invalid={Boolean(errors.centerName)}
+            />
           </Field>
-          <Field label="الاسم الثانوي">
-            <Input value={secondaryName} onChange={(event) => setSecondaryName(event.target.value)} placeholder="الاسم الثانوي" />
+          <Field label="الاسم الثانوي" error={errors.secondaryName}>
+            <Input
+              value={draft.secondaryName ?? ""}
+              onChange={(event) => patchDraft("secondaryName", event.target.value)}
+              placeholder="الاسم الثانوي"
+              aria-invalid={Boolean(errors.secondaryName)}
+            />
           </Field>
-          <Field label="العنوان" className="md:col-span-2">
-            <Input value={address} onChange={(event) => setAddress(event.target.value)} placeholder="عنوان المركز" />
+          <Field label="العنوان" className="md:col-span-2" error={errors.address}>
+            <Input
+              value={draft.address}
+              onChange={(event) => patchDraft("address", event.target.value)}
+              placeholder="عنوان المركز"
+              aria-invalid={Boolean(errors.address)}
+            />
           </Field>
-          <Field label="رقم الهاتف">
-            <Input value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="رقم الهاتف" dir="ltr" />
+          <Field label="رقم الهاتف الأساسي" error={errors.phone1}>
+            <Input
+              value={draft.phone1}
+              onChange={(event) => patchDraft("phone1", event.target.value)}
+              placeholder="رقم الهاتف الأساسي"
+              dir="ltr"
+              aria-invalid={Boolean(errors.phone1)}
+            />
           </Field>
-          <Field label="البريد الإلكتروني">
-            <Input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="البريد الإلكتروني" dir="ltr" type="email" />
+          <Field label="رقم الهاتف البديل" error={errors.phone2}>
+            <Input
+              value={draft.phone2 ?? ""}
+              onChange={(event) => patchDraft("phone2", event.target.value)}
+              placeholder="رقم الهاتف البديل"
+              dir="ltr"
+              aria-invalid={Boolean(errors.phone2)}
+            />
           </Field>
-          <Field label="البند 1 - اختياري" className="md:col-span-2">
-            <Textarea value={term1} onChange={(event) => setTerm1(event.target.value)} className="min-h-20" placeholder="اكتب البند الأول" />
+          <Field label="البريد الإلكتروني" className="md:col-span-2" error={errors.email}>
+            <Input
+              value={draft.email}
+              onChange={(event) => patchDraft("email", event.target.value)}
+              placeholder="البريد الإلكتروني"
+              dir="ltr"
+              type="email"
+              aria-invalid={Boolean(errors.email)}
+            />
           </Field>
-          <Field label="البند 2 - اختياري" className="md:col-span-2">
-            <Textarea value={term2} onChange={(event) => setTerm2(event.target.value)} className="min-h-20" placeholder="اكتب البند الثاني" />
-          </Field>
-          <Field label="البند 3 - اختياري" className="md:col-span-2">
-            <Textarea value={term3} onChange={(event) => setTerm3(event.target.value)} className="min-h-20" placeholder="اكتب البند الثالث" />
-          </Field>
-          <Field label="البند 4 - اختياري" className="md:col-span-2">
-            <Textarea value={term4} onChange={(event) => setTerm4(event.target.value)} className="min-h-20" placeholder="اكتب البند الرابع" />
-          </Field>
-          <Field label="اللوجو - اختياري" className="md:col-span-2">
-            <div className="grid gap-3 rounded-md border border-border bg-surface-2 p-3 sm:grid-cols-[1fr_auto] sm:items-center">
-              <Input
-                type="file"
-                accept="image/*"
-                className="bg-surface"
-                onChange={(event) => setLogoName(event.target.files?.[0]?.name ?? "")}
+          {(["term1", "term2", "term3", "term4"] as const).map((field, index) => (
+            <Field
+              key={field}
+              label={`البند ${index + 1} - اختياري`}
+              className="md:col-span-2"
+              error={errors[field]}
+            >
+              <Textarea
+                value={draft[field] ?? ""}
+                onChange={(event) => patchDraft(field, event.target.value)}
+                className="min-h-20"
+                placeholder={`اكتب البند ${index + 1}`}
+                aria-invalid={Boolean(errors[field])}
               />
-              <span className="text-sm text-content-muted">
-                {logoName || "لم يتم اختيار لوجو"}
+            </Field>
+          ))}
+          <div className="flex justify-end md:col-span-2">
+            <Button type="submit" disabled={update.isPending}>
+              {update.isPending ? <Spinner className="h-4 w-4" /> : <Icon name="pencil" size={18} />}
+              {update.isPending ? "جارٍ الحفظ..." : "حفظ بيانات المركز"}
+            </Button>
+          </div>
+        </form>
+      </Card>
+
+      <Card className="overflow-hidden">
+        <CardHeader>
+          <h3 className="text-right font-heading text-lg font-bold text-content">
+            شعار المركز
+          </h3>
+        </CardHeader>
+        <div className="grid gap-4 p-4 md:grid-cols-[1fr_auto] md:items-end">
+          <Field label="ملف الشعار">
+            <div className="grid gap-2">
+              <Input
+                key={logoInputKey}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="bg-surface"
+                onChange={(event) => {
+                  uploadLogo.reset();
+                  setLogo(event.target.files?.[0] ?? null);
+                }}
+              />
+              <span className="text-xs text-content-muted">
+                {logo?.name || settingsQuery.data?.logoPath || "لم يتم اختيار شعار"}
               </span>
             </div>
           </Field>
-          <div className="flex justify-end md:col-span-2">
-            <Button type="button">حفظ بيانات المركز</Button>
+          <Button type="button" onClick={handleLogoUpload} disabled={uploadLogo.isPending}>
+            {uploadLogo.isPending ? <Spinner className="h-4 w-4" /> : <Icon name="file" size={18} />}
+            {uploadLogo.isPending ? "جارٍ الرفع..." : "رفع الشعار"}
+          </Button>
+        </div>
+        {uploadLogo.error ? (
+          <div className="border-t border-danger/20 bg-danger-soft p-3 text-sm text-danger">
+            {getApiErrorMessage(uploadLogo.error)}
           </div>
-        </form>
+        ) : null}
       </Card>
     </div>
   );

@@ -20,3 +20,6 @@ export const UserUpdateSchema = z.object({
 });
 
 export type UserUpdateInput = z.infer<typeof UserUpdateSchema>;
+
+export const UserUpdatePatchSchema = UserUpdateSchema.partial();
+export type UserUpdatePatchInput = z.infer<typeof UserUpdatePatchSchema>;

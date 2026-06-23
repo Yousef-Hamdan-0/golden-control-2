@@ -1,4 +1,5 @@
 import type { UserListParams } from "@/repositories/user.repository";
+import type { CustomerListParams } from "@/repositories/customer.repository";
 
 /**
  * Single source for every cache key. Precise keys = precise invalidation.
@@ -12,6 +13,15 @@ export const queryKeys = {
     list: (params: UserListParams) => ["users", "list", params] as const,
     counts: () => ["users", "counts"] as const,
     detail: (id: string) => ["users", "detail", id] as const,
+  },
+  customers: {
+    all: ["customers"] as const,
+    list: (params: CustomerListParams) => ["customers", "list", params] as const,
+    detail: (id: string) => ["customers", "detail", id] as const,
+  },
+  settings: {
+    all: ["settings"] as const,
+    detail: () => ["settings", "detail"] as const,
   },
   technicians: {
     all: ["technicians"] as const,

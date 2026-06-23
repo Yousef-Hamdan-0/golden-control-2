@@ -18,6 +18,14 @@ export const API_ROUTES = {
     me: "/api/users/me",
     byId: (id: string) => `/api/users/${encodeURIComponent(id)}`,
   },
+  customers: {
+    root: "/api/customers",
+    byId: (id: string) => `/api/customers/${encodeURIComponent(id)}`,
+  },
+  settings: {
+    root: "/api/settings",
+    logo: "/api/settings/logo",
+  },
 } as const;
 
 function createApiUrl(path: string) {
@@ -33,6 +41,8 @@ export const API_ENDPOINTS = {
     logout: API_ROUTES.auth.logout,
   },
   users: API_ROUTES.users,
+  customers: API_ROUTES.customers,
+  settings: API_ROUTES.settings,
 } as const;
 
 export const BACKEND_API_ENDPOINTS = {
@@ -46,5 +56,13 @@ export const BACKEND_API_ENDPOINTS = {
     root: createApiUrl(API_ROUTES.users.root),
     me: createApiUrl(API_ROUTES.users.me),
     byId: (id: string) => createApiUrl(API_ROUTES.users.byId(id)),
+  },
+  customers: {
+    root: createApiUrl(API_ROUTES.customers.root),
+    byId: (id: string) => createApiUrl(API_ROUTES.customers.byId(id)),
+  },
+  settings: {
+    root: createApiUrl(API_ROUTES.settings.root),
+    logo: createApiUrl(API_ROUTES.settings.logo),
   },
 } as const;

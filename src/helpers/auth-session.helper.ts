@@ -16,6 +16,12 @@ export const AuthSessionSchema = z.object({
 
 export type AuthSession = z.infer<typeof AuthSessionSchema>;
 
+function printAccessToken(accessToken: string | null) {
+  if (process.env.NODE_ENV !== "development") return;
+
+  console.log("accessToken:", accessToken);
+}
+
 export function createAuthSession(
   result: LoginResult,
   request: Pick<LoginRequest, "email">,
@@ -64,7 +70,9 @@ export function writeAuthSession(session: AuthSession, remember: boolean) {
 }
 
 export function getAccessToken() {
-  return readAuthSession()?.accessToken ?? null;
+  const accessToken = readAuthSession()?.accessToken ?? null;
+  printAccessToken(accessToken);
+  return accessToken;
 }
 
 export function getRefreshToken() {

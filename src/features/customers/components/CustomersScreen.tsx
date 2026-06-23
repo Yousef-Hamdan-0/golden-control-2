@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -8,426 +8,423 @@ import { ConfirmToast } from "@/components/ui/ConfirmToast";
 import { Field, Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { TablePagination } from "@/components/ui/TablePagination";
-import { Icon } from "@/lib/icons";
+import { useToast } from "@/components/ui/Toast";
 import { PAGE_SIZE } from "@/config/constants";
+import { getApiErrorMessage } from "@/helpers/api.helper";
+import { Icon } from "@/lib/icons";
 import {
-  OrderDetailsModal,
-  type Invoice,
-  type Order,
-} from "@/features/operations/components/OperationsScreens";
+  CustomerInputSchema,
+  createCustomerUpdatePatch,
+  hasCustomerPatch,
+  type Customer,
+  type CustomerInput,
+  type CustomerRepairRequest,
+} from "@/models/customers/customer.model";
+import {
+  useCustomerMutations,
+  useCustomerQuery,
+  useCustomersQuery,
+} from "@/features/customers/hooks/use-customers";
 
-interface CustomerOrder {
-  id: string;
-  device: string;
-  status: "active" | "completed" | "cancelled";
-  date: string;
-  total: string;
-  type?: Order["type"];
-  brand?: string;
-  technician?: string;
-  orderStatus?: Order["status"];
-  priority?: Order["priority"];
-  visitTime?: string;
-  totalAmount?: number;
-  paidAmount?: number;
-  invoiceId?: string;
-  invoiceStatus?: Invoice["status"];
-  paymentMethod?: Invoice["paymentMethod"];
-  payments?: Invoice["payments"];
-}
-
-interface Customer {
-  id: string;
-  name: string;
-  phone1: string;
-  phone2: string;
-  address: string;
-  locationUrl: string;
-  notes: string;
-  orders: CustomerOrder[];
-}
-
-const INITIAL_CUSTOMERS: Customer[] = [
-  {
-    id: "CUS-1001",
-    name: "محمد العتيبي",
-    phone1: "0991 223 441",
-    phone2: "011 332 8811",
-    address: "دمشق - المزة",
-    locationUrl: "https://maps.google.com",
-    notes: "يفضل الزيارة صباحاً.",
-    orders: [
-      { id: "ORD-5542", device: "ثلاجة LG", status: "active", date: "2026-06-11", total: "950,000 ل.س" },
-      { id: "ORD-5520", device: "غسالة سامسونغ", status: "completed", date: "2026-05-29", total: "620,000 ل.س" },
-    ],
-  },
-  {
-    id: "CUS-1002",
-    name: "سارة القحطاني",
-    phone1: "0944 772 118",
-    phone2: "",
-    address: "دمشق - المالكي",
-    locationUrl: "",
-    notes: "عميلة متابعة دورية.",
-    orders: [
-      { id: "ORD-5541", device: "شاشة سامسونغ", status: "completed", date: "2026-06-10", total: "680,000 ل.س" },
-    ],
-  },
-  {
-    id: "CUS-1003",
-    name: "مركز الصفاء التجاري",
-    phone1: "011 442 0911",
-    phone2: "0998 221 144",
-    address: "دمشق - شارع بغداد",
-    locationUrl: "",
-    notes: "عميل تجاري، الفواتير باسم المركز.",
-    orders: [
-      { id: "ORD-5540", device: "غسالة ناشونال", status: "active", date: "2026-06-12", total: "1,225,000 ل.س" },
-      { id: "ORD-5488", device: "مكيف Gree", status: "completed", date: "2026-04-18", total: "1,040,000 ل.س" },
-    ],
-  },
-  {
-    id: "CUS-1004",
-    name: "ليان منصور",
-    phone1: "0988 113 520",
-    phone2: "",
-    address: "دمشق - كفرسوسة",
-    locationUrl: "",
-    notes: "",
-    orders: [
-      { id: "ORD-5539", device: "فرن كهربائي", status: "cancelled", date: "2026-06-13", total: "0 ل.س" },
-    ],
-  },
-];
-
-const EMPTY_CUSTOMER: Customer = {
-  id: "",
+const EMPTY_CUSTOMER_INPUT: CustomerInput = {
   name: "",
-  phone1: "",
-  phone2: "",
+  firstPhone: "",
+  secondPhone: "",
   address: "",
-  locationUrl: "",
-  notes: "",
-  orders: [],
+  locationLink: "",
 };
 
-const ORDER_STATUS = {
-  active: { label: "نشط", tone: "gold" as const },
-  completed: { label: "مكتمل", tone: "success" as const },
-  cancelled: { label: "ملغي", tone: "danger" as const },
+type CustomerInputKey = keyof CustomerInput;
+type CustomerFieldErrors = Partial<Record<CustomerInputKey, string>>;
+
+const REQUEST_STATUS_LABELS: Record<string, string> = {
+  new: "جديد",
+  pending: "قيد الانتظار",
+  assigned: "مُسند",
+  "under-repair": "قيد الإصلاح",
+  completed: "مكتمل",
+  cancelled: "ملغي",
 };
 
-function contains(value: string, query: string) {
-  return value.toLowerCase().includes(query.trim().toLowerCase());
-}
+const PRIORITY_LABELS: Record<string, string> = {
+  low: "منخفضة",
+  medium: "متوسطة",
+  high: "عالية",
+  urgent: "طارئة",
+};
 
-function nextCustomerId(customers: Customer[]) {
-  return `CUS-${Math.max(...customers.map((item) => Number(item.id.replace(/\D/g, "")))) + 1}`;
-}
-
-function parseMoney(value: string) {
-  return Number(value.replace(/[^\d]/g, "")) || 0;
-}
-
-function buildOrderDetails(customer: Customer, customerOrder: CustomerOrder) {
-  const totalAmount = customerOrder.totalAmount ?? parseMoney(customerOrder.total);
-  const paidAmount =
-    customerOrder.paidAmount ??
-    (customerOrder.status === "completed" ? totalAmount : Math.round(totalAmount / 2));
-
-  const order: Order = {
-    id: customerOrder.id,
-    type: customerOrder.type ?? "external",
-    client: customer.name,
-    phone: customer.phone1,
+function customerToInput(customer: Customer): CustomerInput {
+  return {
+    name: customer.name,
+    firstPhone: customer.firstPhone,
+    secondPhone: customer.secondPhone,
     address: customer.address,
-    device: customerOrder.device,
-    brand: customerOrder.brand ?? customerOrder.device.split(" ").slice(-1)[0] ?? "غير محدد",
-    technician: customerOrder.technician ?? "رامي سمير",
-    status:
-      customerOrder.orderStatus ??
-      (customerOrder.status === "completed"
-        ? "completed"
-        : customerOrder.status === "cancelled"
-          ? "cancelled"
-          : "under-repair"),
-    priority: customerOrder.priority ?? "medium",
-    visitDate: `${customerOrder.date} ${customerOrder.visitTime ?? "09:00"}`,
-    total: totalAmount,
-    paid: paidAmount,
+    locationLink: customer.locationLink,
   };
+}
 
-  const invoice: Invoice = {
-    id: customerOrder.invoiceId ?? `INV-${customerOrder.id.replace(/\D/g, "").slice(-4)}`,
-    orderId: customerOrder.id,
-    type: order.type,
-    client: customer.name,
-    clientPhone: customer.phone1,
-    clientPhone2: customer.phone2 || "لا يوجد",
-    clientAddress: customer.address,
-    technician: order.technician,
-    technicianPhone: order.technician === "رامي سمير" ? "0955 114 220" : "لا يوجد",
-    status:
-      customerOrder.invoiceStatus ??
-      (paidAmount >= totalAmount ? "paid" : paidAmount > 0 ? "partial" : "unpaid"),
-    currency: "SYP",
-    paymentMethod: customerOrder.paymentMethod ?? "cash",
-    total: totalAmount,
-    paid: paidAmount,
-    issuedAt: customerOrder.date,
-    warrantyDuration: "3 أشهر",
-    centerPullItems: "",
-    notes: "",
-    parts: [
-      {
-        id: `PRT-${customerOrder.id.replace(/\D/g, "").slice(-4)}`,
-        name: customerOrder.device,
-        quantity: 1,
-        unitPrice: totalAmount,
-      },
-    ],
-    payments:
-      customerOrder.payments ??
-      (paidAmount > 0
-        ? [
-            {
-              id: `PAY-${customerOrder.id.replace(/\D/g, "").slice(-4)}`,
-              amount: paidAmount,
-              convertedAmount: paidAmount,
-              currency: "SYP",
-              method: customerOrder.paymentMethod ?? "cash",
-              paidAt: customerOrder.date,
-            },
-          ]
-        : []),
-  };
+function fieldErrorsFromIssues(
+  issues: Array<{ path: PropertyKey[]; message: string }>,
+): CustomerFieldErrors {
+  return issues.reduce<CustomerFieldErrors>((errors, issue) => {
+    const field = issue.path[0];
+    if (
+      field === "name" ||
+      field === "firstPhone" ||
+      field === "secondPhone" ||
+      field === "address" ||
+      field === "locationLink"
+    ) {
+      errors[field] = issue.message;
+    }
+    return errors;
+  }, {});
+}
 
-  return { order, invoice };
+function formatApiDate(value: string) {
+  if (!value) return "غير محدد";
+  return value.slice(0, 10);
+}
+
+function requestStatusLabel(request: CustomerRepairRequest) {
+  if (request.isCompleted) return "مكتمل";
+  return REQUEST_STATUS_LABELS[request.status] ?? (request.status || "غير محدد");
+}
+
+function requestStatusTone(request: CustomerRepairRequest) {
+  const status = request.status.toLowerCase();
+  if (request.isCompleted || status === "completed") return "success" as const;
+  if (status === "cancelled" || status === "canceled") return "danger" as const;
+  return "gold" as const;
+}
+
+function customerSearchParams(search: string) {
+  const value = search.trim();
+  if (!value) return {};
+
+  return /\d/.test(value) ? { phone: value } : { name: value };
 }
 
 function CustomerFormModal({
   customer,
-  customers,
+  submitting,
+  submitError,
   onClose,
-  onSave,
+  onSubmit,
 }: {
   customer?: Customer;
-  customers: Customer[];
+  submitting: boolean;
+  submitError?: string;
   onClose: () => void;
-  onSave: (customer: Customer) => void;
+  onSubmit: (input: CustomerInput) => void;
 }) {
-  const [draft, setDraft] = useState<Customer>(customer ?? EMPTY_CUSTOMER);
-  const [pendingEditCustomer, setPendingEditCustomer] = useState<Customer | null>(null);
+  const [draft, setDraft] = useState<CustomerInput>(
+    customer ? customerToInput(customer) : EMPTY_CUSTOMER_INPUT,
+  );
+  const [errors, setErrors] = useState<CustomerFieldErrors>({});
   const isEdit = Boolean(customer);
 
-  function saveCustomer(nextCustomer: Customer) {
-    onSave(nextCustomer);
-    onClose();
+  function updateDraft(field: CustomerInputKey, value: string) {
+    setDraft((current) => ({ ...current, [field]: value }));
+    setErrors((current) => ({ ...current, [field]: undefined }));
+  }
+
+  function submit() {
+    const parsed = CustomerInputSchema.safeParse(draft);
+    if (!parsed.success) {
+      setErrors(fieldErrorsFromIssues(parsed.error.issues));
+      return;
+    }
+    setErrors({});
+    onSubmit(parsed.data);
   }
 
   return (
-    <>
-      <Modal
-        title={isEdit ? "تعديل العميل" : "عميل جديد"}
-        description="إدارة بيانات العميل الأساسية ومعلومات التواصل."
-        onClose={onClose}
-        widthClassName="max-w-3xl"
-      >
-        <form className="grid gap-4 p-5 md:grid-cols-2" onSubmit={(event) => event.preventDefault()}>
-          <Field label="اسم العميل">
-            <Input value={draft.name} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} placeholder="اسم العميل" />
-          </Field>
-          <Field label="الهاتف 1">
-            <Input dir="ltr" value={draft.phone1} onChange={(event) => setDraft((current) => ({ ...current, phone1: event.target.value }))} placeholder="09xx xxx xxx" />
-          </Field>
-          <Field label="الهاتف 2">
-            <Input dir="ltr" value={draft.phone2} onChange={(event) => setDraft((current) => ({ ...current, phone2: event.target.value }))} placeholder="اختياري" />
-          </Field>
-          <Field label="العنوان">
-            <Input value={draft.address} onChange={(event) => setDraft((current) => ({ ...current, address: event.target.value }))} placeholder="العنوان" />
-          </Field>
-          <Field label="رابط الموقع" className="md:col-span-2">
-            <Input dir="ltr" value={draft.locationUrl} onChange={(event) => setDraft((current) => ({ ...current, locationUrl: event.target.value }))} placeholder="https://maps.google.com/..." />
-          </Field>
-          <div className="flex items-center justify-end gap-3 border-t border-border pt-4 md:col-span-2">
-            <Button type="button" variant="outline" onClick={onClose}>
-              إلغاء
-            </Button>
-            <Button
-              type="button"
-              onClick={() => {
-                const nextCustomer = { ...draft, id: draft.id || nextCustomerId(customers) };
-                if (isEdit) setPendingEditCustomer(nextCustomer);
-                else saveCustomer(nextCustomer);
-              }}
-            >
-              <Icon name={isEdit ? "pencil" : "plus"} size={18} />
-              {isEdit ? "حفظ التعديل" : "إنشاء العميل"}
-            </Button>
+    <Modal
+      title={isEdit ? "تعديل العميل" : "عميل جديد"}
+      description="إدارة بيانات العميل الأساسية ومعلومات التواصل."
+      onClose={onClose}
+      widthClassName="max-w-3xl"
+    >
+      <form className="grid gap-4 p-5 md:grid-cols-2" onSubmit={(event) => event.preventDefault()}>
+        {submitError ? (
+          <div className="whitespace-pre-line rounded-md border border-danger/30 bg-danger-soft p-3 text-sm text-danger md:col-span-2">
+            {submitError}
           </div>
-        </form>
-      </Modal>
-      {pendingEditCustomer ? (
-        <ConfirmToast
-          title="تأكيد تعديل العميل"
-          message={`هل تريد حفظ التعديلات على العميل ${pendingEditCustomer.name}؟`}
-          tone="gold"
-          confirmLabel="تأكيد التعديل"
-          onCancel={() => setPendingEditCustomer(null)}
-          onConfirm={() => saveCustomer(pendingEditCustomer)}
-        />
-      ) : null}
-    </>
+        ) : null}
+        <Field label="اسم العميل" error={errors.name}>
+          <Input
+            value={draft.name}
+            onChange={(event) => updateDraft("name", event.target.value)}
+            placeholder="اسم العميل"
+            disabled={submitting}
+          />
+        </Field>
+        <Field label="الهاتف الأول" error={errors.firstPhone}>
+          <Input
+            dir="ltr"
+            value={draft.firstPhone}
+            onChange={(event) => updateDraft("firstPhone", event.target.value)}
+            placeholder="09xx xxx xxx"
+            disabled={submitting}
+          />
+        </Field>
+        <Field label="الهاتف الثاني" error={errors.secondPhone}>
+          <Input
+            dir="ltr"
+            value={draft.secondPhone ?? ""}
+            onChange={(event) => updateDraft("secondPhone", event.target.value)}
+            placeholder="اختياري"
+            disabled={submitting}
+          />
+        </Field>
+        <Field label="العنوان" error={errors.address}>
+          <Input
+            value={draft.address ?? ""}
+            onChange={(event) => updateDraft("address", event.target.value)}
+            placeholder="العنوان"
+            disabled={submitting}
+          />
+        </Field>
+        <Field label="رابط الموقع" error={errors.locationLink} className="md:col-span-2">
+          <Input
+            dir="ltr"
+            value={draft.locationLink ?? ""}
+            onChange={(event) => updateDraft("locationLink", event.target.value)}
+            placeholder="https://maps.google.com/..."
+            disabled={submitting}
+          />
+        </Field>
+        <div className="flex items-center justify-end gap-3 border-t border-border pt-4 md:col-span-2">
+          <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>
+            إلغاء
+          </Button>
+          <Button type="button" onClick={submit} disabled={submitting}>
+            <Icon name={isEdit ? "pencil" : "plus"} size={18} />
+            {submitting ? "جاري الحفظ..." : isEdit ? "حفظ التعديل" : "إنشاء العميل"}
+          </Button>
+        </div>
+      </form>
+    </Modal>
   );
 }
 
 function CustomerDetailsModal({
   customer,
+  isLoading,
+  errorMessage,
   onClose,
   onEdit,
-  onOpenOrder,
 }: {
-  customer: Customer;
+  customer: Customer | null;
+  isLoading: boolean;
+  errorMessage?: string;
   onClose: () => void;
-  onEdit: () => void;
-  onOpenOrder: (details: { order: Order; invoice: Invoice }) => void;
+  onEdit: (customer: Customer) => void;
 }) {
-  const [ordersPage, setOrdersPage] = useState(1);
-  const orderPages = Math.max(1, Math.ceil(customer.orders.length / PAGE_SIZE));
-  const currentOrdersPage = Math.min(ordersPage, orderPages);
-  const visibleOrders = customer.orders.slice(
-    (currentOrdersPage - 1) * PAGE_SIZE,
-    currentOrdersPage * PAGE_SIZE,
+  const [requestsPage, setRequestsPage] = useState(1);
+  const requests = useMemo(() => customer?.requests ?? [], [customer]);
+  const pages = Math.max(1, Math.ceil(requests.length / PAGE_SIZE));
+  const currentPage = Math.min(requestsPage, pages);
+  const visibleRequests = requests.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE,
   );
 
   return (
-    <Modal title={customer.name} description="معلومات العميل وسجل طلباته." onClose={onClose} widthClassName="max-w-4xl">
+    <Modal
+      title={customer?.name ?? "تفاصيل العميل"}
+      description="معلومات العميل وسجل طلبات الإصلاح المرتبطة به."
+      onClose={onClose}
+      widthClassName="max-w-5xl"
+    >
       <div className="space-y-5 p-5">
-        <div className="grid gap-3 md:grid-cols-3">
-          <Card className="bg-surface-2 p-4 shadow-none">
-            <div className="text-xs text-content-muted">الهاتف 1</div>
-            <div className="mt-1 font-semibold text-content" dir="ltr">{customer.phone1}</div>
-          </Card>
-          <Card className="bg-surface-2 p-4 shadow-none">
-            <div className="text-xs text-content-muted">الهاتف 2</div>
-            <div className="mt-1 font-semibold text-content" dir="ltr">{customer.phone2 || "غير محدد"}</div>
-          </Card>
-          <Card className="bg-surface-2 p-4 shadow-none">
-            <div className="text-xs text-content-muted">عدد الطلبات</div>
-            <div className="mt-1 font-semibold text-content">{customer.orders.length}</div>
-          </Card>
-        </div>
-
-        <div className="rounded-md border border-border p-4">
-          <div className="text-sm font-semibold text-content">العنوان</div>
-          <p className="mt-1 text-sm text-content-muted">{customer.address}</p>
-          {customer.locationUrl ? <p className="mt-2 text-sm text-gold" dir="ltr">{customer.locationUrl}</p> : null}
-          {customer.notes ? <p className="mt-3 text-sm text-content-muted">{customer.notes}</p> : null}
-        </div>
-
-        <div>
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <h3 className="font-heading text-lg font-bold text-content">سجل الطلبات</h3>
-            <Button type="button" variant="outline" size="sm" onClick={onEdit}>
-              <Icon name="pencil" size={16} />
-              تعديل العميل
-            </Button>
+        {errorMessage ? (
+          <div className="rounded-md border border-danger/30 bg-danger-soft p-3 text-sm text-danger">
+            تعذّر تحميل تفاصيل العميل. {errorMessage}
           </div>
-          <div className="overflow-x-auto rounded-md border border-border">
-            <table className="min-w-[680px] w-full text-right text-sm">
-              <thead>
-                <tr className="bg-surface-2 text-content-muted">
-                  {["رقم الطلب", "الجهاز", "الحالة", "التاريخ", "الإجمالي", "الإجراءات"].map((header) => (
-                    <th key={header} className="px-4 py-3 font-medium">{header}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {visibleOrders.map((order) => (
-                  <tr key={order.id} className="border-t border-border">
-                    <td className="px-4 py-3 font-bold text-gold">{order.id}</td>
-                    <td className="px-4 py-3 text-content">{order.device}</td>
-                    <td className="px-4 py-3">
-                      <Badge tone={ORDER_STATUS[order.status].tone} dot>
-                        {ORDER_STATUS[order.status].label}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3 text-content-muted">{order.date}</td>
-                    <td className="px-4 py-3 text-content-muted">{order.total}</td>
-                    <td className="px-4 py-3">
-                      <button
-                        type="button"
-                        aria-label={`تفاصيل ${order.id}`}
-                        title="تفاصيل الطلب"
-                        onClick={() => onOpenOrder(buildOrderDetails(customer, order))}
-                        className="rounded-sm p-1.5 text-content-muted hover:bg-surface-2"
-                      >
-                        <Icon name="eye" size={18} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <TablePagination
-            page={currentOrdersPage}
-            total={customer.orders.length}
-            pageSize={PAGE_SIZE}
-            onPage={setOrdersPage}
-            itemLabel="طلب"
-          />
-        </div>
+        ) : null}
+
+        {!customer && isLoading ? (
+          <Card className="bg-surface-2 p-5 text-center text-sm text-content-muted shadow-none">
+            جاري تحميل بيانات العميل...
+          </Card>
+        ) : null}
+
+        {customer ? (
+          <>
+            <div className="grid gap-3 md:grid-cols-4">
+              <Card className="bg-surface-2 p-4 shadow-none">
+                <div className="text-xs text-content-muted">معرّف العميل</div>
+                <div className="mt-1 font-semibold text-gold" dir="ltr">
+                  {customer.customerNumber}
+                </div>
+              </Card>
+              <Card className="bg-surface-2 p-4 shadow-none">
+                <div className="text-xs text-content-muted">الهاتف الأول</div>
+                <div className="mt-1 font-semibold text-content" dir="ltr">
+                  {customer.firstPhone || "غير محدد"}
+                </div>
+              </Card>
+              <Card className="bg-surface-2 p-4 shadow-none">
+                <div className="text-xs text-content-muted">الهاتف الثاني</div>
+                <div className="mt-1 font-semibold text-content" dir="ltr">
+                  {customer.secondPhone || "غير محدد"}
+                </div>
+              </Card>
+              <Card className="bg-surface-2 p-4 shadow-none">
+                <div className="text-xs text-content-muted">سجل الإصلاح</div>
+                <div className="mt-1 font-semibold text-content">{requests.length}</div>
+              </Card>
+            </div>
+
+            <div className="rounded-md border border-border p-4">
+              <div className="text-sm font-semibold text-content">العنوان</div>
+              <p className="mt-1 text-sm text-content-muted">
+                {customer.address || "غير محدد"}
+              </p>
+              {customer.locationLink ? (
+                <a
+                  href={customer.locationLink}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-2 block text-sm text-gold underline-offset-4 hover:underline"
+                  dir="ltr"
+                >
+                  {customer.locationLink}
+                </a>
+              ) : null}
+            </div>
+
+            <div>
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <h3 className="font-heading text-lg font-bold text-content">سجل الإصلاح</h3>
+                <Button type="button" variant="outline" size="sm" onClick={() => onEdit(customer)}>
+                  <Icon name="pencil" size={16} />
+                  تعديل العميل
+                </Button>
+              </div>
+              <div className="overflow-x-auto rounded-md border border-border">
+                <table className="min-w-[820px] w-full text-right text-sm">
+                  <thead>
+                    <tr className="bg-surface-2 text-content-muted">
+                      {["رقم الطلب", "الأولوية", "الحالة", "الموعد", "وصف العطل", "ملاحظات"].map(
+                        (header) => (
+                          <th key={header} className="px-4 py-3 font-medium">
+                            {header}
+                          </th>
+                        ),
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {isLoading ? (
+                      <tr className="border-t border-border">
+                        <td className="px-4 py-6 text-center text-content-muted" colSpan={6}>
+                          جاري تحميل سجل الإصلاح...
+                        </td>
+                      </tr>
+                    ) : visibleRequests.length ? (
+                      visibleRequests.map((request) => (
+                        <tr key={request.id} className="border-t border-border">
+                          <td className="px-4 py-3 font-bold text-gold" dir="ltr">
+                            {request.requestNumber}
+                          </td>
+                          <td className="px-4 py-3 text-content-muted">
+                            {PRIORITY_LABELS[request.priority] ??
+                              (request.priority || "غير محدد")}
+                          </td>
+                          <td className="px-4 py-3">
+                            <Badge tone={requestStatusTone(request)} dot>
+                              {requestStatusLabel(request)}
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-3 text-content-muted">
+                            {formatApiDate(request.scheduledDate)}
+                          </td>
+                          <td className="max-w-[260px] px-4 py-3 text-content">
+                            {request.faultDescription || "غير محدد"}
+                          </td>
+                          <td className="max-w-[240px] px-4 py-3 text-content-muted">
+                            {request.notes || "لا توجد"}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr className="border-t border-border">
+                        <td className="px-4 py-6 text-center text-content-muted" colSpan={6}>
+                          لا يوجد سجل إصلاح لهذا العميل.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <TablePagination
+                page={currentPage}
+                total={requests.length}
+                pageSize={PAGE_SIZE}
+                onPage={setRequestsPage}
+                itemLabel="طلب"
+              />
+            </div>
+          </>
+        ) : null}
       </div>
     </Modal>
   );
 }
 
 export function CustomersScreen() {
-  const [customers, setCustomers] = useState<Customer[]>(INITIAL_CUSTOMERS);
-  const [query, setQuery] = useState("");
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const toast = useToast();
+  const [searchDraft, setSearchDraft] = useState("");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
-  const [selectedOrderDetails, setSelectedOrderDetails] = useState<{
-    order: Order;
-    invoice: Invoice;
-  } | null>(null);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [page, setPage] = useState(1);
+  const { create, update, remove } = useCustomerMutations();
 
-  const filtered = useMemo(
-    () =>
-      customers.filter(
-        (customer) =>
-          !query ||
-          contains(customer.name, query) ||
-          contains(customer.phone1, query) ||
-          contains(customer.phone2, query) ||
-          contains(customer.id, query),
-      ),
-    [customers, query],
+  const listParams = useMemo(
+    () => ({
+      ...customerSearchParams(search),
+      page,
+      pageSize: PAGE_SIZE,
+    }),
+    [page, search],
   );
-  const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const currentPage = Math.min(page, pages);
-  const visibleCustomers = filtered.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE,
-  );
+  const {
+    data,
+    error: listError,
+    isLoading,
+    isError,
+    refetch,
+  } = useCustomersQuery(listParams);
+  const selectedCustomerPreview =
+    data?.items.find((customer) => customer.id === selectedCustomerId) ?? null;
+  const detailsQuery = useCustomerQuery(selectedCustomerId);
+  const detailsCustomer = detailsQuery.data ?? selectedCustomerPreview;
 
-  function upsertCustomer(customer: Customer) {
-    setCustomers((current) => {
-      const exists = current.some((item) => item.id === customer.id);
-      return exists
-        ? current.map((item) => (item.id === customer.id ? customer : item))
-        : [customer, ...current];
-    });
+  useEffect(() => {
+    if (isError && listError) {
+      toast.error("تعذر تحميل العملاء", getApiErrorMessage(listError));
+    }
+  }, [isError, listError, toast]);
+
+  function applyFilters() {
+    setSearch(searchDraft.trim());
+    setPage(1);
   }
 
-  function removeCustomer(customerId: string) {
-    setCustomers((current) => current.filter((customer) => customer.id !== customerId));
-    setSelectedCustomer((current) => (current?.id === customerId ? null : current));
+  function clearFilters() {
+    setSearchDraft("");
+    setSearch("");
+    setPage(1);
   }
+
+  const customers = data?.items ?? [];
+  const totalCustomers = data?.total ?? 0;
 
   return (
     <div className="space-y-6">
@@ -435,107 +432,244 @@ export function CustomersScreen() {
         <div className="text-right">
           <h2 className="font-heading text-xl font-bold text-gold">إدارة العملاء</h2>
           <p className="mt-1 text-sm text-content-muted">
-            متابعة معلومات العملاء، تعديل بياناتهم، حذف العميل، ورؤية سجل الطلبات.
+            متابعة معلومات العملاء، تعديل بياناتهم، تعطيل العميل، ورؤية سجل الإصلاح.
           </p>
         </div>
-        <Button type="button" onClick={() => setShowCreateModal(true)}>
+        <Button
+          type="button"
+          onClick={() => {
+            create.reset();
+            setShowCreateModal(true);
+          }}
+        >
           <Icon name="plus" size={18} />
           عميل جديد
         </Button>
       </div>
 
-      {showCreateModal ? <CustomerFormModal customers={customers} onClose={() => setShowCreateModal(false)} onSave={upsertCustomer} /> : null}
+      {showCreateModal ? (
+        <CustomerFormModal
+          submitting={create.isPending}
+          submitError={create.error ? getApiErrorMessage(create.error) : undefined}
+          onClose={() => setShowCreateModal(false)}
+          onSubmit={(input) =>
+            create.mutate(input, {
+              onSuccess: () => {
+                setShowCreateModal(false);
+                setPage(1);
+                toast.success("تم إنشاء العميل", `تمت إضافة ${input.name} بنجاح.`);
+              },
+              onError: (error) =>
+                toast.error("تعذر إنشاء العميل", getApiErrorMessage(error)),
+            })
+          }
+        />
+      ) : null}
+
       {editingCustomer ? (
         <CustomerFormModal
           customer={editingCustomer}
-          customers={customers}
+          submitting={update.isPending}
+          submitError={update.error ? getApiErrorMessage(update.error) : undefined}
           onClose={() => setEditingCustomer(null)}
-          onSave={(customer) => {
-            upsertCustomer(customer);
-            setSelectedCustomer(customer);
+          onSubmit={(input) => {
+            const patch = createCustomerUpdatePatch(input, editingCustomer);
+            if (!hasCustomerPatch(patch)) {
+              setEditingCustomer(null);
+              toast.success("لا توجد تغييرات", "لم يتم إرسال طلب تعديل للعميل.");
+              return;
+            }
+
+            update.mutate(
+              { id: editingCustomer.id, input: patch },
+              {
+                onSuccess: () => {
+                  setEditingCustomer(null);
+                  toast.success("تم تحديث العميل", `تم حفظ تعديلات ${input.name} بنجاح.`);
+                },
+                onError: (error) =>
+                  toast.error("تعذر تحديث العميل", getApiErrorMessage(error)),
+              },
+            );
           }}
         />
       ) : null}
-      {selectedCustomer ? (
+
+      {selectedCustomerId ? (
         <CustomerDetailsModal
-          customer={selectedCustomer}
-          onClose={() => setSelectedCustomer(null)}
-          onEdit={() => {
-            setSelectedCustomer(null);
-            setEditingCustomer(selectedCustomer);
+          customer={detailsCustomer}
+          isLoading={detailsQuery.isLoading}
+          errorMessage={detailsQuery.error ? getApiErrorMessage(detailsQuery.error) : undefined}
+          onClose={() => setSelectedCustomerId(null)}
+          onEdit={(customer) => {
+            update.reset();
+            setSelectedCustomerId(null);
+            setEditingCustomer(customer);
           }}
-          onOpenOrder={setSelectedOrderDetails}
         />
       ) : null}
-      {selectedOrderDetails ? (
-        <OrderDetailsModal
-          order={selectedOrderDetails.order}
-          invoice={selectedOrderDetails.invoice}
-          onClose={() => setSelectedOrderDetails(null)}
-        />
-      ) : null}
+
       {customerToDelete ? (
         <ConfirmToast
-          title="تأكيد حذف العميل"
-          message={`هل تريد حذف العميل ${customerToDelete.name}؟ سيتم حذف بياناته من القائمة الحالية.`}
+          title="تأكيد تعطيل العميل"
+          message={`هل تريد تعطيل العميل ${customerToDelete.name}؟`}
+          tone="danger"
+          confirmLabel={remove.isPending ? "جاري التعطيل..." : "تعطيل العميل"}
+          isLoading={remove.isPending}
           onCancel={() => setCustomerToDelete(null)}
           onConfirm={() => {
-            removeCustomer(customerToDelete.id);
-            setCustomerToDelete(null);
+            remove.mutate(customerToDelete.id, {
+              onSuccess: () => {
+                if (selectedCustomerId === customerToDelete.id) setSelectedCustomerId(null);
+                toast.success("تم تعطيل العميل", `تم تعطيل ${customerToDelete.name} بنجاح.`);
+                setCustomerToDelete(null);
+              },
+              onError: (error) =>
+                toast.error("تعذر تعطيل العميل", getApiErrorMessage(error)),
+            });
           }}
         />
       ) : null}
 
       <Card className="p-4">
-        <Input value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} placeholder="بحث باسم العميل أو هاتف العميل أو المعرف" aria-label="بحث العملاء" />
+        <form
+          className="grid gap-3 md:grid-cols-[1fr_auto_auto]"
+          onSubmit={(event) => {
+            event.preventDefault();
+            applyFilters();
+          }}
+        >
+          <Field label="بحث العملاء">
+            <Input
+              value={searchDraft}
+              onChange={(event) => setSearchDraft(event.target.value)}
+              placeholder="اسم العميل أو رقم الهاتف"
+              aria-label="بحث العملاء بالاسم أو رقم الهاتف"
+            />
+          </Field>
+          <Button type="submit" className="self-end">
+            بحث
+          </Button>
+          <Button type="button" variant="outline" className="self-end" onClick={clearFilters}>
+            مسح
+          </Button>
+        </form>
       </Card>
 
-      <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-[860px] w-full text-right text-sm">
-            <thead>
-              <tr className="bg-surface-2 text-content-muted">
-                {["المعرف", "العميل", "الهاتف", "العنوان", "عدد الطلبات", "الإجراءات"].map((header) => (
-                  <th key={header} className="px-4 py-3 font-medium">{header}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {visibleCustomers.map((customer) => (
-                <tr key={customer.id} onClick={() => setSelectedCustomer(customer)} className="cursor-pointer border-t border-border hover:bg-gold-soft">
-                  <td className="px-4 py-4 font-bold text-gold">{customer.id}</td>
-                  <td className="px-4 py-4 font-semibold text-content">{customer.name}</td>
-                  <td className="px-4 py-4 text-content-muted" dir="ltr">{customer.phone1}</td>
-                  <td className="px-4 py-4 text-content-muted">{customer.address}</td>
-                  <td className="px-4 py-4">
-                    <Badge tone="gold">{customer.orders.length}</Badge>
-                  </td>
-                  <td className="px-4 py-4">
-                    <div className="flex items-center justify-start gap-2" dir="rtl">
-                      <button type="button" aria-label={`عرض ${customer.name}`} title="عرض" onClick={(event) => { event.stopPropagation(); setSelectedCustomer(customer); }} className="rounded-sm p-1.5 text-content-muted hover:bg-surface-2">
-                        <Icon name="eye" size={18} />
-                      </button>
-                      <button type="button" aria-label={`تعديل ${customer.name}`} title="تعديل" onClick={(event) => { event.stopPropagation(); setEditingCustomer(customer); }} className="rounded-sm p-1.5 text-content-muted hover:bg-surface-2">
-                        <Icon name="pencil" size={18} />
-                      </button>
-                      <button type="button" aria-label={`حذف ${customer.name}`} title="حذف" onClick={(event) => { event.stopPropagation(); setCustomerToDelete(customer); }} className="rounded-sm p-1.5 text-danger hover:bg-danger-soft">
-                        <Icon name="trash" size={18} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {isError && !data ? (
+        <div className="rounded-md border border-danger/30 bg-danger-soft p-6 text-center text-sm text-danger">
+          تعذّر تحميل العملاء.{" "}
+          <button onClick={() => refetch()} className="underline">
+            إعادة المحاولة
+          </button>
         </div>
-        <TablePagination
-          page={currentPage}
-          total={filtered.length}
-          pageSize={PAGE_SIZE}
-          onPage={setPage}
-          itemLabel="عميل"
-        />
-      </Card>
+      ) : (
+        <Card className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-[920px] w-full text-right text-sm">
+              <thead>
+                <tr className="bg-surface-2 text-content-muted">
+                  {["المعرف", "العميل", "الهاتف الأول", "الهاتف الثاني", "العنوان", "الإجراءات"].map(
+                    (header) => (
+                      <th key={header} className="px-4 py-3 font-medium">
+                        {header}
+                      </th>
+                    ),
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {isLoading ? (
+                  <tr className="border-t border-border">
+                    <td className="px-4 py-8 text-center text-content-muted" colSpan={6}>
+                      جاري تحميل العملاء...
+                    </td>
+                  </tr>
+                ) : customers.length ? (
+                  customers.map((customer) => (
+                    <tr
+                      key={customer.id}
+                      onClick={() => setSelectedCustomerId(customer.id)}
+                      className="cursor-pointer border-t border-border hover:bg-gold-soft"
+                    >
+                      <td className="px-4 py-4 font-bold text-gold" dir="ltr">
+                        {customer.customerNumber}
+                      </td>
+                      <td className="px-4 py-4 font-semibold text-content">
+                        {customer.name}
+                      </td>
+                      <td className="px-4 py-4 text-content-muted" dir="ltr">
+                        {customer.firstPhone || "غير محدد"}
+                      </td>
+                      <td className="px-4 py-4 text-content-muted" dir="ltr">
+                        {customer.secondPhone || "غير محدد"}
+                      </td>
+                      <td className="px-4 py-4 text-content-muted">
+                        {customer.address || "غير محدد"}
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="flex items-center justify-start gap-2" dir="rtl">
+                          <button
+                            type="button"
+                            aria-label={`عرض ${customer.name}`}
+                            title="عرض"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setSelectedCustomerId(customer.id);
+                            }}
+                            className="rounded-sm p-1.5 text-content-muted hover:bg-surface-2"
+                          >
+                            <Icon name="eye" size={18} />
+                          </button>
+                          <button
+                            type="button"
+                            aria-label={`تعديل ${customer.name}`}
+                            title="تعديل"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              update.reset();
+                              setEditingCustomer(customer);
+                            }}
+                            className="rounded-sm p-1.5 text-content-muted hover:bg-surface-2"
+                          >
+                            <Icon name="pencil" size={18} />
+                          </button>
+                          <button
+                            type="button"
+                            aria-label={`تعطيل ${customer.name}`}
+                            title="تعطيل"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              remove.reset();
+                              setCustomerToDelete(customer);
+                            }}
+                            className="rounded-sm p-1.5 text-danger hover:bg-danger-soft"
+                          >
+                            <Icon name="trash" size={18} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr className="border-t border-border">
+                    <td className="px-4 py-8 text-center text-content-muted" colSpan={6}>
+                      لا يوجد عملاء مطابقون للبحث الحالي.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          <TablePagination
+            page={page}
+            total={totalCustomers}
+            pageSize={PAGE_SIZE}
+            onPage={setPage}
+            itemLabel="عميل"
+          />
+        </Card>
+      )}
 
       <Card className="p-5">
         <div className="flex flex-col gap-4 text-right sm:flex-row sm:items-center sm:justify-between">
@@ -545,10 +679,12 @@ export function CustomersScreen() {
             </span>
             <div>
               <div className="text-sm text-content-muted">إجمالي العملاء</div>
-              <div className="mt-1 text-xs text-content-muted">العدد الكامل للعملاء المسجلين في النظام</div>
+              <div className="mt-1 text-xs text-content-muted">
+                العدد القادم من pagination في استجابة الخادم
+              </div>
             </div>
           </div>
-          <div className="font-heading text-3xl font-bold text-content">{customers.length}</div>
+          <div className="font-heading text-3xl font-bold text-content">{totalCustomers}</div>
         </div>
       </Card>
     </div>

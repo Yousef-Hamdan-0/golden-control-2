@@ -14,6 +14,8 @@ import {
 import {
   UserUpdateSchema,
   type UserUpdateInput,
+  UserUpdatePatchSchema,
+  type UserUpdatePatchInput,
 } from "@/models/users/user-update.schema";
 
 type JsonRecord = Record<string, unknown>;
@@ -205,6 +207,49 @@ function appendImage(formData: FormData, field: string, value: string | undefine
   if (file) formData.append(field, file);
 }
 
+function hasOwn<T extends object>(object: T, key: PropertyKey) {
+  return Object.prototype.hasOwnProperty.call(object, key);
+}
+
+export function hasUserUpdatePatch(input: UserUpdatePatchInput) {
+  return Object.keys(input).length > 0;
+}
+
+export function createUserUpdatePatch(
+  input: UserUpdateInput,
+  currentUser: User,
+): UserUpdatePatchInput {
+  const parsed = UserUpdateSchema.parse(input);
+  const patch: UserUpdatePatchInput = {};
+
+  if (parsed.email !== currentUser.email) patch.email = parsed.email;
+  if (parsed.fullName !== currentUser.fullName) patch.fullName = parsed.fullName;
+  if ((parsed.jobTitle ?? "") !== (currentUser.jobTitle ?? "")) {
+    patch.jobTitle = parsed.jobTitle ?? "";
+  }
+  if (Number(parsed.salary) !== Number(currentUser.salary)) patch.salary = parsed.salary;
+  if (parsed.role !== currentUser.role) patch.role = parsed.role;
+  if (parsed.status !== currentUser.status) patch.status = parsed.status;
+
+  const nextProfileImage = parsed.imageUrl ?? "";
+  const currentProfileImage = currentUser.imageUrl ?? "";
+  if (nextProfileImage !== currentProfileImage) {
+    const nextProfileFile = dataUrlFile(nextProfileImage, "profileImage");
+    if (nextProfileFile) patch.imageUrl = nextProfileImage;
+    else if (!nextProfileImage) patch.profileImagePath = "";
+  }
+
+  const nextDocumentImage = parsed.identityDocumentUrl ?? "";
+  const currentDocumentImage = currentUser.identityDocumentUrl ?? "";
+  if (nextDocumentImage !== currentDocumentImage) {
+    const nextDocumentFile = dataUrlFile(nextDocumentImage, "documentImage");
+    if (nextDocumentFile) patch.identityDocumentUrl = nextDocumentImage;
+    else if (!nextDocumentImage) patch.documentImagePath = "";
+  }
+
+  return patch;
+}
+
 export class CreateUserRequestModel {
   private readonly input: UserCreateInput;
 
@@ -228,32 +273,42 @@ export class CreateUserRequestModel {
 }
 
 export class UpdateUserRequestModel {
-  private readonly input: UserUpdateInput;
+  private readonly input: UserUpdatePatchInput;
 
-  constructor(input: UserUpdateInput) {
-    this.input = UserUpdateSchema.parse(input);
+  constructor(input: UserUpdatePatchInput) {
+    this.input = UserUpdatePatchSchema.parse(input);
   }
 
   toFormData(): FormData {
     const formData = new FormData();
-    formData.append("email", this.input.email);
-    formData.append("fullName", this.input.fullName);
-    if (this.input.jobTitle !== undefined) formData.append("jobTitle", this.input.jobTitle);
-    formData.append("salary", String(this.input.salary));
-    formData.append("isActive", String(this.input.status === "available"));
-    formData.append("role", this.input.role);
+    if (hasOwn(this.input, "email")) formData.append("email", this.input.email ?? "");
+    if (hasOwn(this.input, "fullName")) {
+      formData.append("fullName", this.input.fullName ?? "");
+    }
+    if (hasOwn(this.input, "jobTitle")) {
+      formData.append("jobTitle", this.input.jobTitle ?? "");
+    }
+    if (hasOwn(this.input, "salary")) formData.append("salary", String(this.input.salary));
+    if (hasOwn(this.input, "status")) {
+      formData.append("isActive", String(this.input.status === "available"));
+    }
+    if (hasOwn(this.input, "role")) formData.append("role", this.input.role ?? "");
 
     const profileFile = this.input.imageUrl
       ? dataUrlFile(this.input.imageUrl, "profileImage")
       : null;
     if (profileFile) formData.append("profileImage", profileFile);
-    else formData.append("profileImagePath", this.input.profileImagePath ?? "");
+    if (hasOwn(this.input, "profileImagePath")) {
+      formData.append("profileImagePath", this.input.profileImagePath ?? "");
+    }
 
     const documentFile = this.input.identityDocumentUrl
       ? dataUrlFile(this.input.identityDocumentUrl, "documentImage")
       : null;
     if (documentFile) formData.append("documentImage", documentFile);
-    else formData.append("documentImagePath", this.input.documentImagePath ?? "");
+    if (hasOwn(this.input, "documentImagePath")) {
+      formData.append("documentImagePath", this.input.documentImagePath ?? "");
+    }
 
     return formData;
   }
