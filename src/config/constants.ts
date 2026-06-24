@@ -10,7 +10,7 @@ export const BASE_CURRENCY: Currency = "SYP";
 export const CURRENCY_SYMBOL = "ل.س";
 
 /** Default page size for list tables. */
-export const PAGE_SIZE = 5;
+export const PAGE_SIZE = 10;
 
 /** Default debounce (ms) for search inputs. */
 export const SEARCH_DEBOUNCE_MS = 300;

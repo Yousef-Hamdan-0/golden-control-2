@@ -9,6 +9,7 @@ import { ConfirmToast } from "@/components/ui/ConfirmToast";
 import { Field, Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { TablePagination } from "@/components/ui/TablePagination";
+import { useToast } from "@/components/ui/Toast";
 import { PAGE_SIZE } from "@/config/constants";
 import { ExpenseFormModal } from "@/features/expenses/components/ExpenseFormModal";
 import {
@@ -33,6 +34,7 @@ interface ExpensesScreenProps {
 }
 
 export function ExpensesScreen({ initialCategory = "all" }: ExpensesScreenProps) {
+  const toast = useToast();
   const [expenses, setExpenses] = useState<ExpenseRecord[]>(() =>
     readStoredList(EXPENSES_STORAGE_KEY, [...INITIAL_EXPENSES]),
   );
@@ -72,6 +74,7 @@ export function ExpensesScreen({ initialCategory = "all" }: ExpensesScreenProps)
   );
 
   function saveExpense(input: ExpenseInput) {
+    const isEdit = Boolean(editingExpense);
     setExpenses((current) => {
       if (editingExpense) {
         return current.map((expense) =>
@@ -86,11 +89,17 @@ export function ExpensesScreen({ initialCategory = "all" }: ExpensesScreenProps)
     setPage(1);
     setEditingExpense(null);
     setShowCreateModal(false);
+    toast.success(
+      isEdit ? "تم تعديل المصروف" : "تم إنشاء المصروف",
+      isEdit ? `تم حفظ تعديلات ${input.title} بنجاح.` : `تمت إضافة ${input.title} بنجاح.`,
+    );
   }
 
   function deleteExpense(expenseId: string) {
+    const expense = expenses.find((item) => item.id === expenseId);
     setExpenses((current) => current.filter((expense) => expense.id !== expenseId));
     setExpenseToDelete(null);
+    toast.success("تم حذف المصروف", `تم حذف ${expense?.title ?? "المصروف"} بنجاح.`);
   }
 
   return (

@@ -39,17 +39,30 @@ type CustomerFieldErrors = Partial<Record<CustomerInputKey, string>>;
 
 const REQUEST_STATUS_LABELS: Record<string, string> = {
   new: "جديد",
-  pending: "قيد الانتظار",
-  assigned: "مُسند",
+  accepted: "مقبول",
+  ontheway: "في الطريق",
+  "on-the-way": "في الطريق",
+  arrived: "تم الوصول",
+  underrepair: "قيد الإصلاح",
   "under-repair": "قيد الإصلاح",
   completed: "مكتمل",
+  incompleted: "غير مكتمل",
+  pulltocenter: "مسحوب للمركز",
+  "pull-to-center": "مسحوب للمركز",
+  postponed: "مؤجل",
   cancelled: "ملغي",
+  canceled: "ملغي",
+  notanswer: "لا يجيب",
+  "not-answer": "لا يجيب",
+  notrepairable: "غير قابل للإصلاح",
+  repeated: "مكرر",
 };
 
 const PRIORITY_LABELS: Record<string, string> = {
   low: "منخفضة",
   medium: "متوسطة",
   high: "عالية",
+  emergency: "طارئة",
   urgent: "طارئة",
 };
 

@@ -26,7 +26,7 @@ export type {
 
 export { MaintenanceOrderModal } from "./orders/MaintenanceOrderModal";
 export { OrderDetailsModal } from "./orders/OrderDetailsModal";
-export { OrdersScreen } from "./orders/OrdersScreen";
+export { RequestsScreen as OrdersScreen } from "@/features/requests/components/RequestsScreen";
 
 export { InventoryScreen } from "./inventory/InventoryScreen";
 

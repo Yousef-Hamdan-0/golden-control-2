@@ -49,8 +49,8 @@ export const NAVIGATION: NavItem[] = [
     children: [
       { label: "طلبات خارجية", href: "/orders?type=external" },
       { label: "طلبات داخلية", href: "/orders?type=internal" },
-      { label: "محولة للمركز", href: "/orders?status=pull-to-center" },
-      { label: "قيد الإصلاح", href: "/orders?status=incompleted" },
+      { label: "محولة للمركز", href: "/orders?status=pulltocenter" },
+      { label: "قيد الإصلاح", href: "/orders?status=underrepair" },
       { label: "مكتملة", href: "/orders?status=completed" },
     ],
   },

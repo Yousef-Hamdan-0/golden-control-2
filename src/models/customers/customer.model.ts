@@ -59,7 +59,11 @@ export const CustomerInputSchema = z.object({
     .max(50, "رقم الهاتف الثاني يجب ألا يتجاوز 50 حرفاً.")
     .optional()
     .default(""),
-  address: z.string().trim().max(500, "العنوان طويل جداً.").optional().default(""),
+  address: z
+    .string()
+    .trim()
+    .min(1, "عنوان العميل مطلوب.")
+    .max(255, "عنوان العميل يجب ألا يتجاوز 255 حرفاً."),
   locationLink: z
     .string()
     .trim()
@@ -248,7 +252,12 @@ export class CustomerRequestModel {
     const body: Partial<Record<(typeof CUSTOMER_FIELDS)[number], string>> = {};
 
     for (const field of CUSTOMER_FIELDS) {
-      if (providedFields.has(field)) body[field] = parsed[field] ?? "";
+      if (!providedFields.has(field)) continue;
+      const value = parsed[field] ?? "";
+      if ((field === "secondPhone" || field === "locationLink") && !value) {
+        continue;
+      }
+      body[field] = value;
     }
 
     return body;

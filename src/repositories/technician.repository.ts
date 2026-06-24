@@ -18,7 +18,7 @@ const latency = <T>(value: T, ms = 350): Promise<T> =>
 export const technicianRepository = {
   async listDailyInventory(
     page = 1,
-    pageSize = PAGE_SIZE + 1,
+    pageSize = PAGE_SIZE,
   ): Promise<Paginated<DailyInventory>> {
     const total = store.length;
     const start = (page - 1) * pageSize;

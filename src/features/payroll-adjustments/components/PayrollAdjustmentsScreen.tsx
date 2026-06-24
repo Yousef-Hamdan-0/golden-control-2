@@ -9,6 +9,7 @@ import { ConfirmToast } from "@/components/ui/ConfirmToast";
 import { Field, Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { TablePagination } from "@/components/ui/TablePagination";
+import { useToast } from "@/components/ui/Toast";
 import { PAGE_SIZE } from "@/config/constants";
 import { PayrollAdjustmentFormModal } from "@/features/payroll-adjustments/components/PayrollAdjustmentFormModal";
 import {
@@ -45,6 +46,7 @@ interface SummaryCard {
 }
 
 export function PayrollAdjustmentsScreen() {
+  const toast = useToast();
   const [adjustments, setAdjustments] = useState<PayrollAdjustment[]>([
     ...INITIAL_PAYROLL_ADJUSTMENTS,
   ]);
@@ -114,6 +116,7 @@ export function PayrollAdjustmentsScreen() {
   );
 
   function createAdjustment(input: PayrollAdjustmentInput) {
+    const user = usersById.get(input.userId);
     setAdjustments((current) => [
       {
         id: nextPayrollAdjustmentId(current),
@@ -125,13 +128,22 @@ export function PayrollAdjustmentsScreen() {
     setTypeFilter("all");
     setPage(1);
     setShowCreateModal(false);
+    toast.success(
+      "تم إنشاء تسوية الراتب",
+      `تمت إضافة تسوية ${PAYROLL_ADJUSTMENT_LABELS[input.type]} لـ ${user?.fullName ?? "المستخدم"} بنجاح.`,
+    );
   }
 
   function deleteAdjustment(adjustmentId: string) {
+    const adjustment = adjustments.find((item) => item.id === adjustmentId);
     setAdjustments((current) =>
       current.filter((adjustment) => adjustment.id !== adjustmentId),
     );
     setAdjustmentToDelete(null);
+    toast.success(
+      "تم حذف تسوية الراتب",
+      `تم حذف تسوية ${adjustment ? PAYROLL_ADJUSTMENT_LABELS[adjustment.type] : "الراتب"} بنجاح.`,
+    );
   }
 
   return (

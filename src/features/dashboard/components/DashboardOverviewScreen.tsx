@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { TablePagination } from "@/components/ui/TablePagination";
 import { Textarea } from "@/components/ui/Textarea";
+import { useToast } from "@/components/ui/Toast";
 import { Icon } from "@/lib/icons";
 import { readAuthSession } from "@/helpers/auth-session.helper";
 import { formatMoney } from "@/lib/format/currency";
@@ -438,6 +439,7 @@ function RecentOrdersTable({
 
 export function DashboardOverviewScreen() {
   const router = useRouter();
+  const toast = useToast();
   const [isChecking, setIsChecking] = useState(true);
   const [orders, setOrders] = useState(initialRecentOrders);
   const [modal, setModal] = useState<{ order: RecentOrder; mode: ModalMode } | null>(null);
@@ -459,6 +461,7 @@ export function DashboardOverviewScreen() {
       current.map((order) => (order.id === updatedOrder.id ? updatedOrder : order)),
     );
     setModal(null);
+    toast.success("تم تحديث الطلب", `تم حفظ تعديلات الطلب ${updatedOrder.id} بنجاح.`);
   }
 
   if (isChecking) {

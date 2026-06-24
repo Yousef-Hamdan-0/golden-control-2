@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { TablePagination } from "@/components/ui/TablePagination";
+import { useToast } from "@/components/ui/Toast";
 import { Icon } from "@/lib/icons";
 import { formatMoney, type Currency } from "@/lib/format/currency";
 import { PAGE_SIZE } from "@/config/constants";
@@ -31,6 +32,7 @@ import { AddPaymentModal } from "./AddPaymentModal";
 
 export function InvoicesScreen() {
   const params = useSearchParams();
+  const toast = useToast();
   const initialType = params.get("type") as InvoiceType | null;
   const initialCurrency = params.get("currency")?.toUpperCase() as Currency | undefined;
   const [invoices, setInvoices] = useState<Invoice[]>(readStoredInvoices);
@@ -102,9 +104,11 @@ export function InvoicesScreen() {
           }
         : current,
     );
+    toast.success("تم حفظ الدفعة", `تم تسجيل دفعة على الفاتورة ${paymentInvoice.id} بنجاح.`);
   }
 
   function saveInvoice(nextInvoice: Invoice) {
+    const exists = invoices.some((invoice) => invoice.id === nextInvoice.id);
     setInvoices((current) =>
       current.some((invoice) => invoice.id === nextInvoice.id)
         ? current.map((invoice) => (invoice.id === nextInvoice.id ? nextInvoice : invoice))
@@ -112,6 +116,10 @@ export function InvoicesScreen() {
     );
     setViewingInvoice((current) => (current?.id === nextInvoice.id ? nextInvoice : current));
     setPaymentInvoice((current) => (current?.id === nextInvoice.id ? nextInvoice : current));
+    toast.success(
+      exists ? "تم تعديل الفاتورة" : "تم إنشاء الفاتورة",
+      exists ? `تم حفظ تعديلات الفاتورة ${nextInvoice.id}.` : `تم إنشاء الفاتورة ${nextInvoice.id} بنجاح.`,
+    );
   }
 
   function returnInvoice(invoiceToReturn: Invoice) {
@@ -121,6 +129,7 @@ export function InvoicesScreen() {
     );
     setViewingInvoice(returnedInvoice);
     setPaymentInvoice((current) => (current?.id === returnedInvoice.id ? returnedInvoice : current));
+    toast.success("تم إرجاع الفاتورة", `تم تسجيل إرجاع الفاتورة ${returnedInvoice.id}.`);
   }
 
   useEffect(() => {

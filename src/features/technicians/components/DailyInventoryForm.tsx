@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
+import { useToast } from "@/components/ui/Toast";
+import { getApiErrorMessage } from "@/helpers/api.helper";
 import { Icon } from "@/lib/icons";
 import { useUsersQuery } from "@/features/users/hooks/use-users-query";
 import { useDailyInventoryMutations } from "@/features/technicians/hooks/use-daily-inventory";
@@ -23,6 +25,7 @@ interface DailyInventoryFormProps {
 
 export function DailyInventoryForm({ onCancel, onSaved }: DailyInventoryFormProps = {}) {
   const router = useRouter();
+  const toast = useToast();
   const { create } = useDailyInventoryMutations();
   // Reuse the users feature to populate the technician picker.
   const { data: techs } = useUsersQuery({ role: "technician", pageSize: 50 });
@@ -47,7 +50,14 @@ export function DailyInventoryForm({ onCancel, onSaved }: DailyInventoryFormProp
   return (
     <form
       onSubmit={handleSubmit((values) =>
-        create.mutate(values, { onSuccess: saved }),
+        create.mutate(values, {
+          onSuccess: () => {
+            toast.success("تم إنشاء المخزون", "تمت إضافة مخزون الفني اليومي بنجاح.");
+            saved();
+          },
+          onError: (error) =>
+            toast.error("تعذر إنشاء المخزون", getApiErrorMessage(error)),
+        }),
       )}
       className="space-y-6"
     >

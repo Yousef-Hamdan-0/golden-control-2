@@ -22,6 +22,14 @@ export const API_ROUTES = {
     root: "/api/customers",
     byId: (id: string) => `/api/customers/${encodeURIComponent(id)}`,
   },
+  requests: {
+    root: "/api/requests",
+    byId: (id: string) => `/api/requests/${encodeURIComponent(id)}`,
+    pdf: (id: string) => `/api/requests/${encodeURIComponent(id)}/pdf`,
+    statusHistory: (id: string) =>
+      `/api/requests/${encodeURIComponent(id)}/status-history`,
+    records: "/api/request/records",
+  },
   settings: {
     root: "/api/settings",
     logo: "/api/settings/logo",
@@ -42,6 +50,7 @@ export const API_ENDPOINTS = {
   },
   users: API_ROUTES.users,
   customers: API_ROUTES.customers,
+  requests: API_ROUTES.requests,
   settings: API_ROUTES.settings,
 } as const;
 
@@ -60,6 +69,14 @@ export const BACKEND_API_ENDPOINTS = {
   customers: {
     root: createApiUrl(API_ROUTES.customers.root),
     byId: (id: string) => createApiUrl(API_ROUTES.customers.byId(id)),
+  },
+  requests: {
+    root: createApiUrl(API_ROUTES.requests.root),
+    byId: (id: string) => createApiUrl(API_ROUTES.requests.byId(id)),
+    pdf: (id: string) => createApiUrl(API_ROUTES.requests.pdf(id)),
+    statusHistory: (id: string) =>
+      createApiUrl(API_ROUTES.requests.statusHistory(id)),
+    records: createApiUrl(API_ROUTES.requests.records),
   },
   settings: {
     root: createApiUrl(API_ROUTES.settings.root),

@@ -51,11 +51,12 @@ export function SettingsCenterScreen() {
 
   function patchDraft(field: SettingsField, value: string) {
     update.reset();
+    uploadLogo.reset();
     setDraft((current) => (current ? { ...current, [field]: value } : current));
     setErrors((current) => ({ ...current, [field]: undefined }));
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!draft) return;
 
@@ -73,36 +74,30 @@ export function SettingsCenterScreen() {
     setErrors({});
     if (!settingsQuery.data) return;
     const patch = createSettingsPatch(parsed.data, settingsQuery.data);
-    if (!hasSettingsPatch(patch)) {
+    const hasLogo = Boolean(logo);
+    if (!hasSettingsPatch(patch) && !hasLogo) {
       toast.success("لا توجد تغييرات", "لم يتم إرسال طلب تعديل للإعدادات.");
       return;
     }
 
-    update.mutate(patch, {
-      onSuccess: (settings) => {
-        setDraft(settingsToInput(settings));
-        toast.success("تم حفظ الإعدادات", "تم تحديث بيانات المركز بنجاح.");
-      },
-      onError: (error) =>
-        toast.error("تعذر حفظ الإعدادات", getApiErrorMessage(error)),
-    });
-  }
-
-  function handleLogoUpload() {
-    if (!logo) {
-      toast.error("لم يتم اختيار شعار", "اختر ملف صورة أولاً ثم اضغط رفع الشعار.");
-      return;
-    }
-
-    uploadLogo.mutate(logo, {
-      onSuccess: () => {
+    try {
+      let nextSettings = settingsQuery.data;
+      if (hasSettingsPatch(patch)) {
+        nextSettings = await update.mutateAsync(patch);
+      }
+      if (logo) {
+        nextSettings = await uploadLogo.mutateAsync(logo);
         setLogo(null);
         setLogoInputKey((current) => current + 1);
-        toast.success("تم رفع الشعار", "تم تحديث شعار المركز بنجاح.");
-      },
-      onError: (error) =>
-        toast.error("تعذر رفع الشعار", getApiErrorMessage(error)),
-    });
+      }
+      setDraft(settingsToInput(nextSettings));
+      toast.success(
+        "تم حفظ بيانات المركز",
+        logo ? "تم تحديث بيانات المركز والشعار بنجاح." : "تم تحديث بيانات المركز بنجاح.",
+      );
+    } catch (error) {
+      toast.error("تعذر حفظ بيانات المركز", getApiErrorMessage(error));
+    }
   }
 
   if (settingsQuery.isLoading && !draft) {
@@ -163,6 +158,11 @@ export function SettingsCenterScreen() {
               {getApiErrorMessage(update.error)}
             </div>
           ) : null}
+          {uploadLogo.error ? (
+            <div className="rounded-md border border-danger/30 bg-danger-soft p-3 text-sm text-danger md:col-span-2">
+              {getApiErrorMessage(uploadLogo.error)}
+            </div>
+          ) : null}
           <Field label="اسم المركز" error={errors.centerName}>
             <Input
               value={draft.centerName}
@@ -215,6 +215,24 @@ export function SettingsCenterScreen() {
               aria-invalid={Boolean(errors.email)}
             />
           </Field>
+          <Field label="شعار المركز" className="md:col-span-2">
+            <div className="grid gap-2">
+              <Input
+                key={logoInputKey}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="bg-surface"
+                onChange={(event) => {
+                  update.reset();
+                  uploadLogo.reset();
+                  setLogo(event.target.files?.[0] ?? null);
+                }}
+              />
+              <span className="text-xs text-content-muted">
+                {logo?.name || settingsQuery.data?.logoPath || "لم يتم اختيار شعار"}
+              </span>
+            </div>
+          </Field>
           {(["term1", "term2", "term3", "term4"] as const).map((field, index) => (
             <Field
               key={field}
@@ -232,48 +250,16 @@ export function SettingsCenterScreen() {
             </Field>
           ))}
           <div className="flex justify-end md:col-span-2">
-            <Button type="submit" disabled={update.isPending}>
-              {update.isPending ? <Spinner className="h-4 w-4" /> : <Icon name="pencil" size={18} />}
-              {update.isPending ? "جارٍ الحفظ..." : "حفظ بيانات المركز"}
+            <Button type="submit" disabled={update.isPending || uploadLogo.isPending}>
+              {update.isPending || uploadLogo.isPending ? (
+                <Spinner className="h-4 w-4" />
+              ) : (
+                <Icon name="pencil" size={18} />
+              )}
+              {update.isPending || uploadLogo.isPending ? "جارٍ الحفظ..." : "حفظ بيانات المركز"}
             </Button>
           </div>
         </form>
-      </Card>
-
-      <Card className="overflow-hidden">
-        <CardHeader>
-          <h3 className="text-right font-heading text-lg font-bold text-content">
-            شعار المركز
-          </h3>
-        </CardHeader>
-        <div className="grid gap-4 p-4 md:grid-cols-[1fr_auto] md:items-end">
-          <Field label="ملف الشعار">
-            <div className="grid gap-2">
-              <Input
-                key={logoInputKey}
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                className="bg-surface"
-                onChange={(event) => {
-                  uploadLogo.reset();
-                  setLogo(event.target.files?.[0] ?? null);
-                }}
-              />
-              <span className="text-xs text-content-muted">
-                {logo?.name || settingsQuery.data?.logoPath || "لم يتم اختيار شعار"}
-              </span>
-            </div>
-          </Field>
-          <Button type="button" onClick={handleLogoUpload} disabled={uploadLogo.isPending}>
-            {uploadLogo.isPending ? <Spinner className="h-4 w-4" /> : <Icon name="file" size={18} />}
-            {uploadLogo.isPending ? "جارٍ الرفع..." : "رفع الشعار"}
-          </Button>
-        </div>
-        {uploadLogo.error ? (
-          <div className="border-t border-danger/20 bg-danger-soft p-3 text-sm text-danger">
-            {getApiErrorMessage(uploadLogo.error)}
-          </div>
-        ) : null}
       </Card>
     </div>
   );

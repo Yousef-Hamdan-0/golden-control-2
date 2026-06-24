@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/Card";
 import { ConfirmToast } from "@/components/ui/ConfirmToast";
 import { Input } from "@/components/ui/Input";
 import { TablePagination } from "@/components/ui/TablePagination";
+import { useToast } from "@/components/ui/Toast";
 import { Icon } from "@/lib/icons";
 import { formatMoney } from "@/lib/format/currency";
 import { PAGE_SIZE } from "@/config/constants";
@@ -27,6 +28,7 @@ import { PartFormModal } from "./PartFormModal";
 import { QuantityAdjustmentModal } from "./QuantityAdjustmentModal";
 
 export function InventoryScreen({ section = "parts" }: { section?: string }) {
+  const toast = useToast();
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>(() =>
     readStoredList(INVENTORY_ITEMS_STORAGE_KEY, INVENTORY),
   );
@@ -76,6 +78,7 @@ export function InventoryScreen({ section = "parts" }: { section?: string }) {
   }, [inventoryMovements]);
 
   function upsertPart(item: InventoryItem) {
+    const isEdit = Boolean(editingPart);
     setInventoryItems((current) => {
       const exists = current.some((part) => part.id === item.id);
       return exists
@@ -98,6 +101,10 @@ export function InventoryScreen({ section = "parts" }: { section?: string }) {
         ...current,
       ]);
     }
+    toast.success(
+      isEdit ? "تم تعديل القطعة" : "تمت إضافة القطعة",
+      isEdit ? `تم حفظ تعديلات ${item.name} بنجاح.` : `تمت إضافة ${item.name} إلى المخزون بنجاح.`,
+    );
   }
 
   function adjustQuantity(partId: string, movementType: InventoryMovement["type"], quantity: number) {
@@ -127,6 +134,7 @@ export function InventoryScreen({ section = "parts" }: { section?: string }) {
       },
       ...current,
     ]);
+    toast.success("تم تعديل الكمية", `تم تسجيل حركة ${movementLabel} للقطعة ${movementPart.name}.`);
   }
 
   return (
@@ -169,6 +177,7 @@ export function InventoryScreen({ section = "parts" }: { section?: string }) {
           onCancel={() => setPartToDelete(null)}
           onConfirm={() => {
             setInventoryItems((current) => current.filter((item) => item.id !== partToDelete.id));
+            toast.success("تم حذف القطعة", `تم حذف ${partToDelete.name} من المخزون بنجاح.`);
             setPartToDelete(null);
           }}
         />

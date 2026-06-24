@@ -5,7 +5,10 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Modal } from "@/components/ui/Modal";
 import { Spinner } from "@/components/ui/Spinner";
+import { useToast } from "@/components/ui/Toast";
+import { getApiErrorMessage } from "@/helpers/api.helper";
 import { Icon } from "@/lib/icons";
+import { PAGE_SIZE } from "@/config/constants";
 import { DailyInventoryCard } from "@/features/technicians/components/DailyInventoryCard";
 import { DailyInventoryForm } from "@/features/technicians/components/DailyInventoryForm";
 import {
@@ -14,13 +17,14 @@ import {
 } from "@/features/technicians/hooks/use-daily-inventory";
 
 export function DailyInventoryScreen() {
+  const toast = useToast();
   const [page, setPage] = useState(1);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const { data, isLoading, isError, refetch } = useDailyInventoryQuery(page);
   const { remove } = useDailyInventoryMutations();
 
   const total = data?.total ?? 0;
-  const pageSize = data?.pageSize ?? 6;
+  const pageSize = data?.pageSize ?? PAGE_SIZE;
   const pages = Math.max(1, Math.ceil(total / pageSize));
   const start = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const end = Math.min(page * pageSize, total);
@@ -76,7 +80,14 @@ export function DailyInventoryScreen() {
               key={entry.id}
               entry={entry}
               isDeleting={remove.isPending}
-              onDelete={() => remove.mutate(entry.id)}
+              onDelete={() =>
+                remove.mutate(entry.id, {
+                  onSuccess: () =>
+                    toast.success("تم حذف المخزون", `تم حذف مخزون ${entry.technicianName} بنجاح.`),
+                  onError: (error) =>
+                    toast.error("تعذر حذف المخزون", getApiErrorMessage(error)),
+                })
+              }
             />
           ))}
         </div>
