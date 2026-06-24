@@ -183,7 +183,7 @@ export function SettingsCenterScreen() {
             <Input
               value={draft.address}
               onChange={(event) => patchDraft("address", event.target.value)}
-              placeholder="عنوان المركز"
+              placeholder="دمشق - المزة - شارع الجلاء"
               aria-invalid={Boolean(errors.address)}
             />
           </Field>
@@ -191,7 +191,7 @@ export function SettingsCenterScreen() {
             <Input
               value={draft.phone1}
               onChange={(event) => patchDraft("phone1", event.target.value)}
-              placeholder="رقم الهاتف الأساسي"
+              placeholder="011 123 4567"
               dir="ltr"
               aria-invalid={Boolean(errors.phone1)}
             />
@@ -200,7 +200,7 @@ export function SettingsCenterScreen() {
             <Input
               value={draft.phone2 ?? ""}
               onChange={(event) => patchDraft("phone2", event.target.value)}
-              placeholder="رقم الهاتف البديل"
+              placeholder="09xx xxx xxx"
               dir="ltr"
               aria-invalid={Boolean(errors.phone2)}
             />

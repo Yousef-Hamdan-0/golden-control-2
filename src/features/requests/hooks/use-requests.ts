@@ -6,6 +6,7 @@ import { requestService } from "@/services/request.service";
 import type { RequestListParams } from "@/repositories/request.repository";
 import type {
   RepairRequestInput,
+  RepairRequestPatchInput,
   RequestRecordsInput,
 } from "@/models/requests/request.model";
 
@@ -42,7 +43,7 @@ export function useRequestMutations() {
   });
 
   const update = useMutation({
-    mutationFn: ({ id, input }: { id: string; input: RepairRequestInput }) =>
+    mutationFn: ({ id, input }: { id: string; input: RepairRequestPatchInput }) =>
       requestService.update(id, input),
     onSuccess: async (_data, vars) => {
       await Promise.all([

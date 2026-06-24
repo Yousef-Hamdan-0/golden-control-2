@@ -7,6 +7,7 @@ import type { Paginated } from "@/repositories/user.repository";
 import type {
   RepairRequest,
   RepairRequestInput,
+  RepairRequestPatchInput,
   RepairRequestStatusHistoryItem,
   RequestRecordsInput,
 } from "@/models/requests/request.model";
@@ -24,7 +25,7 @@ export const requestService = {
     return requestRepository.create(input);
   },
 
-  update(id: string, input: RepairRequestInput): Promise<RepairRequest | null> {
+  update(id: string, input: RepairRequestPatchInput): Promise<RepairRequest | null> {
     return requestRepository.update(id, input);
   },
 

@@ -71,16 +71,17 @@ function errorsFromIssues(issues: Array<{ path: PropertyKey[]; message: string }
   }, {});
 }
 
-function emptyDraft(): RequestFormDraft {
+function emptyDraft(defaultType: RepairRequestType = EMPTY_REQUEST_INPUT.type): RequestFormDraft {
   return {
     ...EMPTY_REQUEST_INPUT,
+    type: defaultType,
     customer: { ...EMPTY_REQUEST_INPUT.customer },
     devices: EMPTY_REQUEST_INPUT.devices.map((device) => ({ ...device })),
   };
 }
 
-function initialDraft(request?: RepairRequest): RequestFormDraft {
-  if (!request) return emptyDraft();
+function initialDraft(request?: RepairRequest, defaultType?: RepairRequestType): RequestFormDraft {
+  if (!request) return emptyDraft(defaultType);
 
   return {
     customer: {
@@ -105,19 +106,22 @@ function initialDraft(request?: RepairRequest): RequestFormDraft {
 
 export function RequestFormModal({
   request,
+  defaultType,
   submitting,
   submitError,
   onClose,
   onSubmit,
 }: {
   request?: RepairRequest;
+  defaultType?: RepairRequestType;
   submitting: boolean;
   submitError?: string;
   onClose: () => void;
   onSubmit: (input: RepairRequestInput) => void;
 }) {
   const isEdit = Boolean(request);
-  const [draft, setDraft] = useState<RequestFormDraft>(() => initialDraft(request));
+  const isTypeLocked = !isEdit && Boolean(defaultType);
+  const [draft, setDraft] = useState<RequestFormDraft>(() => initialDraft(request, defaultType));
   const [errors, setErrors] = useState<FieldErrors>({});
   const { data: technicians } = useUsersQuery({
     role: "technician",
@@ -209,7 +213,7 @@ export function RequestFormModal({
                 dir="ltr"
                 value={draft.customer.firstPhone}
                 onChange={(event) => setCustomerField("firstPhone", event.target.value)}
-                placeholder="05XXXXXXXX"
+                placeholder="09xx xxx xxx"
                 disabled={submitting}
               />
             </Field>
@@ -226,7 +230,7 @@ export function RequestFormModal({
               <Input
                 value={draft.customer.address}
                 onChange={(event) => setCustomerField("address", event.target.value)}
-                placeholder="الرياض - حي النخيل - شارع الأمير سعود"
+                placeholder="دمشق - المزة - شارع الجلاء"
                 disabled={submitting}
               />
             </Field>
@@ -239,7 +243,7 @@ export function RequestFormModal({
                 dir="ltr"
                 value={draft.customer.locationLink}
                 onChange={(event) => setCustomerField("locationLink", event.target.value)}
-                placeholder="https://maps.google.com/..."
+                placeholder="https://maps.google.com/?q=Damascus+Mezzeh"
                 disabled={submitting}
               />
             </Field>
@@ -323,7 +327,7 @@ export function RequestFormModal({
                     type: event.target.value as RepairRequestType,
                   }))
                 }
-                disabled={submitting}
+                disabled={submitting || isTypeLocked}
               >
                 {REQUEST_TYPE_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>

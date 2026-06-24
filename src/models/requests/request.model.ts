@@ -245,6 +245,12 @@ export const RepairRequestInputSchema = z.object({
 
 export type RepairRequestInput = z.input<typeof RepairRequestInputSchema>;
 export type ParsedRepairRequestInput = z.infer<typeof RepairRequestInputSchema>;
+export type RepairRequestPatchInput = Partial<
+  Omit<ParsedRepairRequestInput, "customer" | "devices">
+> & {
+  customer?: Partial<ParsedRepairRequestInput["customer"]>;
+  devices?: ParsedRepairRequestInput["devices"];
+};
 
 export const RequestRecordsInputSchema = z.object({
   requestNumber: z.string().trim().min(1, "رقم الطلب مطلوب."),
@@ -291,6 +297,37 @@ function nestedName(value: unknown): string {
   if (typeof value === "string" || typeof value === "number") return String(value);
   if (!isRecord(value)) return "";
   return stringValue(value.fullName, value.name, value.username, value.email);
+}
+
+function nestedObjectName(value: unknown): string {
+  if (!isRecord(value)) return "";
+  return stringValue(value.fullName, value.name, value.username, value.email);
+}
+
+function firstRecord(...values: unknown[]): JsonRecord {
+  for (const value of values) {
+    if (isRecord(value)) return value;
+    if (Array.isArray(value)) {
+      const record = value.find(isRecord);
+      if (record) return record;
+    }
+  }
+
+  return {};
+}
+
+function technicianAssignment(payload: JsonRecord) {
+  return firstRecord(
+    payload.technicianAssignment,
+    payload.technician_assignment,
+    payload.latestTechnicianAssignment,
+    payload.latest_technician_assignment,
+    payload.assignments,
+    payload.technicianAssignments,
+    payload.technician_assignments,
+    payload.assignedTechnicians,
+    payload.assigned_technicians,
+  );
 }
 
 const STATUS_ALIASES: Record<string, RepairRequestStatus> = {
@@ -434,6 +471,8 @@ export function normalizeRepairRequest(payload: unknown, fallbackId?: string): R
     (Array.isArray(payload.audioRecords) && payload.audioRecords) ||
     (Array.isArray(payload.voiceRecords) && payload.voiceRecords) ||
     [];
+  const assignment = technicianAssignment(payload);
+  const assignmentTechnician = firstRecord(assignment.technician, assignment.user);
 
   return {
     id,
@@ -453,13 +492,21 @@ export function normalizeRepairRequest(payload: unknown, fallbackId?: string): R
     technicianId: stringValue(
       payload.technicianId,
       payload.technician_id,
+      assignment.technicianId,
+      assignment.technician_id,
+      assignmentTechnician.id,
+      assignmentTechnician._id,
+      assignmentTechnician.userNumber,
+      assignmentTechnician.user_number,
       isRecord(payload.technician) ? payload.technician.id : undefined,
     ),
     technicianName: stringValue(
       payload.technicianName,
       payload.technician_name,
-      payload.assignedTechnician,
-      nestedName(payload.technician),
+      nestedObjectName(payload.technician),
+      nestedObjectName(payload.assignedTechnician),
+      nestedObjectName(assignmentTechnician),
+      nestedObjectName(assignment),
     ),
     createdAt: dateValue(payload.createdAt, payload.created_at),
     updatedAt: dateValue(payload.updatedAt, payload.updated_at),
@@ -623,6 +670,93 @@ export class RepairRequestPayloadModel {
 
     return body;
   }
+}
+
+function normalizeOptionalText(value: string | undefined) {
+  return value?.trim() ?? "";
+}
+
+function devicesEqual(
+  firstDevices: ParsedRepairRequestInput["devices"],
+  secondDevices: ParsedRepairRequestInput["devices"],
+) {
+  if (firstDevices.length !== secondDevices.length) return false;
+
+  return firstDevices.every((device, index) => {
+    const other = secondDevices[index];
+    return (
+      device.deviceType === other.deviceType &&
+      device.deviceName === other.deviceName &&
+      normalizeOptionalText(device.brand) === normalizeOptionalText(other.brand) &&
+      normalizeOptionalText(device.model) === normalizeOptionalText(other.model)
+    );
+  });
+}
+
+export function createRepairRequestUpdatePatch(
+  input: RepairRequestInput,
+  currentRequest: RepairRequest,
+): RepairRequestPatchInput {
+  const parsed = RepairRequestInputSchema.parse(input);
+  const current = RepairRequestInputSchema.parse(requestToInput(currentRequest));
+  const patch: RepairRequestPatchInput = {};
+  const customerPatch: RepairRequestPatchInput["customer"] = {};
+
+  if (parsed.customer.name !== current.customer.name) {
+    customerPatch.name = parsed.customer.name;
+  }
+  if (parsed.customer.firstPhone !== current.customer.firstPhone) {
+    customerPatch.firstPhone = parsed.customer.firstPhone;
+  }
+  if (
+    normalizeOptionalText(parsed.customer.secondPhone) &&
+    normalizeOptionalText(parsed.customer.secondPhone) !== normalizeOptionalText(current.customer.secondPhone)
+  ) {
+    customerPatch.secondPhone = normalizeOptionalText(parsed.customer.secondPhone);
+  }
+  if (parsed.customer.address !== current.customer.address) {
+    customerPatch.address = parsed.customer.address;
+  }
+  if (
+    normalizeOptionalText(parsed.customer.locationLink) &&
+    normalizeOptionalText(parsed.customer.locationLink) !== normalizeOptionalText(current.customer.locationLink)
+  ) {
+    customerPatch.locationLink = normalizeOptionalText(parsed.customer.locationLink);
+  }
+  if (Object.keys(customerPatch).length > 0) patch.customer = customerPatch;
+
+  if (parsed.type !== current.type) patch.type = parsed.type;
+  if (parsed.priority !== current.priority) patch.priority = parsed.priority;
+  if (parsed.faultDescription !== current.faultDescription) {
+    patch.faultDescription = parsed.faultDescription;
+  }
+  if (normalizeOptionalText(parsed.notes) !== normalizeOptionalText(current.notes)) {
+    patch.notes = normalizeOptionalText(parsed.notes);
+  }
+  if (
+    normalizeOptionalText(parsed.scheduledDate) &&
+    normalizeOptionalText(parsed.scheduledDate) !== normalizeOptionalText(current.scheduledDate)
+  ) {
+    patch.scheduledDate = normalizeOptionalText(parsed.scheduledDate);
+  }
+  if (!devicesEqual(parsed.devices, current.devices)) {
+    patch.devices = parsed.devices;
+  }
+  if (
+    normalizeOptionalText(parsed.technicianId) &&
+    normalizeOptionalText(parsed.technicianId) !== normalizeOptionalText(current.technicianId)
+  ) {
+    patch.technicianId = normalizeOptionalText(parsed.technicianId);
+  }
+  if (parsed.status && parsed.status !== current.status) {
+    patch.status = parsed.status;
+  }
+
+  return patch;
+}
+
+export function hasRepairRequestPatch(input: RepairRequestPatchInput) {
+  return Object.keys(input).length > 0;
 }
 
 export function requestToInput(request: RepairRequest): RepairRequestInput {

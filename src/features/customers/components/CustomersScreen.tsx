@@ -195,7 +195,7 @@ function CustomerFormModal({
           <Input
             value={draft.address ?? ""}
             onChange={(event) => updateDraft("address", event.target.value)}
-            placeholder="العنوان"
+            placeholder="دمشق - المزة - شارع الجلاء"
             disabled={submitting}
           />
         </Field>
@@ -204,7 +204,7 @@ function CustomerFormModal({
             dir="ltr"
             value={draft.locationLink ?? ""}
             onChange={(event) => updateDraft("locationLink", event.target.value)}
-            placeholder="https://maps.google.com/..."
+            placeholder="https://maps.google.com/?q=Damascus+Mezzeh"
             disabled={submitting}
           />
         </Field>

@@ -76,7 +76,16 @@ export async function requestApi(
 }
 
 export function getApiErrorMessage(error: unknown) {
-  return error instanceof ApiError
-    ? error.message
-    : "حدث خطأ غير متوقع. حاول مرة أخرى.";
+  if (!(error instanceof ApiError)) {
+    return "حدث خطأ غير متوقع. حاول مرة أخرى.";
+  }
+
+  if (
+    error.message.includes("requests_request_number_key") ||
+    error.message.includes("فشل إنشاء رقم طلب فريد")
+  ) {
+    return "تعذر توليد رقم طلب فريد من الخادم. حاول مرة أخرى بعد لحظة، وإذا تكرر الخطأ يحتاج مولّد أرقام الطلبات في الـ Backend إلى تعديل.";
+  }
+
+  return error.message;
 }

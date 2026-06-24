@@ -15,6 +15,7 @@ import {
   RequestRecordsInputSchema,
   type RepairRequest,
   type RepairRequestInput,
+  type RepairRequestPatchInput,
   type RepairRequestPriority,
   type RepairRequestStatus,
   type RepairRequestStatusHistoryItem,
@@ -94,12 +95,11 @@ export const requestRepository = {
     return maybeNormalizeRepairRequestResponse(payload);
   },
 
-  async update(id: string, input: RepairRequestInput): Promise<RepairRequest | null> {
-    const body = new RepairRequestPayloadModel(input, { includeStatus: true }).toJSON();
+  async update(id: string, input: RepairRequestPatchInput): Promise<RepairRequest | null> {
     const payload = await requestAuthenticatedApi(API_ENDPOINTS.requests.byId(id), {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      body: JSON.stringify(input),
     });
 
     return maybeNormalizeRepairRequestResponse(payload);

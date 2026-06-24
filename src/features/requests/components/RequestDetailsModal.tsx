@@ -34,7 +34,6 @@ export function RequestDetailsModal({
   onClose,
   onEdit,
   onDownloadPdf,
-  onUploadRecords,
 }: {
   request: RepairRequest | null;
   isLoading: boolean;
@@ -46,7 +45,6 @@ export function RequestDetailsModal({
   onClose: () => void;
   onEdit: (request: RepairRequest) => void;
   onDownloadPdf: (request: RepairRequest) => void;
-  onUploadRecords: (request: RepairRequest) => void;
 }) {
   return (
     <Modal
@@ -72,15 +70,6 @@ export function RequestDetailsModal({
         {request ? (
           <>
             <div className="flex flex-wrap items-center justify-end gap-2 border-b border-border pb-4">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => onUploadRecords(request)}
-              >
-                <Icon name="plus" size={16} />
-                تسجيلات صوتية
-              </Button>
               <Button
                 type="button"
                 variant="outline"

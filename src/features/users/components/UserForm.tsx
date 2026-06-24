@@ -298,7 +298,7 @@ export function UserForm(props: Props) {
                 <Field label="رقم الهاتف" error={errors.phone?.message}>
                   <Input
                     dir="ltr"
-                    placeholder="+966 50 000 0000"
+                    placeholder="+963 9xx xxx xxx"
                     disabled={isEdit}
                     {...register("phone")}
                   />

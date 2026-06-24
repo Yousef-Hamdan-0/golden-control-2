@@ -176,7 +176,7 @@ export function InvoiceFormModal({
               <Input value={draft.clientPhone2 ?? ""} onChange={(event) => patchDraft({ clientPhone2: event.target.value })} dir="ltr" placeholder="اختياري" />
             </Field>
             <Field label="العنوان">
-              <Input value={draft.clientAddress ?? ""} onChange={(event) => patchDraft({ clientAddress: event.target.value })} placeholder="عنوان العميل" />
+              <Input value={draft.clientAddress ?? ""} onChange={(event) => patchDraft({ clientAddress: event.target.value })} placeholder="دمشق - المزة - شارع الجلاء" />
             </Field>
             <Field label="اسم الفني">
               <Select
@@ -195,7 +195,7 @@ export function InvoiceFormModal({
               </Select>
             </Field>
             <Field label="رقم تلفون الفني">
-              <Input value={draft.technicianPhone ?? ""} onChange={(event) => patchDraft({ technicianPhone: event.target.value })} dir="ltr" placeholder="رقم الفني" />
+              <Input value={draft.technicianPhone ?? ""} onChange={(event) => patchDraft({ technicianPhone: event.target.value })} dir="ltr" placeholder="09xx xxx xxx" />
             </Field>
           </div>
 

@@ -132,7 +132,7 @@ export function MaintenanceOrderModal({
                   onChange={(event) =>
                     setDraft((current) => ({ ...current, address: event.target.value }))
                   }
-                  placeholder="المدينة / المنطقة / التفاصيل"
+                  placeholder="دمشق / المزة / شارع الجلاء"
                 />
               </Field>
               <Field label="رابط الموقع (اختياري)" className="md:col-span-2">
@@ -142,7 +142,7 @@ export function MaintenanceOrderModal({
                   onChange={(event) =>
                     setDraft((current) => ({ ...current, locationUrl: event.target.value }))
                   }
-                  placeholder="https://maps.google.com/..."
+                  placeholder="https://maps.google.com/?q=Damascus+Mezzeh"
                 />
               </Field>
             </div>
