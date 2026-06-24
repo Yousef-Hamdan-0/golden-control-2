@@ -1,6 +1,10 @@
 import type { UserListParams } from "@/repositories/user.repository";
 import type { CustomerListParams } from "@/repositories/customer.repository";
 import type { RequestListParams } from "@/repositories/request.repository";
+import type {
+  InventoryDailyListParams,
+  InventoryPartListParams,
+} from "@/repositories/inventory.repository";
 
 /**
  * Single source for every cache key. Precise keys = precise invalidation.
@@ -33,5 +37,11 @@ export const queryKeys = {
   technicians: {
     all: ["technicians"] as const,
     inventory: (page: number) => ["technicians", "inventory", page] as const,
+  },
+  inventory: {
+    all: ["inventory"] as const,
+    daily: (params: InventoryDailyListParams) => ["inventory", "daily", params] as const,
+    parts: (params: InventoryPartListParams) => ["inventory", "parts", params] as const,
+    movements: () => ["inventory", "movements"] as const,
   },
 };

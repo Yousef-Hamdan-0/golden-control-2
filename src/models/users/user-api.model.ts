@@ -230,6 +230,7 @@ export function createUserUpdatePatch(
   if (Number(parsed.salary) !== Number(currentUser.salary)) patch.salary = parsed.salary;
   if (parsed.role !== currentUser.role) patch.role = parsed.role;
   if (parsed.status !== currentUser.status) patch.status = parsed.status;
+  if (parsed.password?.trim()) patch.password = parsed.password.trim();
 
   const nextProfileImage = parsed.imageUrl ?? "";
   const currentProfileImage = currentUser.imageUrl ?? "";
@@ -293,6 +294,9 @@ export class UpdateUserRequestModel {
       formData.append("isActive", String(this.input.status === "available"));
     }
     if (hasOwn(this.input, "role")) formData.append("role", this.input.role ?? "");
+    if (hasOwn(this.input, "password") && this.input.password) {
+      formData.append("password", this.input.password);
+    }
 
     const profileFile = this.input.imageUrl
       ? dataUrlFile(this.input.imageUrl, "profileImage")

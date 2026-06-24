@@ -17,6 +17,7 @@ export const UserUpdateSchema = z.object({
   documentImagePath: z.string().optional().or(z.literal("")),
   role: RoleSchema,
   status: UserStatusSchema,
+  password: z.string().trim().min(8, "كلمة المرور 8 أحرف على الأقل").optional().or(z.literal("")),
 });
 
 export type UserUpdateInput = z.infer<typeof UserUpdateSchema>;

@@ -209,7 +209,7 @@ export function UserForm(props: Props) {
 
   const imageUrl = watch("imageUrl");
   const identityDocumentUrl = watch("identityDocumentUrl");
-  const canChangePassword = !isEdit;
+  const canChangePassword = true;
 
   function confirmEdit() {
     if (props.mode !== "edit" || !pendingEditValues) return;
@@ -349,7 +349,7 @@ export function UserForm(props: Props) {
                 <SectionLabel>الأمان</SectionLabel>
                 <div className="md:w-2/3">
                   <Field
-                    label="كلمة المرور"
+                    label={isEdit ? "كلمة المرور الجديدة" : "كلمة المرور"}
                     error={errors.password?.message}
                   >
                     <div className="relative">
@@ -369,7 +369,9 @@ export function UserForm(props: Props) {
                     </div>
                   </Field>
                   <p className="mt-1.5 text-xs text-content-muted">
-                    سيحتاجها المستخدم عند كل تسجيل دخول.
+                    {isEdit
+                      ? "اتركها فارغة إذا لم ترغب بتغيير كلمة المرور."
+                      : "سيحتاجها المستخدم عند كل تسجيل دخول."}
                   </p>
                 </div>
               </section>

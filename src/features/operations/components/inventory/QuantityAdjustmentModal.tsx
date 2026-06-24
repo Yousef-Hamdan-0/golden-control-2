@@ -9,7 +9,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Select } from "@/components/ui/Select";
 import { Icon } from "@/lib/icons";
 import { cn } from "@/lib/utils/cn";
-import type { InventoryItem, InventoryMovement } from "../../types";
+import type { InventoryMovementType, InventoryPart } from "@/models/inventory/inventory.model";
 import { INVENTORY_MOVEMENT_LABELS } from "../../constants";
 
 export function QuantityAdjustmentModal({
@@ -17,9 +17,9 @@ export function QuantityAdjustmentModal({
   onClose,
   onSave,
 }: {
-  items: InventoryItem[];
+  items: InventoryPart[];
   onClose: () => void;
-  onSave: (partId: string, movementType: InventoryMovement["type"], quantity: number) => void;
+  onSave: (partId: string, movementType: InventoryMovementType, quantity: number) => void;
 }) {
   const [partId, setPartId] = useState(items[0]?.id ?? "");
   const [movementType, setMovementType] = useState<"supply" | "adjustment">("supply");
@@ -33,8 +33,8 @@ export function QuantityAdjustmentModal({
   const selectedPart = items.find((item) => item.id === partId);
   const numericQuantity = Number(quantity) || 0;
   const delta = movementType === "supply" ? Math.max(0, numericQuantity) : numericQuantity;
-  const nextStock = selectedPart ? Math.max(0, selectedPart.stock + delta) : 0;
-  const wouldDropBelowZero = Boolean(selectedPart && selectedPart.stock + delta < 0);
+  const nextStock = selectedPart ? Math.max(0, selectedPart.quantity + delta) : 0;
+  const wouldDropBelowZero = Boolean(selectedPart && selectedPart.quantity + delta < 0);
   const canSave = Boolean(selectedPart) && delta !== 0 && !wouldDropBelowZero;
 
   return (
@@ -53,7 +53,7 @@ export function QuantityAdjustmentModal({
                 {selectedPart?.name ?? "لا توجد قطعة"}
               </div>
               <div className="mt-1 text-xs text-content-muted" dir="ltr">
-                {selectedPart?.id ?? "-"}
+                {selectedPart?.sparePartNumber || selectedPart?.sku || selectedPart?.id || "-"}
               </div>
             </div>
             <Badge tone={INVENTORY_MOVEMENT_LABELS[movementType].tone} dot>
@@ -65,11 +65,11 @@ export function QuantityAdjustmentModal({
         <div className="grid gap-4 md:grid-cols-3">
           <Field label="القطعة">
             <Select value={partId} onChange={(event) => setPartId(event.target.value)}>
-              {items.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name} - {item.id}
-                </option>
-              ))}
+                  {items.map((item) => (
+                    <option key={item.id} value={item.id}>
+                  {item.name} - {item.sparePartNumber || item.sku}
+                    </option>
+                  ))}
             </Select>
           </Field>
           <Field label="نوع الحركة">
@@ -100,7 +100,7 @@ export function QuantityAdjustmentModal({
         <div className="grid gap-3 md:grid-cols-3">
           <div className="rounded-md border border-border bg-surface-2 p-3">
             <div className="text-xs text-content-muted">الكمية الحالية</div>
-            <div className="mt-1 font-heading text-2xl font-bold text-content">{selectedPart?.stock ?? 0}</div>
+            <div className="mt-1 font-heading text-2xl font-bold text-content">{selectedPart?.quantity ?? 0}</div>
           </div>
           <div className="rounded-md border border-border bg-surface-2 p-3">
             <div className="text-xs text-content-muted">قيمة الحركة</div>

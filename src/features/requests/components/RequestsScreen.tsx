@@ -31,6 +31,7 @@ import {
   REQUEST_STATUS_LABELS,
   REQUEST_STATUS_OPTIONS,
   REQUEST_STATUS_TONE,
+  REQUEST_TYPE_OPTIONS,
   type RepairRequest,
   type RepairRequestInput,
   type RepairRequestPriority,
@@ -144,6 +145,7 @@ export function RequestsScreen() {
   const [priority, setPriority] = useState<PriorityFilter>(() =>
     initialPriority(params.get("priority")),
   );
+  const [type, setType] = useState<TypeFilter>(() => routeType);
   const [dateFilter, setDateFilter] = useState<DateFilter>({ from: "", to: "" });
   const [showDateFilter, setShowDateFilter] = useState(false);
   const [query, setQuery] = useState("");
@@ -166,13 +168,13 @@ export function RequestsScreen() {
     () => ({
       status,
       priority,
-      type: routeType,
+      type,
       startDate: dateFilter.from,
       endDate: dateFilter.to,
       page: isLocalSearch ? 1 : page,
       pageSize: PAGE_SIZE,
     }),
-    [dateFilter.from, dateFilter.to, isLocalSearch, page, priority, routeType, status],
+    [dateFilter.from, dateFilter.to, isLocalSearch, page, priority, status, type],
   );
   const {
     data,
@@ -222,8 +224,9 @@ export function RequestsScreen() {
 
   useEffect(() => {
     setStatus(routeStatus);
+    setType(routeType);
     setPage(1);
-  }, [routeStatus]);
+  }, [routeStatus, routeType]);
 
   async function downloadPdf(request: RepairRequest) {
     setPdfRequestId(request.id);
@@ -354,7 +357,7 @@ export function RequestsScreen() {
         />
       ) : null}
 
-      <FilterCard className="lg:grid-cols-[minmax(360px,2fr)_repeat(2,minmax(130px,1fr))_auto]">
+      <FilterCard className="lg:grid-cols-[minmax(360px,2fr)_repeat(3,minmax(130px,1fr))_auto]">
         <Input
           value={query}
           onChange={(event) => {
@@ -389,6 +392,21 @@ export function RequestsScreen() {
         >
           <option value="all">كل الأولويات</option>
           {REQUEST_PRIORITY_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </Select>
+        <Select
+          value={type}
+          onChange={(event) => {
+            setType(event.target.value as TypeFilter);
+            setPage(1);
+          }}
+          aria-label="تصفية نوع الطلب"
+        >
+          <option value="all">كل أنواع الطلبات</option>
+          {REQUEST_TYPE_OPTIONS.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
             </option>

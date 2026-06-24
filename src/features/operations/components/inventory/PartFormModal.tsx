@@ -6,44 +6,41 @@ import { ConfirmToast } from "@/components/ui/ConfirmToast";
 import { Field, Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { Icon } from "@/lib/icons";
-import type { InventoryItem } from "../../types";
-import { USD_TO_SYP_RATE } from "../../constants";
+import type { InventoryPart, InventoryPartInput } from "@/models/inventory/inventory.model";
 
 export function PartFormModal({
   onClose,
   onSave,
   initialPart,
+  submitting = false,
+  submitError,
 }: {
   onClose: () => void;
-  onSave: (item: InventoryItem) => void;
-  initialPart?: InventoryItem | null;
+  onSave: (input: InventoryPartInput) => void;
+  initialPart?: InventoryPart | null;
+  submitting?: boolean;
+  submitError?: string;
 }) {
   const [name, setName] = useState(initialPart?.name ?? "");
-  const [code, setCode] = useState(initialPart?.id ?? "");
-  const [location, setLocation] = useState(initialPart?.location ?? "");
-  const [valueSyp, setValueSyp] = useState(String(initialPart?.unitCost ?? ""));
-  const [valueUsd, setValueUsd] = useState(
-    initialPart ? String(Number((initialPart.unitCost / USD_TO_SYP_RATE).toFixed(2))) : "",
-  );
-  const [pendingEditItem, setPendingEditItem] = useState<InventoryItem | null>(null);
+  const [sku, setSku] = useState(initialPart?.sku ?? "");
+  const [location, setLocation] = useState(initialPart?.shelfLocation ?? "");
+  const [valueSyp, setValueSyp] = useState(String(initialPart?.costSyp ?? ""));
+  const [valueUsd, setValueUsd] = useState(String(initialPart?.costUsd ?? ""));
+  const [pendingInput, setPendingInput] = useState<InventoryPartInput | null>(null);
   const isEdit = Boolean(initialPart);
 
-  function buildItem(): InventoryItem {
+  function buildInput(): InventoryPartInput {
     return {
-      id: code || `PRT-${Date.now().toString().slice(-4)}`,
-      name: name || "قطعة جديدة",
-      category: initialPart?.category ?? "عام",
-      stock: initialPart?.stock ?? 0,
-      minStock: initialPart?.minStock ?? 1,
-      unitCost: Number(valueSyp) || Math.round((Number(valueUsd) || 0) * USD_TO_SYP_RATE),
-      lastMove: isEdit ? "تعديل بيانات" : "إضافة قطعة",
-      location: location || "غير محدد",
+      name,
+      sku,
+      shelfLocation: location,
+      costSyp: Number(valueSyp) || 0,
+      costUsd: Number(valueUsd) || 0,
     };
   }
 
-  function saveItem(item: InventoryItem) {
-    onSave(item);
-    onClose();
+  function saveInput(input: InventoryPartInput) {
+    onSave(input);
   }
 
   return (
@@ -55,47 +52,85 @@ export function PartFormModal({
         widthClassName="max-w-2xl"
       >
         <form className="grid gap-4 p-5 md:grid-cols-2" onSubmit={(event) => event.preventDefault()}>
+          {submitError ? (
+            <div className="whitespace-pre-line rounded-md border border-danger/30 bg-danger-soft p-3 text-sm text-danger md:col-span-2">
+              {submitError}
+            </div>
+          ) : null}
           <Field label="اسم القطعة">
-            <Input value={name} onChange={(event) => setName(event.target.value)} placeholder="مثال: حساس حرارة NTC" />
+            <Input
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="مثال: شاشة iPhone 13 Pro"
+              disabled={submitting}
+            />
           </Field>
-          <Field label="الكود">
-            <Input value={code} onChange={(event) => setCode(event.target.value)} placeholder="PRT-000" dir="ltr" />
+          <Field label="رمز التخزين">
+            <Input
+              value={sku}
+              onChange={(event) => setSku(event.target.value)}
+              placeholder="SCR-IP13-001"
+              dir="ltr"
+              disabled={submitting}
+            />
           </Field>
           <Field label="قيمة القطعة بالليرة السورية">
-            <Input value={valueSyp} onChange={(event) => setValueSyp(event.target.value)} type="number" min={0} placeholder="0" />
+            <Input
+              value={valueSyp}
+              onChange={(event) => setValueSyp(event.target.value)}
+              type="number"
+              min={0}
+              placeholder="25000"
+              disabled={submitting}
+            />
           </Field>
           <Field label="قيمة القطعة بالدولار">
-            <Input value={valueUsd} onChange={(event) => setValueUsd(event.target.value)} type="number" min={0} step="0.01" placeholder="0" />
+            <Input
+              value={valueUsd}
+              onChange={(event) => setValueUsd(event.target.value)}
+              type="number"
+              min={0}
+              step="0.01"
+              placeholder="7.14"
+              disabled={submitting}
+            />
           </Field>
           <Field label="الموقع" className="md:col-span-2">
-            <Input value={location} onChange={(event) => setLocation(event.target.value)} placeholder="رف A-01" />
+            <Input
+              value={location}
+              onChange={(event) => setLocation(event.target.value)}
+              placeholder="رف 3 - صف 2 - مكان 1"
+              disabled={submitting}
+            />
           </Field>
           <div className="flex items-center justify-end gap-3 border-t border-border pt-4 md:col-span-2">
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>
               إلغاء
             </Button>
             <Button
               type="button"
+              disabled={submitting}
               onClick={() => {
-                const item = buildItem();
-                if (isEdit) setPendingEditItem(item);
-                else saveItem(item);
+                const input = buildInput();
+                if (isEdit) setPendingInput(input);
+                else saveInput(input);
               }}
             >
               <Icon name={isEdit ? "pencil" : "plus"} size={18} />
-              {isEdit ? "حفظ التعديل" : "إضافة القطعة"}
+              {submitting ? "جارٍ الحفظ..." : isEdit ? "حفظ التعديل" : "إضافة القطعة"}
             </Button>
           </div>
         </form>
       </Modal>
-      {pendingEditItem ? (
+      {pendingInput ? (
         <ConfirmToast
           title="تأكيد تعديل القطعة"
-          message={`هل تريد حفظ التعديلات على القطعة ${pendingEditItem.name}؟`}
+          message={`هل تريد حفظ التعديلات على القطعة ${pendingInput.name}؟`}
           tone="gold"
           confirmLabel="تأكيد التعديل"
-          onCancel={() => setPendingEditItem(null)}
-          onConfirm={() => saveItem(pendingEditItem)}
+          isLoading={submitting}
+          onCancel={() => setPendingInput(null)}
+          onConfirm={() => saveInput(pendingInput)}
         />
       ) : null}
     </>

@@ -1,140 +1,188 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { ConfirmToast } from "@/components/ui/ConfirmToast";
 import { Input } from "@/components/ui/Input";
+import { SkeletonRow } from "@/components/ui/Spinner";
 import { TablePagination } from "@/components/ui/TablePagination";
 import { useToast } from "@/components/ui/Toast";
+import { getApiErrorMessage } from "@/helpers/api.helper";
 import { Icon } from "@/lib/icons";
 import { formatMoney } from "@/lib/format/currency";
 import { PAGE_SIZE } from "@/config/constants";
-import type { InventoryItem, InventoryMovement, DateFilter } from "../../types";
-import { INVENTORY, INVENTORY_MOVEMENTS } from "../../data/seed";
-import {
-  INVENTORY_ITEMS_STORAGE_KEY,
-  INVENTORY_MOVEMENTS_STORAGE_KEY,
-  INVENTORY_MOVEMENT_LABELS,
-  USD_TO_SYP_RATE,
-} from "../../constants";
-import { readStoredList, writeStoredList } from "../../utils/storage";
-import { matchesDateValue, contains } from "../../utils/filter";
+import type { DateFilter } from "../../types";
+import { INVENTORY_MOVEMENT_LABELS } from "../../constants";
 import { SectionTitle } from "../shared/SectionTitle";
 import { KpiCards } from "../shared/KpiCards";
 import { DateFilterModal } from "../shared/DateFilterModal";
+import { EmptyState } from "../shared/EmptyState";
 import { PartFormModal } from "./PartFormModal";
 import { QuantityAdjustmentModal } from "./QuantityAdjustmentModal";
+import {
+  useInventoryMovementsQuery,
+  useInventoryMutations,
+  useInventoryPartsQuery,
+} from "@/features/inventory/hooks/use-inventory";
+import type {
+  InventoryMovementType,
+  InventoryMovementLog,
+  InventoryPart,
+  InventoryPartInput,
+} from "@/models/inventory/inventory.model";
+
+const EMPTY_PARTS: InventoryPart[] = [];
+const EMPTY_MOVEMENTS: InventoryMovementLog[] = [];
+
+function hasArabic(value: string) {
+  return /[\u0600-\u06FF]/.test(value);
+}
+
+function isGeneratedPartCode(value: string) {
+  return /^SP-\d+/i.test(value.trim());
+}
+
+function normalizeSearch(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function partMatchesSearch(part: InventoryPart, query: string) {
+  const term = normalizeSearch(query);
+  if (!term) return true;
+
+  return [part.name, part.sparePartNumber, part.sku].some((value) =>
+    normalizeSearch(value).includes(term),
+  );
+}
+
+function partListParams(query: string, page: number) {
+  const search = query.trim();
+  const params: { page: number; pageSize: number; name?: string; sku?: string } = {
+    page,
+    pageSize: PAGE_SIZE,
+  };
+  if (!search) return params;
+  if (isGeneratedPartCode(search)) return params;
+  if (hasArabic(search)) params.name = search;
+  else params.sku = search;
+  return params;
+}
+
+function matchesDateFilter(value: string, filter: DateFilter) {
+  const date = value.slice(0, 10);
+  if (filter.from && date < filter.from) return false;
+  if (filter.to && date > filter.to) return false;
+  return true;
+}
+
+function movementReference(type: InventoryMovementType) {
+  if (type === "supply") return "توريد مخزون";
+  if (type === "withdraw") return "صرف مخزون";
+  return "تسوية مخزون";
+}
 
 export function InventoryScreen({ section = "parts" }: { section?: string }) {
   const toast = useToast();
-  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>(() =>
-    readStoredList(INVENTORY_ITEMS_STORAGE_KEY, INVENTORY),
-  );
-  const [inventoryMovements, setInventoryMovements] = useState<InventoryMovement[]>(() =>
-    readStoredList(INVENTORY_MOVEMENTS_STORAGE_KEY, INVENTORY_MOVEMENTS),
-  );
   const [query, setQuery] = useState("");
   const [showSupplyModal, setShowSupplyModal] = useState(false);
   const [showQuantityModal, setShowQuantityModal] = useState(false);
-  const [editingPart, setEditingPart] = useState<InventoryItem | null>(null);
-  const [partToDelete, setPartToDelete] = useState<InventoryItem | null>(null);
+  const [editingPart, setEditingPart] = useState<InventoryPart | null>(null);
+  const [partToDelete, setPartToDelete] = useState<InventoryPart | null>(null);
   const [partPage, setPartPage] = useState(1);
   const [movementPage, setMovementPage] = useState(1);
   const [showMovementDateFilter, setShowMovementDateFilter] = useState(false);
   const [movementDateFilter, setMovementDateFilter] = useState<DateFilter>({ from: "", to: "" });
-  const lowStock = inventoryItems.filter((item) => item.stock <= item.minStock);
-  const filtered = inventoryItems.filter((item) => {
-    const byQuery = !query || contains(item.name, query) || contains(item.id, query);
-    return byQuery;
-  });
-
   const isMovement = section === "movement";
-  const inventoryValue = inventoryItems.reduce((sum, item) => sum + item.stock * item.unitCost, 0);
-  const sortedMovements = [...inventoryMovements]
-    .filter((movement) => matchesDateValue(movement.createdAt, movementDateFilter))
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const hasMovementDateFilter = Boolean(movementDateFilter.from || movementDateFilter.to);
+  const partsQueryParams = useMemo(() => partListParams(query, partPage), [partPage, query]);
+  const partsQuery = useInventoryPartsQuery(partsQueryParams);
+  const movementsQuery = useInventoryMovementsQuery();
+  const { createPart, updatePart, deletePart, createMovement } = useInventoryMutations();
+  const inventoryItems = partsQuery.data?.items ?? EMPTY_PARTS;
+  const visibleParts = inventoryItems.filter((item) => partMatchesSearch(item, query));
+  const inventoryMovements = movementsQuery.data ?? EMPTY_MOVEMENTS;
+  const lowStock = visibleParts.filter((item) => item.quantity <= 0);
+  const inventoryValueSyp = visibleParts.reduce(
+    (sum, item) => sum + item.quantity * item.costSyp,
+    0,
+  );
+  const inventoryValueUsd = visibleParts.reduce(
+    (sum, item) => sum + item.quantity * item.costUsd,
+    0,
+  );
+  const sortedMovements = useMemo(
+    () =>
+      [...inventoryMovements]
+        .filter((movement) => matchesDateFilter(movement.createdAt, movementDateFilter))
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    [inventoryMovements, movementDateFilter],
+  );
   const movementPages = Math.max(1, Math.ceil(sortedMovements.length / PAGE_SIZE));
   const currentMovementPage = Math.min(movementPage, movementPages);
   const visibleMovements = sortedMovements.slice(
     (currentMovementPage - 1) * PAGE_SIZE,
     currentMovementPage * PAGE_SIZE,
   );
-  const partPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const currentPartPage = Math.min(partPage, partPages);
-  const visibleParts = filtered.slice(
-    (currentPartPage - 1) * PAGE_SIZE,
-    currentPartPage * PAGE_SIZE,
-  );
-  const hasMovementDateFilter = Boolean(movementDateFilter.from || movementDateFilter.to);
+  const totalParts = query.trim() ? visibleParts.length : (partsQuery.data?.total ?? inventoryItems.length);
+  const currentPartPage = partsQuery.data?.page ?? partPage;
+  const isPartSubmitting = createPart.isPending || updatePart.isPending;
+  const partSubmitError =
+    createPart.error ? getApiErrorMessage(createPart.error) :
+    updatePart.error ? getApiErrorMessage(updatePart.error) :
+    undefined;
 
-  useEffect(() => {
-    writeStoredList(INVENTORY_ITEMS_STORAGE_KEY, inventoryItems);
-  }, [inventoryItems]);
-
-  useEffect(() => {
-    writeStoredList(INVENTORY_MOVEMENTS_STORAGE_KEY, inventoryMovements);
-  }, [inventoryMovements]);
-
-  function upsertPart(item: InventoryItem) {
-    const isEdit = Boolean(editingPart);
-    setInventoryItems((current) => {
-      const exists = current.some((part) => part.id === item.id);
-      return exists
-        ? current.map((part) => (part.id === item.id ? item : part))
-        : [item, ...current];
-    });
-
-    if (!editingPart) {
-      setInventoryMovements((current) => [
-        {
-          id: `MOV-${Date.now().toString().slice(-5)}`,
-          partId: item.id,
-          partName: item.name,
-          type: "supply",
-          quantity: item.stock,
-          owner: "إدارة المخزون",
-          createdAt: new Date().toISOString().slice(0, 10),
-          reference: "إضافة قطعة",
-        },
-        ...current,
-      ]);
-    }
-    toast.success(
-      isEdit ? "تم تعديل القطعة" : "تمت إضافة القطعة",
-      isEdit ? `تم حفظ تعديلات ${item.name} بنجاح.` : `تمت إضافة ${item.name} إلى المخزون بنجاح.`,
-    );
+  function closePartModal() {
+    setShowSupplyModal(false);
+    setEditingPart(null);
   }
 
-  function adjustQuantity(partId: string, movementType: InventoryMovement["type"], quantity: number) {
+  function savePart(input: InventoryPartInput) {
+    if (editingPart) {
+      updatePart.mutate(
+        { id: editingPart.id, input },
+        {
+          onSuccess: () => {
+            toast.success("تم تعديل القطعة", `تم حفظ تعديلات ${input.name} بنجاح.`);
+            closePartModal();
+          },
+          onError: (error) => toast.error("تعذر تعديل القطعة", getApiErrorMessage(error)),
+        },
+      );
+      return;
+    }
+
+    createPart.mutate(input, {
+      onSuccess: () => {
+        toast.success("تمت إضافة القطعة", `تمت إضافة ${input.name} إلى المخزون بنجاح.`);
+        closePartModal();
+        setPartPage(1);
+      },
+      onError: (error) => toast.error("تعذر إضافة القطعة", getApiErrorMessage(error)),
+    });
+  }
+
+  function adjustQuantity(partId: string, movementType: InventoryMovementType, quantity: number) {
     const movementPart = inventoryItems.find((item) => item.id === partId);
     if (!movementPart) return;
 
-    const movementLabel = INVENTORY_MOVEMENT_LABELS[movementType].label;
-
-    setInventoryItems((current) =>
-      current.map((item) => {
-        if (item.id !== partId) return item;
-        const nextStock = Math.max(0, item.stock + quantity);
-        return { ...item, stock: nextStock, lastMove: movementLabel };
-      }),
-    );
-
-    setInventoryMovements((current) => [
+    createMovement.mutate(
       {
-        id: `MOV-${Date.now().toString().slice(-5)}`,
-        partId: movementPart.id,
-        partName: movementPart.name,
-        type: movementType,
+        partId,
+        movementType,
         quantity,
-        owner: "إدارة المخزون",
-        createdAt: new Date().toISOString().slice(0, 10),
-        reference: movementType === "supply" ? "تعديل كمية - توريد" : "تعديل كمية - تسوية",
+        reference: movementReference(movementType),
       },
-      ...current,
-    ]);
-    toast.success("تم تعديل الكمية", `تم تسجيل حركة ${movementLabel} للقطعة ${movementPart.name}.`);
+      {
+        onSuccess: () =>
+          toast.success(
+            "تم تعديل الكمية",
+            `تم تسجيل حركة ${INVENTORY_MOVEMENT_LABELS[movementType].label} للقطعة ${movementPart.name}.`,
+          ),
+        onError: (error) => toast.error("تعذر تعديل الكمية", getApiErrorMessage(error)),
+      },
+    );
   }
 
   return (
@@ -143,19 +191,19 @@ export function InventoryScreen({ section = "parts" }: { section?: string }) {
         title={isMovement ? "حركة المخزون" : "قطع الغيار"}
         subtitle="إدارة مخزون قطع الصيانة، حدود النقص، ومتابعة الصرف والتوريد."
       />
+
       {showSupplyModal || editingPart ? (
         <PartFormModal
           initialPart={editingPart}
-          onClose={() => {
-            setShowSupplyModal(false);
-            setEditingPart(null);
-          }}
-          onSave={upsertPart}
+          submitting={isPartSubmitting}
+          submitError={partSubmitError}
+          onClose={closePartModal}
+          onSave={savePart}
         />
       ) : null}
       {showQuantityModal ? (
         <QuantityAdjustmentModal
-          items={inventoryItems}
+          items={visibleParts}
           onClose={() => setShowQuantityModal(false)}
           onSave={adjustQuantity}
         />
@@ -174,11 +222,18 @@ export function InventoryScreen({ section = "parts" }: { section?: string }) {
         <ConfirmToast
           title="تأكيد حذف القطعة"
           message={`هل تريد حذف القطعة ${partToDelete.name} من جدول قطع الغيار؟`}
+          isLoading={deletePart.isPending}
           onCancel={() => setPartToDelete(null)}
           onConfirm={() => {
-            setInventoryItems((current) => current.filter((item) => item.id !== partToDelete.id));
-            toast.success("تم حذف القطعة", `تم حذف ${partToDelete.name} من المخزون بنجاح.`);
-            setPartToDelete(null);
+            const deletedPart = partToDelete;
+            deletePart.mutate(deletedPart.id, {
+              onSuccess: () => {
+                toast.success("تم حذف القطعة", `تم حذف ${deletedPart.name} من المخزون بنجاح.`);
+                setPartToDelete(null);
+                if (visibleParts.length <= 1 && partPage > 1) setPartPage((current) => current - 1);
+              },
+              onError: (error) => toast.error("تعذر حذف القطعة", getApiErrorMessage(error)),
+            });
           }}
         />
       ) : null}
@@ -190,34 +245,34 @@ export function InventoryScreen({ section = "parts" }: { section?: string }) {
                 { label: "إجمالي الحركات", value: String(inventoryMovements.length), icon: "clipboard" },
                 {
                   label: "حركات التوريد",
-                  value: String(inventoryMovements.filter((item) => item.type === "supply").length),
+                  value: String(inventoryMovements.filter((item) => item.movementType === "supply").length),
                   icon: "plus",
                   tone: "success",
                 },
                 {
                   label: "حركات الصرف",
-                  value: String(inventoryMovements.filter((item) => item.type === "withdraw").length),
+                  value: String(inventoryMovements.filter((item) => item.movementType === "withdraw").length),
                   icon: "box",
                   tone: "gold",
                 },
                 {
                   label: "التسويات",
-                  value: String(inventoryMovements.filter((item) => item.type === "adjustment").length),
+                  value: String(inventoryMovements.filter((item) => item.movementType === "adjustment").length),
                   icon: "clipboard",
                   tone: "info",
                 },
               ]
             : [
-                { label: "إجمالي القطع", value: String(inventoryItems.length), icon: "box" },
+                { label: "إجمالي القطع", value: String(totalParts), icon: "box" },
                 { label: "تنبيهات نقص", value: String(lowStock.length), icon: "alert", tone: "danger" },
                 {
                   label: "قيمة المخزون بالليرة",
-                  value: formatMoney(inventoryValue, "SYP"),
+                  value: formatMoney(inventoryValueSyp, "SYP"),
                   icon: "wallet",
                 },
                 {
                   label: "قيمة المخزون بالدولار",
-                  value: formatMoney(inventoryValue / USD_TO_SYP_RATE, "USD", { decimals: 2 }),
+                  value: formatMoney(inventoryValueUsd, "USD", { decimals: 2 }),
                   icon: "wallet",
                 },
               ]
@@ -241,7 +296,13 @@ export function InventoryScreen({ section = "parts" }: { section?: string }) {
               <Icon name="plus" size={18} />
               إضافة قطعة
             </Button>
-            <Button type="button" variant="outline" className="shrink-0" onClick={() => setShowQuantityModal(true)}>
+            <Button
+              type="button"
+              variant="outline"
+              className="shrink-0"
+              onClick={() => setShowQuantityModal(true)}
+              disabled={!visibleParts.length}
+            >
               <Icon name="pencil" size={18} />
               تعديل الكمية
             </Button>
@@ -276,27 +337,38 @@ export function InventoryScreen({ section = "parts" }: { section?: string }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {visibleMovements.map((movement) => (
-                    <tr key={movement.id} className="border-b border-border last:border-0 hover:bg-gold-soft">
-                      <td className="px-4 py-4 font-bold text-gold">{movement.id}</td>
-                      <td className="px-4 py-4 text-content">
-                        <div className="font-medium">{movement.partName}</div>
-                        <div className="text-xs text-content-muted" dir="ltr">{movement.partId}</div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <Badge tone={INVENTORY_MOVEMENT_LABELS[movement.type].tone} dot>
-                          {INVENTORY_MOVEMENT_LABELS[movement.type].label}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-4 text-content-muted">{movement.quantity}</td>
-                      <td className="px-4 py-4 text-content-muted">{movement.owner}</td>
-                      <td className="px-4 py-4 text-content-muted">{movement.reference}</td>
-                      <td className="px-4 py-4 text-content-muted">{movement.createdAt}</td>
-                    </tr>
-                  ))}
+                  {movementsQuery.isLoading ? (
+                    Array.from({ length: PAGE_SIZE }).map((_, index) => (
+                      <SkeletonRow key={index} cols={7} />
+                    ))
+                  ) : visibleMovements.length ? (
+                    visibleMovements.map((movement) => (
+                      <tr key={movement.id} className="border-b border-border last:border-0 hover:bg-gold-soft">
+                        <td className="px-4 py-4 font-bold text-gold">{movement.id}</td>
+                        <td className="px-4 py-4 text-content">
+                          <div className="font-medium">{movement.partName || "قطعة غير محددة"}</div>
+                          <div className="text-xs text-content-muted" dir="ltr">
+                            {movement.partId}
+                          </div>
+                        </td>
+                        <td className="px-4 py-4">
+                          <Badge tone={INVENTORY_MOVEMENT_LABELS[movement.movementType].tone} dot>
+                            {INVENTORY_MOVEMENT_LABELS[movement.movementType].label}
+                          </Badge>
+                        </td>
+                        <td className="px-4 py-4 text-content-muted">{movement.quantity}</td>
+                        <td className="px-4 py-4 text-content-muted">{movement.owner}</td>
+                        <td className="px-4 py-4 text-content-muted">{movement.reference || "غير محدد"}</td>
+                        <td className="px-4 py-4 text-content-muted">{movement.createdAt || "غير محدد"}</td>
+                      </tr>
+                    ))
+                  ) : null}
                 </tbody>
               </table>
             </div>
+            {!movementsQuery.isLoading && visibleMovements.length === 0 ? (
+              <EmptyState title="لا توجد حركات مخزون مطابقة." />
+            ) : null}
             <TablePagination
               page={currentMovementPage}
               total={sortedMovements.length}
@@ -309,7 +381,7 @@ export function InventoryScreen({ section = "parts" }: { section?: string }) {
       ) : (
         <Card className="overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="min-w-[840px] w-full text-right text-sm">
+            <table className="min-w-[900px] w-full text-right text-sm">
               <thead>
                 <tr className="bg-surface-2 text-content-muted">
                   {["الكود", "القطعة", "المتوفر", "الموقع", "القيمة بالليرة", "القيمة بالدولار", "الإجراءات"].map(
@@ -322,53 +394,67 @@ export function InventoryScreen({ section = "parts" }: { section?: string }) {
                 </tr>
               </thead>
               <tbody>
-                {visibleParts.map((item) => (
-                  <tr key={item.id} className="border-b border-border last:border-0 hover:bg-gold-soft">
-                    <td className="px-4 py-4 font-bold text-gold">{item.id}</td>
-                    <td className="px-4 py-4 text-content">{item.name}</td>
-                    <td className="px-4 py-4">
-                      <Badge tone={item.stock <= item.minStock ? "danger" : "success"} dot>
-                        {item.stock}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-4 text-content-muted">{item.location}</td>
-                    <td className="px-4 py-4 text-content-muted">
-                      {formatMoney(item.stock * item.unitCost, "SYP")}
-                    </td>
-                    <td className="px-4 py-4 text-content-muted">
-                      {formatMoney((item.stock * item.unitCost) / USD_TO_SYP_RATE, "USD", { decimals: 2 })}
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="flex items-center justify-start gap-2" dir="rtl">
-                        <button
-                          type="button"
-                          aria-label={`تعديل ${item.id}`}
-                          title="تعديل"
-                          onClick={() => setEditingPart(item)}
-                          className="rounded-sm p-1.5 text-content-muted hover:bg-surface-2"
-                        >
-                          <Icon name="pencil" size={18} />
-                        </button>
-                        <button
-                          type="button"
-                          aria-label={`حذف ${item.id}`}
-                          title="حذف"
-                          onClick={() => setPartToDelete(item)}
-                          className="rounded-sm p-1.5 text-danger hover:bg-danger-soft"
-                        >
-                          <Icon name="trash" size={18} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {partsQuery.isLoading ? (
+                  Array.from({ length: PAGE_SIZE }).map((_, index) => (
+                    <SkeletonRow key={index} cols={7} />
+                  ))
+                ) : visibleParts.length ? (
+                  visibleParts.map((item) => (
+                    <tr key={item.id} className="border-b border-border last:border-0 hover:bg-gold-soft">
+                      <td className="px-4 py-4">
+                        <div className="font-bold text-gold">{item.sparePartNumber}</div>
+                        <div className="text-xs text-content-muted" dir="ltr">
+                          {item.sku || "بدون SKU"}
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 text-content">{item.name}</td>
+                      <td className="px-4 py-4">
+                        <Badge tone={item.quantity <= 0 ? "danger" : "success"} dot>
+                          {item.quantity}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-4 text-content-muted">{item.shelfLocation || "غير محدد"}</td>
+                      <td className="px-4 py-4 text-content-muted">
+                        {formatMoney(item.quantity * item.costSyp, "SYP")}
+                      </td>
+                      <td className="px-4 py-4 text-content-muted">
+                        {formatMoney(item.quantity * item.costUsd, "USD", { decimals: 2 })}
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="flex items-center justify-start gap-2" dir="rtl">
+                          <button
+                            type="button"
+                            aria-label={`تعديل ${item.sparePartNumber}`}
+                            title="تعديل"
+                            onClick={() => setEditingPart(item)}
+                            className="rounded-sm p-1.5 text-content-muted hover:bg-surface-2"
+                          >
+                            <Icon name="pencil" size={18} />
+                          </button>
+                          <button
+                            type="button"
+                            aria-label={`حذف ${item.sparePartNumber}`}
+                            title="حذف"
+                            onClick={() => setPartToDelete(item)}
+                            className="rounded-sm p-1.5 text-danger hover:bg-danger-soft"
+                          >
+                            <Icon name="trash" size={18} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : null}
               </tbody>
             </table>
           </div>
+          {!partsQuery.isLoading && visibleParts.length === 0 ? (
+            <EmptyState title="لا توجد قطع غيار مطابقة." />
+          ) : null}
           <TablePagination
             page={currentPartPage}
-            total={filtered.length}
-            pageSize={PAGE_SIZE}
+            total={totalParts}
+            pageSize={partsQuery.data?.pageSize ?? PAGE_SIZE}
             onPage={setPartPage}
             itemLabel="قطعة"
           />
