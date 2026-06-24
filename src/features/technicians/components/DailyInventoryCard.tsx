@@ -58,7 +58,6 @@ export function DailyInventoryCard({
           <div>
             <div className="text-sm font-bold text-content">{entry.technicianName}</div>
             <div className="mt-0.5 flex items-center gap-1 text-xs text-content-muted">
-              <Icon name="phone" size={13} />
               <span dir="ltr">{entry.technicianPhone}</span>
             </div>
           </div>

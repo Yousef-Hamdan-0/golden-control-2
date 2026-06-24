@@ -24,9 +24,51 @@ export interface InventoryDailyListParams {
 
 export interface InventoryPartListParams {
   name?: string;
-  sku?: string;
+  sparePartNumber?: string;
   page?: number;
   pageSize?: number;
+}
+
+function normalizePartSearch(value: string) {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function partNumberMatches(part: InventoryPart, query: string) {
+  return normalizePartSearch(part.sparePartNumber).includes(normalizePartSearch(query));
+}
+
+async function fetchPartsPage(params: InventoryPartListParams): Promise<InventoryListResult<InventoryPart>> {
+  const page = params.page ?? 1;
+  const pageSize = params.pageSize ?? PAGE_SIZE;
+  const searchParams = new URLSearchParams({
+    page: String(page),
+    limit: String(pageSize),
+  });
+  if (params.name?.trim()) searchParams.set("name", params.name.trim());
+  if (params.sparePartNumber?.trim()) {
+    searchParams.set("sparePartNumber", params.sparePartNumber.trim());
+  }
+
+  const payload = await requestAuthenticatedApi(
+    `${API_ENDPOINTS.inventory.parts}?${searchParams}`,
+    { method: "GET" },
+  );
+
+  return normalizeInventoryPartList(payload, { page, pageSize });
+}
+
+async function fetchAllParts(params: Omit<InventoryPartListParams, "page">) {
+  const pageSize = params.pageSize ?? PAGE_SIZE;
+  const firstPage = await fetchPartsPage({ ...params, page: 1, pageSize });
+  const byId = new Map(firstPage.items.map((part) => [part.id, part]));
+  const pages = Math.max(1, Math.ceil(firstPage.total / firstPage.pageSize));
+
+  for (let page = 2; page <= pages; page += 1) {
+    const result = await fetchPartsPage({ ...params, page, pageSize });
+    result.items.forEach((part) => byId.set(part.id, part));
+  }
+
+  return Array.from(byId.values());
 }
 
 export const inventoryRepository = {
@@ -35,9 +77,14 @@ export const inventoryRepository = {
   ): Promise<InventoryListResult<ReturnType<typeof normalizeInventoryDailyList>["items"][number]>> {
     const page = params.page ?? 1;
     const pageSize = params.pageSize ?? PAGE_SIZE;
-    const payload = await requestAuthenticatedApi(API_ENDPOINTS.inventory.daily, {
-      method: "GET",
+    const searchParams = new URLSearchParams({
+      page: String(page),
+      limit: String(pageSize),
     });
+    const payload = await requestAuthenticatedApi(
+      `${API_ENDPOINTS.inventory.daily}?${searchParams}`,
+      { method: "GET" },
+    );
 
     return normalizeInventoryDailyList(payload, page, pageSize);
   },
@@ -60,19 +107,32 @@ export const inventoryRepository = {
   async listParts(params: InventoryPartListParams = {}): Promise<InventoryListResult<InventoryPart>> {
     const page = params.page ?? 1;
     const pageSize = params.pageSize ?? PAGE_SIZE;
-    const searchParams = new URLSearchParams({
-      page: String(page),
-      limit: String(pageSize),
-    });
-    if (params.name?.trim()) searchParams.set("name", params.name.trim());
-    if (params.sku?.trim()) searchParams.set("sku", params.sku.trim());
+    const sparePartNumber = params.sparePartNumber?.trim();
 
-    const payload = await requestAuthenticatedApi(
-      `${API_ENDPOINTS.inventory.parts}?${searchParams}`,
-      { method: "GET" },
-    );
+    if (sparePartNumber) {
+      let matches: InventoryPart[];
+      try {
+        const allParts = await fetchAllParts({ sparePartNumber, pageSize });
+        matches = allParts.filter((part) => partNumberMatches(part, sparePartNumber));
+      } catch {
+        matches = [];
+      }
 
-    return normalizeInventoryPartList(payload, { page, pageSize });
+      if (!matches.length) {
+        const allParts = await fetchAllParts({ pageSize });
+        matches = allParts.filter((part) => partNumberMatches(part, sparePartNumber));
+      }
+      const start = (page - 1) * pageSize;
+
+      return {
+        items: matches.slice(start, start + pageSize),
+        total: matches.length,
+        page,
+        pageSize,
+      };
+    }
+
+    return fetchPartsPage(params);
   },
 
   async getPartById(id: string): Promise<InventoryPart> {

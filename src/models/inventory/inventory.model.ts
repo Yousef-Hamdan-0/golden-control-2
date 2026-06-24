@@ -170,16 +170,28 @@ export function normalizeInventoryDailyLog(payload: unknown): InventoryDailyLog 
 export function normalizeInventoryDailyList(payload: unknown, page: number, pageSize: number) {
   const root = isRecord(payload) ? payload : {};
   const data = dataRecord(payload);
+  const pagination = isRecord(root.pagination)
+    ? root.pagination
+    : isRecord(data.pagination)
+      ? data.pagination
+      : {};
   const items = arrayData(payload, "technicians", "items", "logs").map(normalizeInventoryDailyLog);
   const total = numberValue(
     isRecord(data) ? data.totalTechnicians : undefined,
     root.totalTechnicians,
+    pagination.total,
+    pagination.totalItems,
+    pagination.totalCount,
     items.length,
   );
   const start = (page - 1) * pageSize;
+  const isServerPaginated =
+    isRecord(root.pagination) ||
+    isRecord(data.pagination) ||
+    (total > items.length && items.length <= pageSize);
 
   return {
-    items: items.slice(start, start + pageSize),
+    items: isServerPaginated ? items : items.slice(start, start + pageSize),
     total,
     page,
     pageSize,

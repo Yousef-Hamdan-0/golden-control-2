@@ -41,6 +41,7 @@ export const queryKeys = {
   inventory: {
     all: ["inventory"] as const,
     daily: (params: InventoryDailyListParams) => ["inventory", "daily", params] as const,
+    dailyAll: () => ["inventory", "daily", "all"] as const,
     parts: (params: InventoryPartListParams) => ["inventory", "parts", params] as const,
     movements: () => ["inventory", "movements"] as const,
   },

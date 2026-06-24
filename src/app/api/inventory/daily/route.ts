@@ -4,7 +4,8 @@ import { proxyInventoryRequest } from "@/app/api/inventory/inventory-proxy.helpe
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  return proxyInventoryRequest(request, BACKEND_API_ENDPOINTS.inventory.daily);
+  const search = new URL(request.url).search;
+  return proxyInventoryRequest(request, `${BACKEND_API_ENDPOINTS.inventory.daily}${search}`);
 }
 
 export async function POST(request: Request) {

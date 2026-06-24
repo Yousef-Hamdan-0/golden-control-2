@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Modal } from "@/components/ui/Modal";
@@ -9,25 +9,57 @@ import { useToast } from "@/components/ui/Toast";
 import { getApiErrorMessage } from "@/helpers/api.helper";
 import { Icon } from "@/lib/icons";
 import { PAGE_SIZE } from "@/config/constants";
+import { useUsersQuery } from "@/features/users/hooks/use-users-query";
 import { DailyInventoryCard } from "@/features/technicians/components/DailyInventoryCard";
 import { DailyInventoryForm } from "@/features/technicians/components/DailyInventoryForm";
 import {
+  useDailyInventoryAllQuery,
   useDailyInventoryMutations,
-  useDailyInventoryQuery,
 } from "@/features/technicians/hooks/use-daily-inventory";
 
 export function DailyInventoryScreen() {
   const toast = useToast();
   const [page, setPage] = useState(1);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const { data, isLoading, isError, refetch } = useDailyInventoryQuery(page);
+  const dailyInventoryQuery = useDailyInventoryAllQuery();
+  const availableTechniciansQuery = useUsersQuery({
+    role: "technician",
+    status: "available",
+    pageSize: 1000,
+  });
   const { remove } = useDailyInventoryMutations();
 
-  const total = data?.total ?? 0;
-  const pageSize = data?.pageSize ?? PAGE_SIZE;
+  const availableTechnicianIds = useMemo(
+    () => new Set((availableTechniciansQuery.data?.items ?? []).map((technician) => technician.id)),
+    [availableTechniciansQuery.data?.items],
+  );
+  const activeInventoryItems = useMemo(
+    () =>
+      (dailyInventoryQuery.data?.items ?? []).filter((entry) =>
+        availableTechnicianIds.has(entry.technicianId),
+      ),
+    [availableTechnicianIds, dailyInventoryQuery.data?.items],
+  );
+  const total = activeInventoryItems.length;
+  const pageSize = PAGE_SIZE;
   const pages = Math.max(1, Math.ceil(total / pageSize));
-  const start = total === 0 ? 0 : (page - 1) * pageSize + 1;
-  const end = Math.min(page * pageSize, total);
+  const currentPage = Math.min(page, pages);
+  const start = total === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const end = Math.min(currentPage * pageSize, total);
+  const visibleItems = activeInventoryItems.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize,
+  );
+  const isLoading = dailyInventoryQuery.isLoading || availableTechniciansQuery.isLoading;
+  const isError = dailyInventoryQuery.isError || availableTechniciansQuery.isError;
+  const refetch = () => {
+    void dailyInventoryQuery.refetch();
+    void availableTechniciansQuery.refetch();
+  };
+
+  useEffect(() => {
+    if (page > pages) setPage(pages);
+  }, [page, pages]);
 
   return (
     <div className="space-y-6">
@@ -75,7 +107,7 @@ export function DailyInventoryScreen() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {data?.items.map((entry) => (
+          {visibleItems.map((entry) => (
             <DailyInventoryCard
               key={entry.id}
               entry={entry}
@@ -90,21 +122,26 @@ export function DailyInventoryScreen() {
               }
             />
           ))}
+          {visibleItems.length === 0 ? (
+            <Card className="p-6 text-center text-sm text-content-muted md:col-span-2 xl:col-span-3">
+              لا توجد سجلات مخزون يومي لفنيين متاحين حالياً.
+            </Card>
+          ) : null}
         </div>
       )}
 
       {/* Pagination */}
       <div className="flex items-center justify-between gap-3 text-sm text-content-muted">
         <span>
-          عرض {start}-{end} من أصل {total} فني
+          عرض {start}-{end} من أصل {total} سجل
         </span>
         <div className="flex items-center gap-1">
           <Button
             variant="outline"
             size="sm"
             className="h-8 w-8 px-0"
-            disabled={page <= 1}
-            onClick={() => setPage(page - 1)}
+            disabled={currentPage <= 1}
+            onClick={() => setPage(currentPage - 1)}
             aria-label="السابق"
           >
             <Icon name="chevron-right" size={16} />
@@ -113,7 +150,7 @@ export function DailyInventoryScreen() {
             <Button
               key={i}
               size="sm"
-              variant={i + 1 === page ? "primary" : "outline"}
+              variant={i + 1 === currentPage ? "primary" : "outline"}
               className="h-8 w-8 px-0"
               onClick={() => setPage(i + 1)}
             >
@@ -124,8 +161,8 @@ export function DailyInventoryScreen() {
             variant="outline"
             size="sm"
             className="h-8 w-8 px-0"
-            disabled={page >= pages}
-            onClick={() => setPage(page + 1)}
+            disabled={currentPage >= pages}
+            onClick={() => setPage(currentPage + 1)}
             aria-label="التالي"
           >
             <Icon name="chevron-left" size={16} />

@@ -36,37 +36,38 @@ import type {
 const EMPTY_PARTS: InventoryPart[] = [];
 const EMPTY_MOVEMENTS: InventoryMovementLog[] = [];
 
-function hasArabic(value: string) {
-  return /[\u0600-\u06FF]/.test(value);
-}
-
-function isGeneratedPartCode(value: string) {
-  return /^SP-\d+/i.test(value.trim());
+function isSparePartNumberSearch(value: string) {
+  const term = value.trim();
+  return /^SP[-\s]?\d+/i.test(term) || /^\d+$/.test(term);
 }
 
 function normalizeSearch(value: string) {
   return value.trim().toLowerCase();
 }
 
+function normalizePartNumberSearch(value: string) {
+  return normalizeSearch(value).replace(/[^a-z0-9]/g, "");
+}
+
 function partMatchesSearch(part: InventoryPart, query: string) {
   const term = normalizeSearch(query);
   if (!term) return true;
 
-  return [part.name, part.sparePartNumber, part.sku].some((value) =>
-    normalizeSearch(value).includes(term),
+  return (
+    normalizeSearch(part.name).includes(term) ||
+    normalizePartNumberSearch(part.sparePartNumber).includes(normalizePartNumberSearch(term))
   );
 }
 
 function partListParams(query: string, page: number) {
   const search = query.trim();
-  const params: { page: number; pageSize: number; name?: string; sku?: string } = {
+  const params: { page: number; pageSize: number; name?: string; sparePartNumber?: string } = {
     page,
     pageSize: PAGE_SIZE,
   };
   if (!search) return params;
-  if (isGeneratedPartCode(search)) return params;
-  if (hasArabic(search)) params.name = search;
-  else params.sku = search;
+  if (isSparePartNumberSearch(search)) params.sparePartNumber = search;
+  else params.name = search;
   return params;
 }
 
@@ -125,7 +126,11 @@ export function InventoryScreen({ section = "parts" }: { section?: string }) {
     (currentMovementPage - 1) * PAGE_SIZE,
     currentMovementPage * PAGE_SIZE,
   );
-  const totalParts = query.trim() ? visibleParts.length : (partsQuery.data?.total ?? inventoryItems.length);
+  const hasServerPartPagination = (partsQuery.data?.total ?? 0) > inventoryItems.length;
+  const displayedTotalParts =
+    query.trim() && !hasServerPartPagination
+      ? visibleParts.length
+      : (partsQuery.data?.total ?? inventoryItems.length);
   const currentPartPage = partsQuery.data?.page ?? partPage;
   const isPartSubmitting = createPart.isPending || updatePart.isPending;
   const partSubmitError =
@@ -263,7 +268,7 @@ export function InventoryScreen({ section = "parts" }: { section?: string }) {
                 },
               ]
             : [
-                { label: "إجمالي القطع", value: String(totalParts), icon: "box" },
+                { label: "إجمالي القطع", value: String(displayedTotalParts), icon: "box" },
                 { label: "تنبيهات نقص", value: String(lowStock.length), icon: "alert", tone: "danger" },
                 {
                   label: "قيمة المخزون بالليرة",
@@ -287,7 +292,7 @@ export function InventoryScreen({ section = "parts" }: { section?: string }) {
               setQuery(event.target.value);
               setPartPage(1);
             }}
-            placeholder="بحث باسم القطعة أو الكود"
+            placeholder="بحث باسم القطعة أو رقم القطعة"
             aria-label="بحث المخزون"
             className="md:flex-1"
           />
@@ -384,7 +389,7 @@ export function InventoryScreen({ section = "parts" }: { section?: string }) {
             <table className="min-w-[900px] w-full text-right text-sm">
               <thead>
                 <tr className="bg-surface-2 text-content-muted">
-                  {["الكود", "القطعة", "المتوفر", "الموقع", "القيمة بالليرة", "القيمة بالدولار", "الإجراءات"].map(
+                  {["رقم القطعة", "القطعة", "المتوفر", "الموقع", "القيمة بالليرة", "القيمة بالدولار", "الإجراءات"].map(
                     (header) => (
                       <th key={header} className="px-4 py-3 font-medium">
                         {header}
@@ -403,9 +408,6 @@ export function InventoryScreen({ section = "parts" }: { section?: string }) {
                     <tr key={item.id} className="border-b border-border last:border-0 hover:bg-gold-soft">
                       <td className="px-4 py-4">
                         <div className="font-bold text-gold">{item.sparePartNumber}</div>
-                        <div className="text-xs text-content-muted" dir="ltr">
-                          {item.sku || "بدون SKU"}
-                        </div>
                       </td>
                       <td className="px-4 py-4 text-content">{item.name}</td>
                       <td className="px-4 py-4">
@@ -453,7 +455,7 @@ export function InventoryScreen({ section = "parts" }: { section?: string }) {
           ) : null}
           <TablePagination
             page={currentPartPage}
-            total={totalParts}
+            total={displayedTotalParts}
             pageSize={partsQuery.data?.pageSize ?? PAGE_SIZE}
             onPage={setPartPage}
             itemLabel="قطعة"

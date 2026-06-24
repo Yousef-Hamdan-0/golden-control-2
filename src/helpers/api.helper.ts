@@ -87,5 +87,12 @@ export function getApiErrorMessage(error: unknown) {
     return "تعذر توليد رقم طلب فريد من الخادم. حاول مرة أخرى بعد لحظة، وإذا تكرر الخطأ يحتاج مولّد أرقام الطلبات في الـ Backend إلى تعديل.";
   }
 
+  if (
+    error.message.includes("يوجد مخزون يومي لهذا الفني") ||
+    error.message.toLowerCase().includes("daily inventory")
+  ) {
+    return "يوجد مخزون يومي لهذا الفني حالياً. احذف السجل الموجود أولاً ثم أعد المحاولة.";
+  }
+
   return error.message;
 }

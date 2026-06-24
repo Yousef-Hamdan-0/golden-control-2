@@ -53,7 +53,7 @@ export function QuantityAdjustmentModal({
                 {selectedPart?.name ?? "لا توجد قطعة"}
               </div>
               <div className="mt-1 text-xs text-content-muted" dir="ltr">
-                {selectedPart?.sparePartNumber || selectedPart?.sku || selectedPart?.id || "-"}
+                {selectedPart?.sparePartNumber || selectedPart?.id || "-"}
               </div>
             </div>
             <Badge tone={INVENTORY_MOVEMENT_LABELS[movementType].tone} dot>
@@ -65,11 +65,11 @@ export function QuantityAdjustmentModal({
         <div className="grid gap-4 md:grid-cols-3">
           <Field label="القطعة">
             <Select value={partId} onChange={(event) => setPartId(event.target.value)}>
-                  {items.map((item) => (
-                    <option key={item.id} value={item.id}>
-                  {item.name} - {item.sparePartNumber || item.sku}
-                    </option>
-                  ))}
+              {items.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name} - {item.sparePartNumber || item.id}
+                </option>
+              ))}
             </Select>
           </Field>
           <Field label="نوع الحركة">

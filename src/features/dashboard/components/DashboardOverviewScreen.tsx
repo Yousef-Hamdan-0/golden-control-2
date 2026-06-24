@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { ConfirmToast } from "@/components/ui/ConfirmToast";
 import { Input } from "@/components/ui/Input";
+import { OverlayPortal } from "@/components/ui/OverlayPortal";
 import { Select } from "@/components/ui/Select";
 import { TablePagination } from "@/components/ui/TablePagination";
 import { Textarea } from "@/components/ui/Textarea";
@@ -230,28 +231,29 @@ function OrderModal({
   const isEdit = mode === "edit";
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="recent-order-modal-title"
-      className="fixed inset-0 z-[100] flex min-h-screen w-screen items-center justify-center bg-black/60 px-4 py-6"
-    >
-      <Card className="max-h-[90vh] w-full max-w-2xl overflow-y-auto">
-        <div className="flex items-center justify-between border-b border-border px-5 py-4">
-          <div className="text-right">
-            <h3 id="recent-order-modal-title" className="font-heading text-lg font-bold text-content">
-              {isEdit ? "تعديل الطلب" : "تفاصيل الطلب"}
-            </h3>
-            <p className="text-sm text-content-muted">#{order.id}</p>
+    <OverlayPortal>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="recent-order-modal-title"
+        className="fixed inset-0 z-[100] flex h-dvh min-h-dvh w-dvw items-center justify-center overflow-y-auto overscroll-contain bg-black/60 px-4 py-6"
+      >
+        <Card className="max-h-[calc(100dvh-3rem)] w-full max-w-2xl overflow-y-auto">
+          <div className="flex items-center justify-between border-b border-border px-5 py-4">
+            <div className="text-right">
+              <h3 id="recent-order-modal-title" className="font-heading text-lg font-bold text-content">
+                {isEdit ? "تعديل الطلب" : "تفاصيل الطلب"}
+              </h3>
+              <p className="text-sm text-content-muted">#{order.id}</p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-sm px-3 py-1.5 text-sm text-content-muted transition hover:bg-surface-2"
+            >
+              إغلاق
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-sm px-3 py-1.5 text-sm text-content-muted transition hover:bg-surface-2"
-          >
-            إغلاق
-          </button>
-        </div>
 
         <div className="grid gap-4 p-5 md:grid-cols-2">
           <label className="space-y-1.5 text-right text-sm text-content-muted">
@@ -347,7 +349,8 @@ function OrderModal({
           onConfirm={() => onSave(pendingEditOrder)}
         />
       ) : null}
-    </div>
+      </div>
+    </OverlayPortal>
   );
 }
 
