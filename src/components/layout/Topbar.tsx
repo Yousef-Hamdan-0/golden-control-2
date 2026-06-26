@@ -50,6 +50,11 @@ export function Topbar({
 
   useEffect(() => {
     setDateLabel(todayLabel());
+    const interval = window.setInterval(() => {
+      setDateLabel(todayLabel());
+    }, 60_000);
+
+    return () => window.clearInterval(interval);
   }, []);
 
   return (

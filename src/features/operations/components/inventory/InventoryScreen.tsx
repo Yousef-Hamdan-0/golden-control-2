@@ -12,6 +12,7 @@ import { useToast } from "@/components/ui/Toast";
 import { getApiErrorMessage } from "@/helpers/api.helper";
 import { Icon } from "@/lib/icons";
 import { formatMoney } from "@/lib/format/currency";
+import { localDateKey } from "@/lib/format/date";
 import { PAGE_SIZE } from "@/config/constants";
 import type { DateFilter } from "../../types";
 import { INVENTORY_MOVEMENT_LABELS } from "../../constants";
@@ -72,7 +73,7 @@ function partListParams(query: string, page: number) {
 }
 
 function matchesDateFilter(value: string, filter: DateFilter) {
-  const date = value.slice(0, 10);
+  const date = localDateKey(value);
   if (filter.from && date < filter.from) return false;
   if (filter.to && date > filter.to) return false;
   return true;
@@ -364,7 +365,9 @@ export function InventoryScreen({ section = "parts" }: { section?: string }) {
                         <td className="px-4 py-4 text-content-muted">{movement.quantity}</td>
                         <td className="px-4 py-4 text-content-muted">{movement.owner}</td>
                         <td className="px-4 py-4 text-content-muted">{movement.reference || "غير محدد"}</td>
-                        <td className="px-4 py-4 text-content-muted">{movement.createdAt || "غير محدد"}</td>
+                        <td className="px-4 py-4 text-content-muted">
+                          {localDateKey(movement.createdAt, "غير محدد")}
+                        </td>
                       </tr>
                     ))
                   ) : null}

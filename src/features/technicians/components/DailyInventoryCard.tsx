@@ -4,15 +4,18 @@ import { useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { ConfirmToast } from "@/components/ui/ConfirmToast";
 import { Icon } from "@/lib/icons";
+import { localDateKey, localDateTimeKey } from "@/lib/format/date";
 import type { DailyInventory } from "@/models/technician/daily-inventory.model";
 
 function formatCreated(iso: string): string {
-  const d = new Date(iso);
-  const date = `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(
-    d.getDate(),
-  ).padStart(2, "0")}`;
-  const h = d.getHours();
-  const m = String(d.getMinutes()).padStart(2, "0");
+  if (!iso.includes("T") && !iso.includes(" ")) return localDateKey(iso, "غير محدد").replaceAll("-", "/");
+  const d = new Date(iso.includes("T") ? iso : iso.replace(" ", "T"));
+  if (Number.isNaN(d.getTime())) return localDateKey(iso, "غير محدد").replaceAll("-", "/");
+  const [datePart, timePart = "00:00"] = localDateTimeKey(d).split(" ");
+  const date = datePart.replaceAll("-", "/");
+  const [hour = "0", minute = "00"] = timePart.split(":");
+  const h = Number(hour);
+  const m = minute.padStart(2, "0");
   const period = h < 12 ? "ص" : "م";
   const hour12 = h % 12 === 0 ? 12 : h % 12;
   return `${hour12}:${m}${period} ${date}`;

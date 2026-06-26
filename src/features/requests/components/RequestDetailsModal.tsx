@@ -10,6 +10,7 @@ import { PAGE_SIZE } from "@/config/constants";
 import { getApiErrorMessage } from "@/helpers/api.helper";
 import { Icon } from "@/lib/icons";
 import { formatMoney } from "@/lib/format/currency";
+import { localDateKey } from "@/lib/format/date";
 import { invoiceService } from "@/services/invoice.service";
 import {
   PAYMENT_LABELS,
@@ -72,7 +73,7 @@ function statusHistoryOwner(
 }
 
 function formatDate(value: string) {
-  return value ? value.slice(0, 10) : "غير محدد";
+  return localDateKey(value, "غير محدد");
 }
 
 function invoiceDisplayNumber(invoice: Invoice) {
@@ -444,15 +445,7 @@ export function RequestDetailsModal({
                     <Icon name="plus" size={16} />
                     إنشاء فاتورة
                   </Button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={showCreateInvoice}
-                    className="text-sm font-medium text-content-muted underline-offset-4 hover:text-gold hover:underline"
-                  >
-                    شروط إنشاء الفاتورة
-                  </button>
-                )}
+                ) : null}
               </div>
 
               {invoiceNotice ? (

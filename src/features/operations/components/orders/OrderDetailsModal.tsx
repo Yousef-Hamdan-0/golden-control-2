@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/Card";
 import { Modal } from "@/components/ui/Modal";
 import { Icon } from "@/lib/icons";
 import { formatMoney } from "@/lib/format/currency";
+import { localDateTimeKey } from "@/lib/format/date";
 import { CURRENT_USER } from "@/lib/auth/current-user";
 import type { Order, Invoice } from "../../types";
 import { INVOICES } from "../../data/seed";
@@ -306,7 +307,7 @@ export function OrderDetailsModal({
                     status: "completed",
                     note: `تم إنهاء الطلب وإنشاء الفاتورة ${nextInvoice.id}.`,
                     owner: CURRENT_USER.fullName,
-                    date: new Date().toISOString().slice(0, 16).replace("T", " "),
+                    date: localDateTimeKey(new Date()),
                   },
                 ],
               });

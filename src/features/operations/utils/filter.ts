@@ -1,8 +1,8 @@
 import type { Order, DateFilter } from "../types";
+import { localDateKey } from "@/lib/format/date";
 
 export function normalizeDateKey(value: string): string {
-  if (!value) return "";
-  return value.slice(0, 10);
+  return localDateKey(value);
 }
 
 export function matchesDateValue(value: string, filter: DateFilter): boolean {

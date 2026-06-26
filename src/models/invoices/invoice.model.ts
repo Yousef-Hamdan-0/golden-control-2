@@ -11,6 +11,7 @@ import type {
 } from "@/features/operations/types";
 import { USD_TO_SYP_RATE } from "@/features/operations/constants";
 import type { Currency } from "@/lib/format/currency";
+import { localDateKey } from "@/lib/format/date";
 
 type JsonRecord = Record<string, unknown>;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -73,7 +74,7 @@ function numberValue(...values: unknown[]): number {
 
 function dateValue(...values: unknown[]) {
   const value = stringValue(...values);
-  return value.length > 10 ? value.slice(0, 10) : value;
+  return localDateKey(value);
 }
 
 function dataRecord(payload: unknown) {

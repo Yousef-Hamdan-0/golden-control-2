@@ -6,6 +6,7 @@ import { Field, Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { Select } from "@/components/ui/Select";
 import { formatMoney } from "@/lib/format/currency";
+import { todayDateKey } from "@/lib/format/date";
 import type { Invoice, InvoicePayment, PaymentMethod, PaymentCurrency } from "../../types";
 import { USD_TO_SYP_RATE } from "../../constants";
 import { remaining, convertPaymentToInvoiceCurrency } from "../../utils/invoice";
@@ -40,7 +41,7 @@ export function AddPaymentModal({
         convertedAmount,
         currency,
         method,
-        paidAt: new Date().toISOString().slice(0, 10),
+        paidAt: todayDateKey(),
       },
       convertedAmount,
     );

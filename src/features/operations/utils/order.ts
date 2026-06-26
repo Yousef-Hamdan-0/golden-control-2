@@ -2,6 +2,7 @@ import type { Order, MaintenanceOrderDraft, DeviceDraft, OrderAudioRecord, Order
 import { SILENT_AUDIO_SRC } from "../constants";
 import { ORDERS, TECHNICIANS } from "../data/seed";
 import { CURRENT_USER } from "@/lib/auth/current-user";
+import { localDateKey } from "@/lib/format/date";
 
 export const EMPTY_DEVICE: DeviceDraft = {
   type: "",
@@ -44,7 +45,7 @@ export function orderToDraft(order: Order): MaintenanceOrderDraft {
     devices: order.devices?.length ? order.devices : [fallbackDevice],
     faultDescription: order.faultDescription ?? "",
     notes: order.notes ?? "",
-    visitDate: order.visitDate.slice(0, 10),
+    visitDate: localDateKey(order.visitDate),
     visitTime: order.visitDate.slice(11, 16),
     priority: order.priority,
     technician: order.technician === "غير محدد" ? "" : order.technician,
@@ -124,7 +125,7 @@ export function getOrderAudioRecords(order: Order): OrderAudioRecord[] {
 export function getOrderStatusHistory(order: Order): OrderStatusHistoryItem[] {
   if (order.statusHistory?.length) return order.statusHistory;
 
-  const createdDate = order.visitDate.slice(0, 10);
+  const createdDate = localDateKey(order.visitDate);
   return [
     {
       id: `HIS-${order.id}-1`,

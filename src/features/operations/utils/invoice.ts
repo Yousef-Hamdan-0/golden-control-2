@@ -1,6 +1,7 @@
 import type { Invoice, InvoicePart, InvoicePayment, Order, PaymentStatus, PaymentCurrency } from "../types";
 import type { Currency } from "@/lib/format/currency";
 import type { RepairRequest } from "@/models/requests/request.model";
+import { todayDateKey } from "@/lib/format/date";
 import { USD_TO_SYP_RATE } from "../constants";
 import { TECHNICIAN_PHONE_BY_NAME } from "../data/seed";
 import { INVOICES } from "../data/seed";
@@ -102,7 +103,7 @@ export function normalizeInvoice(invoice: Partial<Invoice>): Invoice {
     paymentMethod,
     total,
     paid,
-    issuedAt: invoice.issuedAt || new Date().toISOString().slice(0, 10),
+    issuedAt: invoice.issuedAt || todayDateKey(),
     warrantyDuration: invoice.warrantyDuration || "غير محددة",
     locationURL: invoice.locationURL ?? "",
     centerPullItems: invoice.centerPullItems ?? "",
@@ -117,7 +118,7 @@ export function normalizeInvoice(invoice: Partial<Invoice>): Invoice {
           currency: payment.currency === "USD" ? "USD" as const : "SYP" as const,
           method: payment.method === "sham-cash" ? "sham-cash" as const : "cash" as const,
           dollarExchangeRate: Math.max(0, Number(payment.dollarExchangeRate) || 0) || undefined,
-          paidAt: payment.paidAt || invoice.issuedAt || new Date().toISOString().slice(0, 10),
+          paidAt: payment.paidAt || invoice.issuedAt || todayDateKey(),
         }))
       : [],
   };
@@ -143,7 +144,7 @@ export function createInvoiceDraftFromOrder(order: Order, invoices: Invoice[]): 
     paymentMethod: "cash",
     total: order.total,
     paid,
-    issuedAt: new Date().toISOString().slice(0, 10),
+    issuedAt: todayDateKey(),
     warrantyDuration: "",
     locationURL: order.locationUrl ?? "",
     centerPullItems: order.status === "incompleted" ? order.device : "",
@@ -168,7 +169,7 @@ export function createInvoiceDraftFromOrder(order: Order, invoices: Invoice[]): 
               convertedAmount: paid,
               currency: "SYP",
               method: "cash",
-              paidAt: new Date().toISOString().slice(0, 10),
+              paidAt: todayDateKey(),
             },
           ]
         : [],
@@ -197,7 +198,7 @@ export function createInvoiceDraftFromRequest(request: RepairRequest): Invoice {
     paymentMethod: "cash",
     total: 0,
     paid: 0,
-    issuedAt: new Date().toISOString().slice(0, 10),
+    issuedAt: todayDateKey(),
     warrantyDuration: "",
     locationURL: request.customer.locationLink,
     centerPullItems: request.status === "pulltocenter" ? deviceSummary || request.faultDescription : "",

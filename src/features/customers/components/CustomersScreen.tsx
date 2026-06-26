@@ -12,6 +12,7 @@ import { useToast } from "@/components/ui/Toast";
 import { PAGE_SIZE } from "@/config/constants";
 import { getApiErrorMessage } from "@/helpers/api.helper";
 import { Icon } from "@/lib/icons";
+import { localDateKey } from "@/lib/format/date";
 import {
   CustomerInputSchema,
   createCustomerUpdatePatch,
@@ -95,8 +96,7 @@ function fieldErrorsFromIssues(
 }
 
 function formatApiDate(value: string) {
-  if (!value) return "غير محدد";
-  return value.slice(0, 10);
+  return localDateKey(value, "غير محدد");
 }
 
 function requestStatusLabel(request: CustomerRepairRequest) {

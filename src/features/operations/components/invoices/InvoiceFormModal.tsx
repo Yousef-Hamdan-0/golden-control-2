@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/Textarea";
 import { Icon } from "@/lib/icons";
 import { formatMoney } from "@/lib/format/currency";
 import type { Currency } from "@/lib/format/currency";
+import { todayDateKey } from "@/lib/format/date";
 import { cn } from "@/lib/utils/cn";
 import { PAGE_SIZE } from "@/config/constants";
 import { useInventoryAllPartsQuery } from "@/features/inventory/hooks/use-inventory";
@@ -187,7 +188,7 @@ export function InvoiceFormModal({
                 convertedAmount: paid,
                 currency: draft.currency,
                 method: draft.paymentMethod,
-                paidAt: draft.issuedAt || new Date().toISOString().slice(0, 10),
+                paidAt: draft.issuedAt || todayDateKey(),
               },
             ]
           : [];
@@ -204,7 +205,7 @@ export function InvoiceFormModal({
       paid,
       status: nextStatus,
       requestNumber: draft.requestNumber,
-      issuedAt: draft.issuedAt || new Date().toISOString().slice(0, 10),
+      issuedAt: draft.issuedAt || todayDateKey(),
       warrantyDuration: draft.warrantyDuration || "غير محددة",
       centerPullItems: draft.centerPullItems ?? "",
       notes: draft.notes ?? "",

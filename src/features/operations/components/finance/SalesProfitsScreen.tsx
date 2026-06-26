@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { Icon, type IconName } from "@/lib/icons";
 import { formatMoney } from "@/lib/format/currency";
+import { localDateKey } from "@/lib/format/date";
 import { cn } from "@/lib/utils/cn";
 import {
   EXPENSES_STORAGE_KEY,
@@ -93,7 +94,7 @@ function toSyp(value: number, currency: "SYP" | "USD") {
 }
 
 function matchesDate(date: string, filters: DateParts) {
-  const [year, month, day] = date.slice(0, 10).split("-");
+  const [year, month, day] = localDateKey(date).split("-");
   return (
     (!filters.year || filters.year === year) &&
     (!filters.month || filters.month === String(Number(month))) &&
@@ -256,7 +257,7 @@ export function SalesProfitsScreen() {
     () =>
       Array.from(
         new Set([
-          ...invoices.map((invoice) => invoice.issuedAt.slice(0, 4)),
+          ...invoices.map((invoice) => localDateKey(invoice.issuedAt).slice(0, 4)),
           ...expenses.map((expense) => expense.month.slice(0, 4)),
         ]),
       ).sort((a, b) => Number(b) - Number(a)),
@@ -278,7 +279,7 @@ export function SalesProfitsScreen() {
     const inventoryCost = new Map(inventoryItems.map((item) => [item.id, item.unitCost]));
     const dateKeys = Array.from(
       new Set([
-        ...filteredInvoices.map((invoice) => invoice.issuedAt.slice(0, 10)),
+        ...filteredInvoices.map((invoice) => localDateKey(invoice.issuedAt)),
         ...expenseRecords.map((expense) => `${expense.month}-01`),
       ]),
     ).sort();
@@ -286,7 +287,7 @@ export function SalesProfitsScreen() {
 
     const invoiceTotals = (date?: string) => {
       const scoped = date
-        ? filteredInvoices.filter((invoice) => invoice.issuedAt.slice(0, 10) === date)
+        ? filteredInvoices.filter((invoice) => localDateKey(invoice.issuedAt) === date)
         : filteredInvoices;
       const sales = scoped.reduce(
         (sum, invoice) => sum + toSyp(invoice.total, invoice.currency),
