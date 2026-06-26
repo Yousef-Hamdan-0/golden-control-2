@@ -2,6 +2,10 @@ import type { UserListParams } from "@/repositories/user.repository";
 import type { CustomerListParams } from "@/repositories/customer.repository";
 import type { RequestListParams } from "@/repositories/request.repository";
 import type {
+  InvoiceListParams,
+  PaymentListParams,
+} from "@/repositories/invoice.repository";
+import type {
   InventoryDailyListParams,
   InventoryPartListParams,
 } from "@/repositories/inventory.repository";
@@ -30,6 +34,13 @@ export const queryKeys = {
     detail: (id: string) => ["requests", "detail", id] as const,
     statusHistory: (id: string) => ["requests", "status-history", id] as const,
   },
+  invoices: {
+    all: ["invoices"] as const,
+    list: (params: InvoiceListParams) => ["invoices", "list", params] as const,
+    detail: (id: string) => ["invoices", "detail", id] as const,
+    payments: (invoiceId: string, params: PaymentListParams) =>
+      ["invoices", "payments", invoiceId, params] as const,
+  },
   settings: {
     all: ["settings"] as const,
     detail: () => ["settings", "detail"] as const,
@@ -43,6 +54,7 @@ export const queryKeys = {
     daily: (params: InventoryDailyListParams) => ["inventory", "daily", params] as const,
     dailyAll: () => ["inventory", "daily", "all"] as const,
     parts: (params: InventoryPartListParams) => ["inventory", "parts", params] as const,
+    partsAll: () => ["inventory", "parts", "all"] as const,
     movements: () => ["inventory", "movements"] as const,
   },
 };

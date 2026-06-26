@@ -40,12 +40,14 @@ export const PAYMENT_LABELS: Record<PaymentStatus, string> = {
   paid: "مدفوعة بالكامل",
   partial: "مدفوعة جزئياً",
   unpaid: "غير مدفوعة",
+  refunded: "مسترجعة",
 };
 
 export const PAYMENT_TONE: Record<PaymentStatus, BadgeTone> = {
   paid: "success",
   partial: "gold",
   unpaid: "danger",
+  refunded: "danger",
 };
 
 export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {

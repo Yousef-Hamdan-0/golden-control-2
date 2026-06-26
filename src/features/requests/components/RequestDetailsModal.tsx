@@ -1,11 +1,35 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { Spinner } from "@/components/ui/Spinner";
+import { useToast } from "@/components/ui/Toast";
+import { PAGE_SIZE } from "@/config/constants";
+import { getApiErrorMessage } from "@/helpers/api.helper";
 import { Icon } from "@/lib/icons";
+import { formatMoney } from "@/lib/format/currency";
+import { invoiceService } from "@/services/invoice.service";
+import {
+  PAYMENT_LABELS,
+  PAYMENT_TONE,
+} from "@/features/operations/constants";
+import type { Invoice, InvoicePayment } from "@/features/operations/types";
+import {
+  createInvoiceDraftFromRequest,
+  remaining,
+} from "@/features/operations/utils/invoice";
 import { DetailItem } from "@/features/operations/components/shared/DetailItem";
+import { InvoiceDetailsModal } from "@/features/operations/components/invoices/InvoiceDetailsModal";
+import { InvoiceFormModal } from "@/features/operations/components/invoices/InvoiceFormModal";
+import { AddPaymentModal } from "@/features/operations/components/invoices/AddPaymentModal";
+import {
+  useInvoiceMutations,
+  useInvoicePaymentsQuery,
+  useInvoiceQuery,
+  useInvoicesQuery,
+} from "@/features/invoices/hooks/use-invoices";
 import {
   REQUEST_PRIORITY_LABELS,
   REQUEST_STATUS_LABELS,
@@ -21,6 +45,29 @@ function fallback(value: string, empty = "غير محدد") {
 
 function formatDate(value: string) {
   return value ? value.slice(0, 10) : "غير محدد";
+}
+
+function invoiceDisplayNumber(invoice: Invoice) {
+  return invoice.invoiceNumber || invoice.id;
+}
+
+function canCreateInvoiceForRequest(request: RepairRequest) {
+  return ["new", "underrepair", "incompleted"].includes(request.status);
+}
+
+function canAddPayment(invoice: Invoice) {
+  return invoice.status !== "paid" && invoice.status !== "refunded" && !invoice.returned;
+}
+
+function saveInvoicePdf(response: Awaited<ReturnType<typeof invoiceService.downloadPdf>>, invoice: Invoice) {
+  const url = URL.createObjectURL(response.blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = response.fileName ?? `${invoiceDisplayNumber(invoice)}.pdf`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
 }
 
 export function RequestDetailsModal({
@@ -46,13 +93,120 @@ export function RequestDetailsModal({
   onEdit: (request: RepairRequest) => void;
   onDownloadPdf: (request: RepairRequest) => void;
 }) {
+  const toast = useToast();
+  const [showInvoiceForm, setShowInvoiceForm] = useState(false);
+  const [invoiceNotice, setInvoiceNotice] = useState<string | null>(null);
+  const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null);
+  const [paymentInvoice, setPaymentInvoice] = useState<Invoice | null>(null);
+  const [invoicePdfId, setInvoicePdfId] = useState<string | null>(null);
+  const { create, recordPayment } = useInvoiceMutations();
+  const invoiceListParams = useMemo(
+    () => ({
+      page: 1,
+      pageSize: PAGE_SIZE,
+      requestId: request?.id ?? "",
+      type: "all" as const,
+      status: "all" as const,
+    }),
+    [request?.id],
+  );
+  const invoicesQuery = useInvoicesQuery(invoiceListParams, Boolean(request?.id));
+  const invoices = invoicesQuery.data?.items ?? [];
+  const hasPaidInvoice = invoices.some((invoice) => invoice.status === "paid");
+  const canCreateRequestInvoice = Boolean(
+    request && canCreateInvoiceForRequest(request) && !hasPaidInvoice,
+  );
+  const invoiceDraft = useMemo(
+    () => (request ? createInvoiceDraftFromRequest(request) : null),
+    [request],
+  );
+  const invoiceDetailQuery = useInvoiceQuery(viewingInvoice?.id ?? null);
+  const invoicePaymentsQuery = useInvoicePaymentsQuery(viewingInvoice?.id ?? null);
+  const activeViewingInvoice = invoiceDetailQuery.data ?? viewingInvoice;
+  const activeViewingInvoiceWithPayments = activeViewingInvoice
+    ? { ...activeViewingInvoice, payments: invoicePaymentsQuery.data ?? activeViewingInvoice.payments }
+    : null;
+
+  function showCreateInvoice() {
+    if (!request || !invoiceDraft) return;
+    setInvoiceNotice(null);
+
+    if (!canCreateInvoiceForRequest(request)) {
+      setInvoiceNotice("إنشاء الفاتورة متاح للطلب الجديد أو قيد الإصلاح أو غير مكتمل الدفع.");
+      return;
+    }
+
+    if (hasPaidInvoice) {
+      setInvoiceNotice("توجد فاتورة مدفوعة بالكامل لهذا الطلب، لذلك لا يمكن إنشاء فاتورة جديدة.");
+      return;
+    }
+
+    create.reset();
+    setShowInvoiceForm(true);
+  }
+
+  function saveInvoice(nextInvoice: Invoice) {
+    if (!request) return;
+
+    create.mutate(nextInvoice, {
+      onSuccess: (createdInvoice) => {
+        const linkedInvoice = {
+          ...createdInvoice,
+          orderId: createdInvoice.orderId || request.id,
+          requestNumber: createdInvoice.requestNumber || request.requestNumber,
+        };
+        setShowInvoiceForm(false);
+        setViewingInvoice(linkedInvoice);
+        void invoicesQuery.refetch();
+        toast.success("تم إنشاء الفاتورة", `تم إنشاء الفاتورة ${invoiceDisplayNumber(linkedInvoice)} للطلب ${request.requestNumber}.`);
+      },
+      onError: (error) => toast.error("تعذر إنشاء الفاتورة", getApiErrorMessage(error)),
+    });
+  }
+
+  function savePayment(payment: InvoicePayment, convertedAmount: number) {
+    if (!paymentInvoice) return;
+    void convertedAmount;
+
+    recordPayment.mutate(
+      {
+        invoiceId: paymentInvoice.id,
+        amount: payment.amount,
+        currency: payment.currency,
+        paymentMethod: payment.method,
+      },
+      {
+        onSuccess: () => {
+          setPaymentInvoice(null);
+          void invoicesQuery.refetch();
+          toast.success("تم حفظ الدفعة", `تم تسجيل دفعة على الفاتورة ${invoiceDisplayNumber(paymentInvoice)} بنجاح.`);
+        },
+        onError: (error) => toast.error("تعذر حفظ الدفعة", getApiErrorMessage(error)),
+      },
+    );
+  }
+
+  async function downloadInvoicePdf(invoice: Invoice) {
+    setInvoicePdfId(invoice.id);
+    try {
+      const response = await invoiceService.downloadPdf(invoice.id);
+      saveInvoicePdf(response, invoice);
+      toast.success("تم تنزيل PDF", `تم تجهيز الفاتورة ${invoiceDisplayNumber(invoice)}.`);
+    } catch (error) {
+      toast.error("تعذر تنزيل PDF", getApiErrorMessage(error));
+    } finally {
+      setInvoicePdfId(null);
+    }
+  }
+
   return (
-    <Modal
-      title={request ? `تفاصيل الطلب ${request.requestNumber}` : "تفاصيل الطلب"}
-      description="بيانات العميل، الأجهزة، الحالة، سجل الحالة، والتسجيلات الصوتية."
-      onClose={onClose}
-      widthClassName="max-w-5xl"
-    >
+    <>
+      <Modal
+        title={request ? `تفاصيل الطلب ${request.requestNumber}` : "تفاصيل الطلب"}
+        description="بيانات العميل، الأجهزة، الحالة، سجل الحالة، الفواتير، والتسجيلات الصوتية."
+        onClose={onClose}
+        widthClassName="max-w-5xl"
+      >
       <div className="space-y-5 p-5">
         {errorMessage ? (
           <div className="rounded-md border border-danger/30 bg-danger-soft p-3 text-sm text-danger">
@@ -244,6 +398,117 @@ export function RequestDetailsModal({
             </section>
 
             <section className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h3 className="font-heading text-base font-bold text-gold">سجل الفواتير</h3>
+                {canCreateRequestInvoice ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={create.isPending}
+                    onClick={showCreateInvoice}
+                  >
+                    <Icon name="plus" size={16} />
+                    إنشاء فاتورة
+                  </Button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={showCreateInvoice}
+                    className="text-sm font-medium text-content-muted underline-offset-4 hover:text-gold hover:underline"
+                  >
+                    شروط إنشاء الفاتورة
+                  </button>
+                )}
+              </div>
+
+              {invoiceNotice ? (
+                <div className="rounded-md border border-gold/30 bg-gold-soft p-3 text-sm font-medium text-gold-active">
+                  {invoiceNotice}
+                </div>
+              ) : null}
+              {invoicesQuery.isError ? (
+                <div className="rounded-md border border-danger/30 bg-danger-soft p-3 text-sm text-danger">
+                  تعذر تحميل سجل الفواتير. {getApiErrorMessage(invoicesQuery.error)}
+                </div>
+              ) : null}
+
+              <div className="overflow-x-auto rounded-md border border-border">
+                <table className="min-w-[820px] w-full text-right text-sm">
+                  <thead>
+                    <tr className="bg-surface-2 text-content-muted">
+                      {["رقم الفاتورة", "الحالة", "الإجمالي", "المدفوع", "المتبقي", "التاريخ", "إجراءات"].map((header) => (
+                        <th key={header} className="px-4 py-3 font-medium">
+                          {header}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {invoicesQuery.isLoading ? (
+                      <tr className="border-t border-border">
+                        <td className="px-4 py-6 text-center text-content-muted" colSpan={7}>
+                          جاري تحميل سجل الفواتير...
+                        </td>
+                      </tr>
+                    ) : invoices.length ? (
+                      invoices.map((invoice) => (
+                        <tr key={invoice.id} className="border-t border-border">
+                          <td className="px-4 py-3 font-bold text-gold" dir="ltr">
+                            {invoiceDisplayNumber(invoice)}
+                          </td>
+                          <td className="px-4 py-3">
+                            <Badge tone={PAYMENT_TONE[invoice.status]} dot>
+                              {PAYMENT_LABELS[invoice.status]}
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-3 text-content-muted">
+                            {formatMoney(invoice.total, invoice.currency)}
+                          </td>
+                          <td className="px-4 py-3 text-content-muted">
+                            {formatMoney(invoice.paid, invoice.currency)}
+                          </td>
+                          <td className="px-4 py-3 text-content-muted">
+                            {formatMoney(remaining(invoice.total, invoice.paid), invoice.currency)}
+                          </td>
+                          <td className="px-4 py-3 text-content-muted">{formatDate(invoice.issuedAt)}</td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center justify-start gap-2" dir="rtl">
+                              <button
+                                type="button"
+                                aria-label={`تفاصيل الفاتورة ${invoiceDisplayNumber(invoice)}`}
+                                title="تفاصيل الفاتورة"
+                                onClick={() => setViewingInvoice(invoice)}
+                                className="rounded-sm p-1.5 text-content-muted hover:bg-surface-2"
+                              >
+                                <Icon name="eye" size={18} />
+                              </button>
+                              <button
+                                type="button"
+                                aria-label={`دفعة ${invoiceDisplayNumber(invoice)}`}
+                                title="إضافة دفعة"
+                                disabled={!canAddPayment(invoice)}
+                                onClick={() => setPaymentInvoice(invoice)}
+                                className="rounded-sm p-1.5 text-content-muted hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
+                              >
+                                <Icon name="plus" size={18} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr className="border-t border-border">
+                        <td className="px-4 py-6 text-center text-content-muted" colSpan={7}>
+                          لا توجد فواتير مرتبطة بهذا الطلب حالياً.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section className="space-y-3">
               <h3 className="font-heading text-base font-bold text-gold">التسجيلات الصوتية</h3>
               <div className="divide-y divide-border rounded-md border border-border">
                 {request.records.length ? (
@@ -268,6 +533,41 @@ export function RequestDetailsModal({
           </>
         ) : null}
       </div>
-    </Modal>
+      </Modal>
+
+      {showInvoiceForm && invoiceDraft ? (
+        <InvoiceFormModal
+          invoice={invoiceDraft}
+          mode="create"
+          lockRequest
+          onClose={() => setShowInvoiceForm(false)}
+          onSave={saveInvoice}
+          submitting={create.isPending}
+          submitError={create.error ? getApiErrorMessage(create.error) : undefined}
+        />
+      ) : null}
+      {activeViewingInvoiceWithPayments ? (
+        <InvoiceDetailsModal
+          invoice={activeViewingInvoiceWithPayments}
+          onClose={() => setViewingInvoice(null)}
+          onAddPayment={
+            canAddPayment(activeViewingInvoiceWithPayments)
+              ? () => setPaymentInvoice(activeViewingInvoiceWithPayments)
+              : undefined
+          }
+          onDownloadPdf={downloadInvoicePdf}
+          downloadingPdf={invoicePdfId === activeViewingInvoiceWithPayments.id}
+        />
+      ) : null}
+      {paymentInvoice ? (
+        <AddPaymentModal
+          invoice={paymentInvoice}
+          onClose={() => setPaymentInvoice(null)}
+          onSave={savePayment}
+          submitting={recordPayment.isPending}
+          submitError={recordPayment.error ? getApiErrorMessage(recordPayment.error) : undefined}
+        />
+      ) : null}
+    </>
   );
 }

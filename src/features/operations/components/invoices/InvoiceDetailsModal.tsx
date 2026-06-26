@@ -34,12 +34,16 @@ export function InvoiceDetailsModal({
   onClose,
   onAddPayment,
   onReturnInvoice,
+  onDownloadPdf,
+  downloadingPdf = false,
 }: {
   invoice: Invoice;
   order?: Order;
   onClose: () => void;
   onAddPayment?: () => void;
   onReturnInvoice?: (invoice: Invoice) => void;
+  onDownloadPdf?: (invoice: Invoice) => void;
+  downloadingPdf?: boolean;
 }) {
   const [paymentsPage, setPaymentsPage] = useState(1);
   const paymentPages = Math.max(1, Math.ceil(invoice.payments.length / PAGE_SIZE));
@@ -52,14 +56,15 @@ export function InvoiceDetailsModal({
 
   return (
     <Modal
-      title={`تفاصيل الفاتورة ${invoice.id}`}
+      title={`تفاصيل الفاتورة ${invoice.invoiceNumber || invoice.id}`}
       description="معاينة كاملة للفاتورة والقطع والدفعات قبل الطباعة أو التحميل."
       onClose={onClose}
       widthClassName="max-w-6xl"
     >
       <div className="space-y-5 p-5">
-        <div className="grid gap-3 md:grid-cols-3">
-          <DetailItem label="رقم الفاتورة" value={invoice.id} ltr />
+        <div className="grid gap-3 md:grid-cols-4">
+          <DetailItem label="رقم الفاتورة" value={invoice.invoiceNumber || invoice.id} ltr />
+          <DetailItem label="رقم الطلب" value={invoice.requestNumber || invoice.orderId} ltr />
           <DetailItem label="نوع الفاتورة" value={typeLabel(invoice.type)} />
           <DetailItem
             label="حالة الفاتورة"
@@ -214,19 +219,26 @@ export function InvoiceDetailsModal({
             <Icon name="file" size={18} />
             طباعة الفاتورة
           </Button>
-          <Button type="button" variant="outline" onClick={() => downloadInvoicePdf(invoice)}>
-            <Icon name="file" size={18} />
-            تحميل PDF
-          </Button>
           <Button
             type="button"
-            variant="danger"
-            disabled={invoice.returned}
-            onClick={() => onReturnInvoice?.(invoice)}
+            variant="outline"
+            disabled={downloadingPdf}
+            onClick={() => (onDownloadPdf ? onDownloadPdf(invoice) : downloadInvoicePdf(invoice))}
           >
-            <Icon name="arrow-left" size={18} />
-            إرجاع الفاتورة
+            <Icon name="file" size={18} />
+            {downloadingPdf ? "جاري التحميل..." : "تحميل PDF"}
           </Button>
+          {onReturnInvoice ? (
+            <Button
+              type="button"
+              variant="danger"
+              disabled={invoice.returned}
+              onClick={() => onReturnInvoice(invoice)}
+            >
+              <Icon name="arrow-left" size={18} />
+              إرجاع الفاتورة
+            </Button>
+          ) : null}
         </div>
       </div>
     </Modal>

@@ -1,5 +1,6 @@
 import type { Invoice, InvoicePart, InvoicePayment, Order, PaymentStatus, PaymentCurrency } from "../types";
 import type { Currency } from "@/lib/format/currency";
+import type { RepairRequest } from "@/models/requests/request.model";
 import { USD_TO_SYP_RATE } from "../constants";
 import { TECHNICIAN_PHONE_BY_NAME } from "../data/seed";
 import { INVOICES } from "../data/seed";
@@ -48,7 +49,10 @@ export function normalizeInvoice(invoice: Partial<Invoice>): Invoice {
   const total = Number(invoice.total) || 0;
   const paid = Math.min(total, Math.max(0, Number(invoice.paid) || 0));
   const status: PaymentStatus =
-    invoice.status === "paid" || invoice.status === "partial" || invoice.status === "unpaid"
+    invoice.status === "paid" ||
+    invoice.status === "partial" ||
+    invoice.status === "unpaid" ||
+    invoice.status === "refunded"
       ? invoice.status
       : paid >= total && total > 0
         ? "paid"
@@ -61,23 +65,31 @@ export function normalizeInvoice(invoice: Partial<Invoice>): Invoice {
     Array.isArray(invoice.parts) && invoice.parts.length > 0
       ? invoice.parts.map((part, index) => ({
           id: part.id || `PRT-${index + 1}`,
+          sparePartId: part.sparePartId,
           name: part.name || "قطعة غير محددة",
           quantity: Math.max(1, Number(part.quantity) || 1),
           unitPrice: Math.max(0, Number(part.unitPrice) || 0),
+          currency: part.currency,
+          totalPrice: Math.max(0, Number(part.totalPrice) || 0),
         }))
       : [
           {
             id: `PRT-${(invoice.id ?? "0000").replace(/\D/g, "").slice(-4) || "0000"}`,
+            sparePartId: undefined,
             name: "أجور صيانة",
             quantity: 1,
             unitPrice: total,
+            currency,
+            totalPrice: total,
           },
         ];
   const technician = invoice.technician || "غير محدد";
 
   return {
     id: invoice.id || "INV-0000",
+    invoiceNumber: invoice.invoiceNumber,
     orderId: invoice.orderId || "ORD-0000",
+    requestNumber: invoice.requestNumber,
     type: invoice.type === "internal" ? "internal" : "external",
     client: invoice.client || "عميل غير محدد",
     clientPhone: invoice.clientPhone || "غير محدد",
@@ -103,6 +115,7 @@ export function normalizeInvoice(invoice: Partial<Invoice>): Invoice {
           convertedAmount: Math.max(0, Number(payment.convertedAmount ?? payment.amount) || 0),
           currency: payment.currency === "USD" ? "USD" as const : "SYP" as const,
           method: payment.method === "sham-cash" ? "sham-cash" as const : "cash" as const,
+          dollarExchangeRate: Math.max(0, Number(payment.dollarExchangeRate) || 0) || undefined,
           paidAt: payment.paidAt || invoice.issuedAt || new Date().toISOString().slice(0, 10),
         }))
       : [],
@@ -116,6 +129,7 @@ export function createInvoiceDraftFromOrder(order: Order, invoices: Invoice[]): 
   return {
     id: nextInvoiceId(invoices),
     orderId: order.id,
+    requestNumber: order.id,
     type: order.type,
     client: order.client,
     clientPhone: order.phone,
@@ -139,6 +153,8 @@ export function createInvoiceDraftFromOrder(order: Order, invoices: Invoice[]): 
         name: order.device,
         quantity: 1,
         unitPrice: order.total,
+        currency: "SYP",
+        totalPrice: order.total,
       },
     ],
     payments:
@@ -154,5 +170,46 @@ export function createInvoiceDraftFromOrder(order: Order, invoices: Invoice[]): 
             },
           ]
         : [],
+  };
+}
+
+export function createInvoiceDraftFromRequest(request: RepairRequest): Invoice {
+  const deviceSummary = request.devices
+    .map((device) => [device.deviceType, device.deviceName].filter(Boolean).join(" "))
+    .filter(Boolean)
+    .join("، ");
+
+  return {
+    id: `INV-${Date.now().toString().slice(-6)}`,
+    orderId: request.id,
+    requestNumber: request.requestNumber,
+    type: request.type,
+    client: request.customer.name,
+    clientPhone: request.customer.firstPhone,
+    clientPhone2: request.customer.secondPhone,
+    clientAddress: request.customer.address,
+    technician: request.technicianName || "غير محدد",
+    technicianPhone: "",
+    status: "partial",
+    currency: "SYP",
+    paymentMethod: "cash",
+    total: 0,
+    paid: 0,
+    issuedAt: new Date().toISOString().slice(0, 10),
+    warrantyDuration: "",
+    centerPullItems: request.status === "pulltocenter" ? deviceSummary || request.faultDescription : "",
+    notes: [request.faultDescription, request.notes].filter(Boolean).join("\n"),
+    returned: false,
+    parts: [
+      {
+        id: "",
+        sparePartId: "",
+        name: "",
+        quantity: 1,
+        unitPrice: 0,
+        currency: "SYP",
+      },
+    ],
+    payments: [],
   };
 }

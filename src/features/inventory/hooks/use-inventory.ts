@@ -27,6 +27,13 @@ export function useInventoryPartsQuery(params: InventoryPartListParams = {}) {
   });
 }
 
+export function useInventoryAllPartsQuery() {
+  return useQuery({
+    queryKey: queryKeys.inventory.partsAll(),
+    queryFn: () => inventoryService.listAllParts(),
+  });
+}
+
 export function useInventoryMovementsQuery() {
   return useQuery({
     queryKey: queryKeys.inventory.movements(),

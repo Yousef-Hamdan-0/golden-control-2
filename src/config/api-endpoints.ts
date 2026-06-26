@@ -30,6 +30,16 @@ export const API_ROUTES = {
       `/api/requests/${encodeURIComponent(id)}/status-history`,
     records: "/api/request/records",
   },
+  invoices: {
+    root: "/api/invoices",
+    byId: (id: string) => `/api/invoices/${encodeURIComponent(id)}`,
+    pdf: (id: string) => `/api/invoices/${encodeURIComponent(id)}/pdf`,
+  },
+  payments: {
+    root: "/api/payments",
+    byInvoice: (invoiceId: string) =>
+      `/api/payments/invoice/${encodeURIComponent(invoiceId)}`,
+  },
   inventory: {
     daily: "/api/inventory/daily",
     dailyById: (id: string) => `/api/inventory/daily/${encodeURIComponent(id)}`,
@@ -58,6 +68,8 @@ export const API_ENDPOINTS = {
   users: API_ROUTES.users,
   customers: API_ROUTES.customers,
   requests: API_ROUTES.requests,
+  invoices: API_ROUTES.invoices,
+  payments: API_ROUTES.payments,
   inventory: API_ROUTES.inventory,
   settings: API_ROUTES.settings,
 } as const;
@@ -85,6 +97,15 @@ export const BACKEND_API_ENDPOINTS = {
     statusHistory: (id: string) =>
       createApiUrl(API_ROUTES.requests.statusHistory(id)),
     records: createApiUrl(API_ROUTES.requests.records),
+  },
+  invoices: {
+    root: createApiUrl(API_ROUTES.invoices.root),
+    byId: (id: string) => createApiUrl(API_ROUTES.invoices.byId(id)),
+    pdf: (id: string) => createApiUrl(API_ROUTES.invoices.pdf(id)),
+  },
+  payments: {
+    root: createApiUrl(API_ROUTES.payments.root),
+    byInvoice: (invoiceId: string) => createApiUrl(API_ROUTES.payments.byInvoice(invoiceId)),
   },
   inventory: {
     daily: createApiUrl(API_ROUTES.inventory.daily),

@@ -26,6 +26,10 @@ export const inventoryService = {
     return inventoryRepository.listParts(params);
   },
 
+  listAllParts() {
+    return inventoryRepository.listAllParts();
+  },
+
   getPartById(id: string) {
     return inventoryRepository.getPartById(id);
   },

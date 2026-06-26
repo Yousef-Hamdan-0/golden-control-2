@@ -61,11 +61,24 @@ async function fetchAllParts(params: Omit<InventoryPartListParams, "page">) {
   const pageSize = params.pageSize ?? PAGE_SIZE;
   const firstPage = await fetchPartsPage({ ...params, page: 1, pageSize });
   const byId = new Map(firstPage.items.map((part) => [part.id, part]));
-  const pages = Math.max(1, Math.ceil(firstPage.total / firstPage.pageSize));
+  const knownPages =
+    firstPage.total > firstPage.items.length
+      ? Math.max(1, Math.ceil(firstPage.total / firstPage.pageSize))
+      : undefined;
+  let page = 2;
 
-  for (let page = 2; page <= pages; page += 1) {
+  while (
+    knownPages ? page <= knownPages : firstPage.items.length >= pageSize && page <= 100
+  ) {
     const result = await fetchPartsPage({ ...params, page, pageSize });
-    result.items.forEach((part) => byId.set(part.id, part));
+    let addedNewPart = false;
+    result.items.forEach((part) => {
+      if (!byId.has(part.id)) addedNewPart = true;
+      byId.set(part.id, part);
+    });
+
+    if (!knownPages && (!addedNewPart || result.items.length < pageSize)) break;
+    page += 1;
   }
 
   return Array.from(byId.values());
@@ -133,6 +146,10 @@ export const inventoryRepository = {
     }
 
     return fetchPartsPage(params);
+  },
+
+  async listAllParts(): Promise<InventoryPart[]> {
+    return fetchAllParts({ pageSize: PAGE_SIZE });
   },
 
   async getPartById(id: string): Promise<InventoryPart> {

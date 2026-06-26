@@ -15,10 +15,14 @@ export function AddPaymentModal({
   invoice,
   onClose,
   onSave,
+  submitting = false,
+  submitError,
 }: {
   invoice: Invoice;
   onClose: () => void;
   onSave: (payment: InvoicePayment, convertedAmount: number) => void;
+  submitting?: boolean;
+  submitError?: string;
 }) {
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState<PaymentMethod>("cash");
@@ -40,7 +44,6 @@ export function AddPaymentModal({
       },
       convertedAmount,
     );
-    onClose();
   }
 
   return (
@@ -51,6 +54,11 @@ export function AddPaymentModal({
       widthClassName="max-w-2xl"
     >
       <div className="space-y-4 p-5">
+        {submitError ? (
+          <div className="rounded-md border border-danger/30 bg-danger-soft p-3 text-sm text-danger">
+            {submitError}
+          </div>
+        ) : null}
         <div className="grid gap-3 md:grid-cols-2">
           <DetailItem label="رقم الفاتورة" value={invoice.id} ltr />
           <DetailItem
@@ -69,16 +77,25 @@ export function AddPaymentModal({
               value={amount}
               onChange={(event) => setAmount(event.target.value)}
               placeholder="0"
+              disabled={submitting}
             />
           </Field>
           <Field label="طريقة الدفع">
-            <Select value={method} onChange={(event) => setMethod(event.target.value as PaymentMethod)}>
+            <Select
+              value={method}
+              onChange={(event) => setMethod(event.target.value as PaymentMethod)}
+              disabled={submitting}
+            >
               <option value="cash">كاش</option>
               <option value="sham-cash">شام كاش</option>
             </Select>
           </Field>
           <Field label="نوع العملية">
-            <Select value={currency} onChange={(event) => setCurrency(event.target.value as PaymentCurrency)}>
+            <Select
+              value={currency}
+              onChange={(event) => setCurrency(event.target.value as PaymentCurrency)}
+              disabled={submitting}
+            >
               <option value="SYP">ليرة</option>
               <option value="USD">دولار</option>
             </Select>
@@ -89,11 +106,11 @@ export function AddPaymentModal({
           />
         </div>
         <div className="flex items-center justify-end gap-3 border-t border-border pt-4">
-          <Button type="button" variant="outline" onClick={onClose}>
+          <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>
             إلغاء
           </Button>
-          <Button type="button" onClick={save} disabled={numericAmount <= 0}>
-            حفظ الدفعة
+          <Button type="button" onClick={save} disabled={numericAmount <= 0 || submitting}>
+            {submitting ? "جاري الحفظ..." : "حفظ الدفعة"}
           </Button>
         </div>
       </div>

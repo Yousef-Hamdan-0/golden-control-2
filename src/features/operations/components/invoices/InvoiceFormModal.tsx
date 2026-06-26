@@ -12,6 +12,10 @@ import { Icon } from "@/lib/icons";
 import { formatMoney } from "@/lib/format/currency";
 import type { Currency } from "@/lib/format/currency";
 import { cn } from "@/lib/utils/cn";
+import { PAGE_SIZE } from "@/config/constants";
+import { useInventoryAllPartsQuery } from "@/features/inventory/hooks/use-inventory";
+import { useRequestsQuery } from "@/features/requests/hooks/use-requests";
+import type { RepairRequest } from "@/models/requests/request.model";
 import type { Invoice, InvoicePart, PaymentStatus, PaymentMethod } from "../../types";
 import { TECHNICIANS } from "../../data/seed";
 import { USD_TO_SYP_RATE } from "../../constants";
@@ -23,26 +27,70 @@ import {
 } from "../../utils/invoice";
 import { DetailItem } from "../shared/DetailItem";
 
+function requestOptionLabel(request: RepairRequest) {
+  const customer = request.customer.name || "عميل غير محدد";
+  return `${request.requestNumber || request.id} - ${customer}`;
+}
+
 export function InvoiceFormModal({
   invoice,
   mode = "edit",
   onClose,
   onSave,
+  submitting = false,
+  submitError,
+  lockRequest = false,
 }: {
   invoice: Invoice;
   mode?: "create" | "edit";
   onClose: () => void;
   onSave: (invoice: Invoice) => void;
+  submitting?: boolean;
+  submitError?: string;
+  lockRequest?: boolean;
 }) {
   const [draft, setDraft] = useState<Invoice>(invoice);
   const [pendingInvoice, setPendingInvoice] = useState<Invoice | null>(null);
+  const [requestSearch, setRequestSearch] = useState(invoice.requestNumber || "");
   const isCreate = mode === "create";
+  const requestsQuery = useRequestsQuery({
+    page: 1,
+    pageSize: PAGE_SIZE,
+    type: draft.type,
+    search: requestSearch.trim() || undefined,
+  });
+  const partsQuery = useInventoryAllPartsQuery();
+  const repairRequests = requestsQuery.data?.items ?? [];
+  const spareParts = partsQuery.data ?? [];
+  const availableSpareParts = spareParts.filter((part) => part.quantity >= 1);
   const draftTotal = invoicePartsTotal(draft.parts) || Math.max(0, Number(draft.total) || 0);
   const draftPaid = Math.min(draftTotal, Math.max(0, Number(draft.paid) || 0));
   const draftRemaining = Math.max(0, draftTotal - draftPaid);
 
   function patchDraft(patch: Partial<Invoice>) {
     setDraft((current) => ({ ...current, ...patch }));
+  }
+
+  function selectRepairRequest(requestId: string) {
+    const request = repairRequests.find((item) => item.id === requestId);
+    if (!request) {
+      patchDraft({ orderId: "", requestNumber: "" });
+      return;
+    }
+
+    setRequestSearch(request.requestNumber || request.customer.name);
+    patchDraft({
+      orderId: request.id,
+      requestNumber: request.requestNumber,
+      type: request.type,
+      client: request.customer.name,
+      clientPhone: request.customer.firstPhone,
+      clientPhone2: request.customer.secondPhone,
+      clientAddress: request.customer.address,
+      technician: request.technicianName || "غير محدد",
+      technicianPhone: "",
+      centerPullItems: request.status === "pulltocenter" ? request.faultDescription : draft.centerPullItems,
+    });
   }
 
   function patchPaymentStatus(status: PaymentStatus) {
@@ -78,9 +126,11 @@ export function InvoiceFormModal({
         ...current.parts,
         {
           id: `PRT-${Date.now().toString().slice(-4)}`,
+          sparePartId: "",
           name: "",
           quantity: 1,
           unitPrice: 0,
+          currency: current.currency,
         },
       ],
     }));
@@ -95,16 +145,24 @@ export function InvoiceFormModal({
 
   function stepPartQuantity(index: number, step: number) {
     const currentQuantity = Math.max(1, Number(draft.parts[index]?.quantity) || 1);
-    patchPart(index, { quantity: Math.max(1, currentQuantity + step) });
+    const selectedPart = availableSpareParts.find(
+      (sparePart) => sparePart.id === draft.parts[index]?.sparePartId,
+    );
+    const nextQuantity = Math.max(1, currentQuantity + step);
+    patchPart(index, {
+      quantity: selectedPart ? Math.min(selectedPart.quantity, nextQuantity) : nextQuantity,
+    });
   }
 
   function buildInvoice(): Invoice {
     const parts = draft.parts.map((part, index) => ({
       ...part,
       id: part.id || `PRT-${index + 1}`,
+      sparePartId: part.sparePartId,
       name: part.name || "قطعة غير محددة",
       quantity: Math.max(1, Number(part.quantity) || 1),
       unitPrice: Math.max(0, Number(part.unitPrice) || 0),
+      currency: part.currency ?? draft.currency,
     }));
     const partsTotal = invoicePartsTotal(parts);
     const total = partsTotal > 0 ? partsTotal : Math.max(0, Number(draft.total) || 0);
@@ -138,6 +196,7 @@ export function InvoiceFormModal({
       total,
       paid,
       status: nextStatus,
+      requestNumber: draft.requestNumber,
       issuedAt: draft.issuedAt || new Date().toISOString().slice(0, 10),
       warrantyDuration: draft.warrantyDuration || "غير محددة",
       centerPullItems: draft.centerPullItems ?? "",
@@ -156,10 +215,53 @@ export function InvoiceFormModal({
         widthClassName="max-w-6xl"
       >
         <form className="space-y-5 p-5" onSubmit={(event) => event.preventDefault()}>
+          {submitError ? (
+            <div className="rounded-md border border-danger/30 bg-danger-soft p-3 text-sm text-danger">
+              {submitError}
+            </div>
+          ) : null}
           <Card className="bg-surface-2 p-4 shadow-none">
             <div className="grid gap-3 md:grid-cols-4">
               <DetailItem label="رقم الفاتورة" value={draft.id} ltr />
-              <DetailItem label="رقم الطلب" value={draft.orderId} ltr />
+              {isCreate && !lockRequest ? (
+                <Field label="الطلب">
+                  <div className="grid gap-2">
+                    <Input
+                      value={requestSearch}
+                      onChange={(event) => {
+                        setRequestSearch(event.target.value);
+                        patchDraft({ orderId: "", requestNumber: "" });
+                      }}
+                      placeholder="ابحث برقم الطلب، العميل أو الهاتف"
+                      disabled={submitting}
+                    />
+                    <Select
+                      value={draft.orderId}
+                      onChange={(event) => selectRepairRequest(event.target.value)}
+                      disabled={submitting || requestsQuery.isLoading}
+                    >
+                      <option value="">
+                        {requestsQuery.isLoading ? "جاري تحميل الطلبات..." : "اختر الطلب..."}
+                      </option>
+                      {draft.orderId && !repairRequests.some((request) => request.id === draft.orderId) ? (
+                        <option value={draft.orderId}>
+                          {draft.requestNumber || draft.orderId}
+                        </option>
+                      ) : null}
+                      {repairRequests.map((request) => (
+                        <option key={request.id} value={request.id}>
+                          {requestOptionLabel(request)}
+                        </option>
+                      ))}
+                    </Select>
+                    {requestsQuery.isError ? (
+                      <p className="text-xs text-danger">تعذر تحميل الطلبات لاختيار الفاتورة.</p>
+                    ) : null}
+                  </div>
+                </Field>
+              ) : (
+                <DetailItem label="رقم الطلب" value={draft.requestNumber || draft.orderId} ltr />
+              )}
               <DetailItem label="نوع الفاتورة" value={typeLabel(draft.type)} />
               <DetailItem label="تاريخ الإصدار" value={draft.issuedAt} />
             </div>
@@ -205,7 +307,6 @@ export function InvoiceFormModal({
               {([
                 ["paid", "مدفوعة بالكامل"],
                 ["partial", "مدفوعة جزئياً"],
-                ["unpaid", "غير مدفوعة"],
               ] as Array<[PaymentStatus, string]>).map(([value, label]) => (
                 <button
                   key={value}
@@ -235,9 +336,52 @@ export function InvoiceFormModal({
             <div className="space-y-3 p-4">
               {draft.parts.map((part, index) => (
                 <div key={`${part.id}-${index}`} className="rounded-md border border-border bg-surface p-4">
+                  {(() => {
+                    const selectedPart = availableSpareParts.find(
+                      (sparePart) => sparePart.id === part.sparePartId,
+                    );
+                    return selectedPart ? (
+                      <div className="mb-3 text-xs text-content-muted">
+                        الكمية المتوفرة من القطعة المختارة: {selectedPart.quantity}
+                      </div>
+                    ) : null;
+                  })()}
                   <div className="flex items-start justify-between gap-3">
-                    <Field label="اسم القطعة" className="flex-1">
-                      <Input value={part.name} onChange={(event) => patchPart(index, { name: event.target.value })} placeholder="اسم القطعة" />
+                    <Field label="قطعة الغيار" className="flex-1">
+                      <Select
+                        value={part.sparePartId ?? ""}
+                        disabled={submitting || partsQuery.isLoading}
+                        onChange={(event) => {
+                          const sparePart = availableSpareParts.find((item) => item.id === event.target.value);
+                          patchPart(index, {
+                            id: sparePart?.id ?? part.id,
+                            sparePartId: sparePart?.id ?? "",
+                            name: sparePart?.name ?? "",
+                            unitPrice:
+                              draft.currency === "USD"
+                                ? (sparePart?.costUsd ?? part.unitPrice)
+                                : (sparePart?.costSyp ?? part.unitPrice),
+                            currency: draft.currency,
+                          });
+                        }}
+                      >
+                        <option value="">اختر قطعة غيار</option>
+                        {availableSpareParts.map((sparePart) => (
+                          <option key={sparePart.id} value={sparePart.id}>
+                            {sparePart.name} - {sparePart.sparePartNumber} (المتوفر: {sparePart.quantity})
+                          </option>
+                        ))}
+                      </Select>
+                      {!partsQuery.isLoading && availableSpareParts.length === 0 ? (
+                        <p className="mt-1 text-xs text-content-muted">
+                          لا توجد قطع غيار متوفرة حالياً.
+                        </p>
+                      ) : null}
+                      {partsQuery.isError ? (
+                        <p className="mt-1 text-xs text-danger">
+                          تعذر تحميل قطع الغيار. حدّث الصفحة ثم حاول مرة أخرى.
+                        </p>
+                      ) : null}
                     </Field>
                     <Button type="button" variant="danger" size="sm" onClick={() => removePart(index)} disabled={draft.parts.length <= 1}>
                       <Icon name="trash" size={16} />
@@ -349,9 +493,9 @@ export function InvoiceFormModal({
             <Button type="button" variant="outline" onClick={onClose}>
               إلغاء
             </Button>
-            <Button type="button" onClick={() => setPendingInvoice(buildInvoice())}>
+            <Button type="button" disabled={submitting} onClick={() => setPendingInvoice(buildInvoice())}>
               <Icon name={isCreate ? "plus" : "pencil"} size={18} />
-              {isCreate ? "إنشاء وإرسال الفاتورة" : "حفظ التعديل"}
+              {submitting ? "جاري الحفظ..." : isCreate ? "إنشاء وإرسال الفاتورة" : "حفظ التعديل"}
             </Button>
           </div>
         </form>
@@ -365,7 +509,7 @@ export function InvoiceFormModal({
           onCancel={() => setPendingInvoice(null)}
           onConfirm={() => {
             onSave(pendingInvoice);
-            onClose();
+            setPendingInvoice(null);
           }}
         />
       ) : null}

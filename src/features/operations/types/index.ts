@@ -16,7 +16,7 @@ export type OrderStatus =
 export type OrderType = "external" | "internal";
 export type Priority = "low" | "medium" | "high" | "emergency";
 export type InvoiceType = "external" | "internal";
-export type PaymentStatus = "paid" | "partial" | "unpaid";
+export type PaymentStatus = "paid" | "partial" | "unpaid" | "refunded";
 export type PaymentMethod = "cash" | "sham-cash";
 export type PaymentCurrency = "SYP" | "USD";
 
@@ -115,19 +115,25 @@ export interface InvoicePayment {
   convertedAmount?: number;
   currency: PaymentCurrency;
   method: PaymentMethod;
+  dollarExchangeRate?: number;
   paidAt: string;
 }
 
 export interface InvoicePart {
   id: string;
+  sparePartId?: string;
   name: string;
   quantity: number;
   unitPrice: number;
+  currency?: Currency;
+  totalPrice?: number;
 }
 
 export interface Invoice {
   id: string;
+  invoiceNumber?: string;
   orderId: string;
+  requestNumber?: string;
   type: InvoiceType;
   client: string;
   clientPhone: string;
