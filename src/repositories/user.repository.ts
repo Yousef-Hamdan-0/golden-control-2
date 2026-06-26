@@ -67,6 +67,19 @@ export const userRepository = {
     };
   },
 
+  async listAll(params: Omit<UserListParams, "page" | "pageSize"> = {}): Promise<User[]> {
+    const firstPage = await this.list({ ...params, page: 1, pageSize: PAGE_SIZE });
+    const items = [...firstPage.items];
+    const totalPages = Math.max(1, Math.ceil(firstPage.total / firstPage.pageSize));
+
+    for (let page = 2; page <= totalPages; page += 1) {
+      const result = await this.list({ ...params, page, pageSize: PAGE_SIZE });
+      items.push(...result.items);
+    }
+
+    return items;
+  },
+
   async counts(): Promise<UserCounts> {
     const [technicians, employees, allUsers] = await Promise.all([
       this.list({ role: "technician", status: "available", page: 1, pageSize: 1 }),

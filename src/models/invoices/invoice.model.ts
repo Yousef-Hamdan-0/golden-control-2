@@ -9,7 +9,7 @@ import type {
   PaymentMethod,
   PaymentStatus,
 } from "@/features/operations/types";
-import { invoicePartsTotal } from "@/features/operations/utils/invoice";
+import { USD_TO_SYP_RATE } from "@/features/operations/constants";
 import type { Currency } from "@/lib/format/currency";
 
 type JsonRecord = Record<string, unknown>;
@@ -234,6 +234,7 @@ export function normalizeInvoice(payload: unknown): Invoice {
     paid: Math.min(total, Math.max(0, paid)),
     issuedAt: dateValue(invoice.createdAt, invoice.created_at),
     warrantyDuration: stringValue(invoice.warrantyPeriod, invoice.warranty_period),
+    locationURL: stringValue(invoice.locationURL, invoice.locationUrl, invoice.location_url),
     centerPullItems: stringValue(invoice.needsCenterMaintenance, invoice.needs_center_maintenance),
     notes: stringValue(invoice.notes),
     returned: status === "refunded",
@@ -301,11 +302,16 @@ export function normalizePaymentResponse(payload: unknown) {
   return normalizeInvoicePayment(dataRecord(payload));
 }
 
+function invoicePaymentConvertedAmount(amount: number, currency: Currency) {
+  if (currency === "SYP") return Number((amount / USD_TO_SYP_RATE).toFixed(2));
+  return Number((amount * USD_TO_SYP_RATE).toFixed(2));
+}
+
 export class InvoicePayloadModel {
   constructor(private readonly input: Invoice) {}
 
   toJSON() {
-    const totalAmount = invoicePartsTotal(this.input.parts) || Math.max(0, Number(this.input.total) || 0);
+    const totalAmount = Math.max(0, Number(this.input.total) || 0);
     const paidAmount = Math.max(0, Number(this.input.paid) || 0);
     const currency = this.input.currency;
     const requestId = this.input.orderId.trim();
@@ -313,6 +319,7 @@ export class InvoicePayloadModel {
     if (!isUuid(requestId)) {
       throw new ApiError("اختر الطلب من القائمة حتى يتم إرسال معرف الطلب الصحيح.");
     }
+    if (totalAmount <= 0) throw new ApiError("المبلغ الكلي مطلوب لإنشاء الفاتورة.");
     if (paidAmount <= 0) throw new ApiError("مبلغ الدفعة الأولى مطلوب لإنشاء الفاتورة.");
 
     return {
@@ -320,12 +327,15 @@ export class InvoicePayloadModel {
         amount: paidAmount,
         currency,
         paymentMethod: toApiPaymentMethod(this.input.paymentMethod),
+        dollarExchangeRate: USD_TO_SYP_RATE,
+        convertedAmount: invoicePaymentConvertedAmount(paidAmount, currency),
       },
       requestId,
       status: toApiInvoiceStatus(this.input.status),
       totalAmount,
       warrantyPeriod: this.input.warrantyDuration ?? "",
       notes: this.input.notes ?? "",
+      locationURL: this.input.locationURL ?? "",
       needsCenterMaintenance: this.input.centerPullItems ?? "",
       items: this.input.parts.map((part) => {
         const sparePartId = part.sparePartId?.trim();

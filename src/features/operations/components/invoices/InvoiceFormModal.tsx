@@ -17,15 +17,11 @@ import { useInventoryAllPartsQuery } from "@/features/inventory/hooks/use-invent
 import { useRequestsQuery } from "@/features/requests/hooks/use-requests";
 import type { RepairRequest } from "@/models/requests/request.model";
 import type { Invoice, InvoicePart, PaymentStatus, PaymentMethod } from "../../types";
-import { TECHNICIANS } from "../../data/seed";
 import { USD_TO_SYP_RATE } from "../../constants";
 import {
-  typeLabel,
   invoicePartTotal,
   invoicePartsTotal,
-  getTechnicianPhone,
 } from "../../utils/invoice";
-import { DetailItem } from "../shared/DetailItem";
 
 function requestOptionLabel(request: RepairRequest) {
   const customer = request.customer.name || "عميل غير محدد";
@@ -63,7 +59,8 @@ export function InvoiceFormModal({
   const repairRequests = requestsQuery.data?.items ?? [];
   const spareParts = partsQuery.data ?? [];
   const availableSpareParts = spareParts.filter((part) => part.quantity >= 1);
-  const draftTotal = invoicePartsTotal(draft.parts) || Math.max(0, Number(draft.total) || 0);
+  const partsTotal = invoicePartsTotal(draft.parts);
+  const draftTotal = Math.max(0, Number(draft.total) || 0);
   const draftPaid = Math.min(draftTotal, Math.max(0, Number(draft.paid) || 0));
   const draftRemaining = Math.max(0, draftTotal - draftPaid);
 
@@ -87,6 +84,7 @@ export function InvoiceFormModal({
       clientPhone: request.customer.firstPhone,
       clientPhone2: request.customer.secondPhone,
       clientAddress: request.customer.address,
+      locationURL: request.customer.locationLink,
       technician: request.technicianName || "غير محدد",
       technicianPhone: "",
       centerPullItems: request.status === "pulltocenter" ? request.faultDescription : draft.centerPullItems,
@@ -94,15 +92,25 @@ export function InvoiceFormModal({
   }
 
   function patchPaymentStatus(status: PaymentStatus) {
-    const total = invoicePartsTotal(draft.parts) || Math.max(0, Number(draft.total) || 0);
+    const total = Math.max(0, Number(draft.total) || 0);
     patchDraft({
       status,
       paid: status === "paid" ? total : status === "unpaid" ? 0 : Math.min(Number(draft.paid) || 0, total),
     });
   }
 
+  function patchTotal(value: string) {
+    const total = Math.max(0, Number(value) || 0);
+    const paid = Math.min(total, Math.max(0, Number(draft.paid) || 0));
+    patchDraft({
+      total,
+      paid,
+      status: paid >= total && total > 0 ? "paid" : paid > 0 ? "partial" : "unpaid",
+    });
+  }
+
   function patchPaid(value: string) {
-    const total = invoicePartsTotal(draft.parts) || Math.max(0, Number(draft.total) || 0);
+    const total = Math.max(0, Number(draft.total) || 0);
     const paid = Math.min(total, Math.max(0, Number(value) || 0));
     patchDraft({
       paid,
@@ -164,8 +172,7 @@ export function InvoiceFormModal({
       unitPrice: Math.max(0, Number(part.unitPrice) || 0),
       currency: part.currency ?? draft.currency,
     }));
-    const partsTotal = invoicePartsTotal(parts);
-    const total = partsTotal > 0 ? partsTotal : Math.max(0, Number(draft.total) || 0);
+    const total = Math.max(0, Number(draft.total) || 0);
     const paid = Math.min(total, Math.max(0, Number(draft.paid) || 0));
     const nextStatus: PaymentStatus =
       paid >= total && total > 0 ? "paid" : paid > 0 ? "partial" : draft.status === "paid" ? "partial" : draft.status;
@@ -192,7 +199,7 @@ export function InvoiceFormModal({
       clientPhone2: draft.clientPhone2 || "لا يوجد",
       clientAddress: draft.clientAddress || "غير محدد",
       technician: draft.technician || "غير محدد",
-      technicianPhone: draft.technicianPhone || getTechnicianPhone(draft.technician),
+      technicianPhone: draft.technicianPhone || "",
       total,
       paid,
       status: nextStatus,
@@ -220,90 +227,68 @@ export function InvoiceFormModal({
               {submitError}
             </div>
           ) : null}
-          <Card className="bg-surface-2 p-4 shadow-none">
-            <div className="grid gap-3 md:grid-cols-4">
-              <DetailItem label="رقم الفاتورة" value={draft.id} ltr />
-              {isCreate && !lockRequest ? (
-                <Field label="الطلب">
-                  <div className="grid gap-2">
-                    <Input
-                      value={requestSearch}
-                      onChange={(event) => {
-                        setRequestSearch(event.target.value);
-                        patchDraft({ orderId: "", requestNumber: "" });
-                      }}
-                      placeholder="ابحث برقم الطلب، العميل أو الهاتف"
-                      disabled={submitting}
-                    />
-                    <Select
-                      value={draft.orderId}
-                      onChange={(event) => selectRepairRequest(event.target.value)}
-                      disabled={submitting || requestsQuery.isLoading}
-                    >
-                      <option value="">
-                        {requestsQuery.isLoading ? "جاري تحميل الطلبات..." : "اختر الطلب..."}
+          <div className="rounded-md border border-border bg-surface-2 px-4 py-3">
+            {isCreate && !lockRequest ? (
+              <Field label="الطلب المرتبط">
+                <div className="grid gap-2 md:grid-cols-[minmax(240px,1fr)_minmax(260px,1.4fr)]">
+                  <Input
+                    value={requestSearch}
+                    onChange={(event) => {
+                      setRequestSearch(event.target.value);
+                      patchDraft({ orderId: "", requestNumber: "" });
+                    }}
+                    placeholder="ابحث برقم الطلب، العميل أو الهاتف"
+                    disabled={submitting}
+                  />
+                  <Select
+                    value={draft.orderId}
+                    onChange={(event) => selectRepairRequest(event.target.value)}
+                    disabled={submitting || requestsQuery.isLoading}
+                  >
+                    <option value="">
+                      {requestsQuery.isLoading ? "جاري تحميل الطلبات..." : "اختر الطلب..."}
+                    </option>
+                    {draft.orderId && !repairRequests.some((request) => request.id === draft.orderId) ? (
+                      <option value={draft.orderId}>
+                        {draft.requestNumber || draft.orderId}
                       </option>
-                      {draft.orderId && !repairRequests.some((request) => request.id === draft.orderId) ? (
-                        <option value={draft.orderId}>
-                          {draft.requestNumber || draft.orderId}
-                        </option>
-                      ) : null}
-                      {repairRequests.map((request) => (
-                        <option key={request.id} value={request.id}>
-                          {requestOptionLabel(request)}
-                        </option>
-                      ))}
-                    </Select>
-                    {requestsQuery.isError ? (
-                      <p className="text-xs text-danger">تعذر تحميل الطلبات لاختيار الفاتورة.</p>
                     ) : null}
+                    {repairRequests.map((request) => (
+                      <option key={request.id} value={request.id}>
+                        {requestOptionLabel(request)}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+                {requestsQuery.isError ? (
+                  <p className="text-xs text-danger">تعذر تحميل الطلبات لاختيار الفاتورة.</p>
+                ) : null}
+              </Field>
+            ) : (
+              <div className="grid gap-3 text-sm md:grid-cols-3">
+                <div>
+                  <div className="text-content-muted">الطلب المرتبط</div>
+                  <div className="mt-1 font-bold text-content" dir="ltr">
+                    {draft.requestNumber || draft.orderId}
                   </div>
-                </Field>
-              ) : (
-                <DetailItem label="رقم الطلب" value={draft.requestNumber || draft.orderId} ltr />
-              )}
-              <DetailItem label="نوع الفاتورة" value={typeLabel(draft.type)} />
-              <DetailItem label="تاريخ الإصدار" value={draft.issuedAt} />
-            </div>
-          </Card>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <Field label="اسم العميل">
-              <Input value={draft.client} onChange={(event) => patchDraft({ client: event.target.value })} placeholder="اسم العميل" />
-            </Field>
-            <Field label="رقم 1">
-              <Input value={draft.clientPhone} onChange={(event) => patchDraft({ clientPhone: event.target.value })} dir="ltr" placeholder="09xx xxx xxx" />
-            </Field>
-            <Field label="رقم 2">
-              <Input value={draft.clientPhone2 ?? ""} onChange={(event) => patchDraft({ clientPhone2: event.target.value })} dir="ltr" placeholder="اختياري" />
-            </Field>
-            <Field label="العنوان">
-              <Input value={draft.clientAddress ?? ""} onChange={(event) => patchDraft({ clientAddress: event.target.value })} placeholder="دمشق - المزة - شارع الجلاء" />
-            </Field>
-            <Field label="اسم الفني">
-              <Select
-                value={draft.technician}
-                onChange={(event) => {
-                  const technician = event.target.value;
-                  patchDraft({ technician, technicianPhone: getTechnicianPhone(technician) });
-                }}
-              >
-                {TECHNICIANS.map((tech) => (
-                  <option key={tech.id} value={tech.name}>
-                    {tech.name}
-                  </option>
-                ))}
-                <option value="غير محدد">غير محدد</option>
-              </Select>
-            </Field>
-            <Field label="رقم تلفون الفني">
-              <Input value={draft.technicianPhone ?? ""} onChange={(event) => patchDraft({ technicianPhone: event.target.value })} dir="ltr" placeholder="09xx xxx xxx" />
-            </Field>
+                </div>
+                <div>
+                  <div className="text-content-muted">نوع الفاتورة</div>
+                  <div className="mt-1 font-bold text-content">
+                    {draft.type === "internal" ? "داخلي" : "خارجي"}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-content-muted">تاريخ الإصدار</div>
+                  <div className="mt-1 font-bold text-content">{draft.issuedAt}</div>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="space-y-3">
             <h3 className="font-heading text-base font-bold text-gold">حالة الفاتورة</h3>
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2">
               {([
                 ["paid", "مدفوعة بالكامل"],
                 ["partial", "مدفوعة جزئياً"],
@@ -335,19 +320,9 @@ export function InvoiceFormModal({
             </div>
             <div className="space-y-3 p-4">
               {draft.parts.map((part, index) => (
-                <div key={`${part.id}-${index}`} className="rounded-md border border-border bg-surface p-4">
-                  {(() => {
-                    const selectedPart = availableSpareParts.find(
-                      (sparePart) => sparePart.id === part.sparePartId,
-                    );
-                    return selectedPart ? (
-                      <div className="mb-3 text-xs text-content-muted">
-                        الكمية المتوفرة من القطعة المختارة: {selectedPart.quantity}
-                      </div>
-                    ) : null;
-                  })()}
-                  <div className="flex items-start justify-between gap-3">
-                    <Field label="قطعة الغيار" className="flex-1">
+                <div key={`${part.id}-${index}`} className="rounded-md border border-border bg-surface p-3">
+                  <div className="grid gap-3 lg:grid-cols-[minmax(260px,1fr)_150px_150px_150px_auto] lg:items-end">
+                    <Field label="قطعة الغيار">
                       <Select
                         value={part.sparePartId ?? ""}
                         disabled={submitting || partsQuery.isLoading}
@@ -372,23 +347,24 @@ export function InvoiceFormModal({
                           </option>
                         ))}
                       </Select>
+                      {(() => {
+                        const selectedPart = availableSpareParts.find(
+                          (sparePart) => sparePart.id === part.sparePartId,
+                        );
+                        return selectedPart ? (
+                          <span className="text-xs text-content-muted">
+                            المتوفر: {selectedPart.quantity}
+                          </span>
+                        ) : null;
+                      })()}
                       {!partsQuery.isLoading && availableSpareParts.length === 0 ? (
-                        <p className="mt-1 text-xs text-content-muted">
-                          لا توجد قطع غيار متوفرة حالياً.
-                        </p>
+                        <span className="text-xs text-content-muted">لا توجد قطع غيار متوفرة حالياً.</span>
                       ) : null}
                       {partsQuery.isError ? (
-                        <p className="mt-1 text-xs text-danger">
-                          تعذر تحميل قطع الغيار. حدّث الصفحة ثم حاول مرة أخرى.
-                        </p>
+                        <span className="text-xs text-danger">تعذر تحميل قطع الغيار.</span>
                       ) : null}
                     </Field>
-                    <Button type="button" variant="danger" size="sm" onClick={() => removePart(index)} disabled={draft.parts.length <= 1}>
-                      <Icon name="trash" size={16} />
-                    </Button>
-                  </div>
-                  <div className="mt-4 grid gap-4 md:grid-cols-[1fr_auto_auto] md:items-end">
-                    <Field label="السعر لكل قطعة حسب العملة">
+                    <Field label="السعر">
                       <Input
                         value={String(part.unitPrice)}
                         onChange={(event) => patchPart(index, { unitPrice: Number(event.target.value) })}
@@ -396,22 +372,46 @@ export function InvoiceFormModal({
                         min={0}
                         step="0.01"
                         dir="ltr"
-                        placeholder={draft.currency === "USD" ? "دولار" : "ليرة سورية"}
+                        className="h-10"
+                        placeholder={draft.currency === "USD" ? "USD" : "SYP"}
                       />
                     </Field>
                     <div>
                       <div className="mb-1.5 text-sm text-content-muted">الكمية</div>
-                      <div className="flex items-center gap-2">
-                        <Button type="button" variant="outline" size="sm" className="h-9 w-9 px-0" onClick={() => stepPartQuantity(index, 1)}>
+                      <div className="grid h-10 grid-cols-[36px_1fr_36px] items-center overflow-hidden rounded-md border border-border bg-surface-2">
+                        <button
+                          type="button"
+                          className="h-full text-content-muted hover:bg-gold-soft hover:text-gold"
+                          onClick={() => stepPartQuantity(index, 1)}
+                        >
                           +
-                        </Button>
-                        <span className="min-w-8 text-center font-heading text-lg font-bold text-content">{part.quantity}</span>
-                        <Button type="button" variant="outline" size="sm" className="h-9 w-9 px-0" onClick={() => stepPartQuantity(index, -1)}>
+                        </button>
+                        <span className="text-center font-heading text-base font-bold text-content">{part.quantity}</span>
+                        <button
+                          type="button"
+                          className="h-full text-content-muted hover:bg-gold-soft hover:text-gold"
+                          onClick={() => stepPartQuantity(index, -1)}
+                        >
                           -
-                        </Button>
+                        </button>
                       </div>
                     </div>
-                    <DetailItem label="إجمالي القطعة" value={formatMoney(invoicePartTotal(part), draft.currency)} />
+                    <div className="rounded-md border border-border bg-surface-2 px-3 py-2">
+                      <div className="text-xs text-content-muted">الإجمالي</div>
+                      <div className="mt-1 font-heading text-sm font-bold text-gold">
+                        {formatMoney(invoicePartTotal(part), draft.currency)}
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="danger"
+                      size="sm"
+                      className="h-10 px-3"
+                      onClick={() => removePart(index)}
+                      disabled={draft.parts.length <= 1}
+                    >
+                      <Icon name="trash" size={16} />
+                    </Button>
                   </div>
                 </div>
               ))}
@@ -419,21 +419,53 @@ export function InvoiceFormModal({
           </Card>
 
           <p className="text-sm font-medium text-content-muted">
-            **ملاحظة سعر الصرف الحالي لكل 1 دولار = {formatMoney(USD_TO_SYP_RATE, "SYP")}
+            ملاحظة: سعر الصرف الحالي لكل 1 دولار = {formatMoney(USD_TO_SYP_RATE, "SYP")}
           </p>
 
           <Card className="space-y-4 p-4 shadow-none">
             <h3 className="font-heading text-base font-bold text-gold">تفاصيل المبالغ</h3>
             <div className="grid gap-4 md:grid-cols-3">
-              <DetailItem label="المبلغ الكلي" value={formatMoney(draftTotal, draft.currency)} />
-              <Field label="المبلغ المدفوع">
-                <Input value={String(draftPaid)} onChange={(event) => patchPaid(event.target.value)} type="number" min={0} placeholder="0.00" dir="ltr" />
-              </Field>
-              <DetailItem label="المبلغ المتبقي" value={formatMoney(draftRemaining, draft.currency)} />
+              <div className="rounded-md border border-border bg-surface-2 p-3">
+                <Field label="المبلغ الكلي">
+                  <Input
+                    value={String(draftTotal)}
+                    onChange={(event) => patchTotal(event.target.value)}
+                    type="number"
+                    min={0}
+                    placeholder="0.00"
+                    dir="ltr"
+                    disabled={submitting}
+                  />
+                </Field>
+              </div>
+              <div className="rounded-md border border-border bg-surface-2 p-3">
+                <Field label="المبلغ المدفوع">
+                  <Input
+                    value={String(draftPaid)}
+                    onChange={(event) => patchPaid(event.target.value)}
+                    type="number"
+                    min={0}
+                    placeholder="0.00"
+                    dir="ltr"
+                    disabled={submitting}
+                  />
+                </Field>
+              </div>
+              <div className="rounded-md border border-border bg-surface-2 p-3">
+                <div className="text-sm text-content-muted">المبلغ المتبقي</div>
+                <div className="mt-3 h-11 rounded-md border border-border bg-surface px-3 py-2 text-left font-heading text-base font-bold text-gold" dir="ltr">
+                  {formatMoney(draftRemaining, draft.currency)}
+                </div>
+              </div>
             </div>
+            {partsTotal > 0 ? (
+              <p className="text-xs text-content-muted">
+                إجمالي قطع الغيار المحسوب: {formatMoney(partsTotal, draft.currency)}
+              </p>
+            ) : null}
           </Card>
 
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-4">
             <Field label="نوع الدفع">
               <div className="grid grid-cols-2 gap-2">
                 {([
@@ -478,13 +510,13 @@ export function InvoiceFormModal({
                 ))}
               </div>
             </Field>
-            <Field label="مدة الكفالة" className="md:col-span-2">
+            <Field label="مدة الكفالة">
               <Input value={draft.warrantyDuration ?? ""} onChange={(event) => patchDraft({ warrantyDuration: event.target.value })} placeholder="مثال: 6 أشهر" />
             </Field>
-            <Field label="الأجهزة أو القطع التي تحتاج صيانة في المركز (اختياري)" className="md:col-span-2">
+            <Field label="الأجهزة أو القطع التي تحتاج صيانة في المركز (اختياري)">
               <Textarea value={draft.centerPullItems ?? ""} onChange={(event) => patchDraft({ centerPullItems: event.target.value })} className="min-h-24" placeholder="اكتب أي ملاحظات تتعلق بالأجهزة والقطع التي تم سحبها إلى المركز هنا..." />
             </Field>
-            <Field label="ملاحظات إضافية (اختياري)" className="md:col-span-2">
+            <Field label="ملاحظات إضافية (اختياري)">
               <Textarea value={draft.notes ?? ""} onChange={(event) => patchDraft({ notes: event.target.value })} className="min-h-24" placeholder="اكتب أي ملاحظات تتعلق بالصيانة هنا..." />
             </Field>
           </div>

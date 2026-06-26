@@ -11,6 +11,10 @@ export const invoiceService = {
     return invoiceRepository.list(params);
   },
 
+  listAll(params: Omit<InvoiceListParams, "page"> = {}) {
+    return invoiceRepository.listAll(params);
+  },
+
   getById(id: string) {
     return invoiceRepository.getById(id);
   },

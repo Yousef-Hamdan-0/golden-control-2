@@ -25,6 +25,7 @@ import {
   useInvoiceMutations,
   useInvoicePaymentsQuery,
   useInvoiceQuery,
+  useInvoicesAllQuery,
   useInvoicesQuery,
 } from "@/features/invoices/hooks/use-invoices";
 import { matchesDateValue } from "../../utils/filter";
@@ -57,6 +58,7 @@ function invoiceMatchesSearch(invoice: Invoice, query: string) {
     invoice.orderId,
     invoice.client,
     invoice.clientPhone,
+    invoice.clientPhone2,
   ].some((value) => value?.toLowerCase().includes(normalized));
 }
 
@@ -88,24 +90,35 @@ export function InvoicesScreen() {
   const [pdfInvoiceId, setPdfInvoiceId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const { recordPayment } = useInvoiceMutations();
-  const listParams = useMemo(
+  const queryIsRequestId = isUuid(query);
+  const hasTextSearch = Boolean(query.trim());
+  const hasLocalFilter =
+    currency !== "all" ||
+    paymentMethod !== "all" ||
+    Boolean(dateFilter.from || dateFilter.to) ||
+    (hasTextSearch && !queryIsRequestId);
+  const baseListParams = useMemo(
     () => ({
-      page,
       pageSize: PAGE_SIZE,
-      requestId: isUuid(query) ? query.trim() : undefined,
+      requestId: queryIsRequestId ? query.trim() : undefined,
       type,
       status,
     }),
-    [page, query, status, type],
+    [query, queryIsRequestId, status, type],
   );
-  const {
-    data,
-    error: listError,
-    isError,
-    isLoading,
-    refetch,
-  } = useInvoicesQuery(listParams);
-  const invoices = data?.items ?? EMPTY_INVOICES;
+  const listParams = useMemo(
+    () => ({
+      ...baseListParams,
+      page,
+    }),
+    [baseListParams, page],
+  );
+  const pagedInvoicesQuery = useInvoicesQuery(listParams, !hasLocalFilter);
+  const allInvoicesQuery = useInvoicesAllQuery(baseListParams, hasLocalFilter);
+  const activeListQuery = hasLocalFilter ? allInvoicesQuery : pagedInvoicesQuery;
+  const invoices = hasLocalFilter
+    ? allInvoicesQuery.data ?? EMPTY_INVOICES
+    : pagedInvoicesQuery.data?.items ?? EMPTY_INVOICES;
   const detailQuery = useInvoiceQuery(viewingInvoice?.id ?? null);
   const paymentsQuery = useInvoicePaymentsQuery(viewingInvoice?.id ?? null);
   const activeViewingInvoice = detailQuery.data ?? viewingInvoice;
@@ -117,7 +130,7 @@ export function InvoicesScreen() {
     const byCurrency = currency === "all" || invoice.currency === currency;
     const byPaymentMethod = paymentMethod === "all" || invoice.paymentMethod === paymentMethod;
     const byDate = matchesDateValue(invoice.issuedAt, dateFilter);
-    const bySearch = isUuid(query) || invoiceMatchesSearch(invoice, query);
+    const bySearch = queryIsRequestId || invoiceMatchesSearch(invoice, query);
     return byCurrency && byPaymentMethod && byDate && bySearch;
   });
 
@@ -126,14 +139,14 @@ export function InvoicesScreen() {
   const completedInvoices = invoices.filter((invoice) => invoice.status === "paid").length;
   const incompletedInvoices = invoices.filter((invoice) => invoice.status !== "paid").length;
   const hasDateFilter = Boolean(dateFilter.from || dateFilter.to);
-  const hasLocalFilters =
-    currency !== "all" ||
-    paymentMethod !== "all" ||
-    Boolean(dateFilter.from || dateFilter.to) ||
-    Boolean(query.trim() && !isUuid(query));
-  const currentPage = data?.page ?? page;
-  const visibleInvoices = filtered;
-  const tableTotal = hasLocalFilters ? filtered.length : (data?.total ?? 0);
+  const localPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = hasLocalFilter
+    ? Math.min(page, localPages)
+    : (pagedInvoicesQuery.data?.page ?? page);
+  const visibleInvoices = hasLocalFilter
+    ? filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+    : filtered;
+  const tableTotal = hasLocalFilter ? filtered.length : (pagedInvoicesQuery.data?.total ?? 0);
 
   function savePayment(payment: InvoicePayment, convertedAmount: number) {
     if (!paymentInvoice) return;
@@ -169,13 +182,13 @@ export function InvoicesScreen() {
   }
 
   useEffect(() => {
-    if (isError && listError) {
-      toast.error("تعذر تحميل الفواتير", getApiErrorMessage(listError));
+    if (activeListQuery.isError && activeListQuery.error) {
+      toast.error("تعذر تحميل الفواتير", getApiErrorMessage(activeListQuery.error));
     }
-  }, [isError, listError, toast]);
+  }, [activeListQuery.error, activeListQuery.isError, toast]);
 
   function refreshList() {
-    void refetch();
+    void activeListQuery.refetch();
   }
 
   function canAddPayment(invoice: Invoice) {
@@ -259,7 +272,6 @@ export function InvoicesScreen() {
           <option value="all">كل الحالات</option>
           <option value="paid">مدفوعة بالكامل</option>
           <option value="partial">مدفوعة جزئياً</option>
-          <option value="refunded">مسترجعة</option>
         </Select>
         <Select value={paymentMethod} onChange={(event) => { setPaymentMethod(event.target.value as PaymentMethod | "all"); setPage(1); }}>
           <option value="all">كل طرق الدفع</option>
@@ -276,7 +288,7 @@ export function InvoicesScreen() {
           الفترة الزمنية
         </Button>
       </FilterCard>
-      {isError ? listErrorCard() : null}
+      {activeListQuery.isError ? listErrorCard() : null}
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-[1020px] w-full text-right text-sm">
@@ -292,7 +304,7 @@ export function InvoicesScreen() {
               </tr>
             </thead>
             <tbody>
-              {isLoading ? (
+              {activeListQuery.isLoading ? (
                 Array.from({ length: PAGE_SIZE }).map((_, index) => (
                   <SkeletonRow key={index} cols={10} />
                 ))
@@ -354,7 +366,7 @@ export function InvoicesScreen() {
             </tbody>
           </table>
         </div>
-        {!isLoading && visibleInvoices.length === 0 ? (
+        {!activeListQuery.isLoading && visibleInvoices.length === 0 ? (
           <EmptyState title="لا توجد فواتير مطابقة." />
         ) : null}
         <TablePagination

@@ -20,6 +20,8 @@ export const queryKeys = {
     all: ["users"] as const,
     me: () => ["users", "me"] as const,
     list: (params: UserListParams) => ["users", "list", params] as const,
+    listAll: (params: Omit<UserListParams, "page" | "pageSize">) =>
+      ["users", "list-all", params] as const,
     counts: () => ["users", "counts"] as const,
     detail: (id: string) => ["users", "detail", id] as const,
   },
@@ -37,6 +39,8 @@ export const queryKeys = {
   invoices: {
     all: ["invoices"] as const,
     list: (params: InvoiceListParams) => ["invoices", "list", params] as const,
+    listAll: (params: Omit<InvoiceListParams, "page">) =>
+      ["invoices", "list-all", params] as const,
     detail: (id: string) => ["invoices", "detail", id] as const,
     payments: (invoiceId: string, params: PaymentListParams) =>
       ["invoices", "payments", invoiceId, params] as const,

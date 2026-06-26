@@ -148,6 +148,7 @@ export interface Invoice {
   paid: number;
   issuedAt: string;
   warrantyDuration?: string;
+  locationURL?: string;
   centerPullItems?: string;
   notes?: string;
   returned?: boolean;

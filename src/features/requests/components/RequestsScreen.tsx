@@ -46,7 +46,7 @@ import {
 } from "@/features/requests/hooks/use-requests";
 import { RequestDetailsModal } from "@/features/requests/components/RequestDetailsModal";
 import { RequestFormModal } from "@/features/requests/components/RequestFormModal";
-import { useUsersQuery } from "@/features/users/hooks/use-users-query";
+import { useUsersAllQuery } from "@/features/users/hooks/use-users-query";
 
 type StatusFilter = RepairRequestStatus | "all";
 type PriorityFilter = RepairRequestPriority | "all";
@@ -120,11 +120,11 @@ function isLikelyIdentifier(value: string) {
   );
 }
 
-function technicianDisplayName(request: RepairRequest, techniciansById: Map<string, string>) {
-  const fromTechnicianId = techniciansById.get(request.technicianId);
+function technicianDisplayName(request: RepairRequest, usersById: Map<string, string>) {
+  const fromTechnicianId = usersById.get(request.technicianId);
   if (fromTechnicianId) return fromTechnicianId;
 
-  const fromNameAsId = techniciansById.get(request.technicianName);
+  const fromNameAsId = usersById.get(request.technicianName);
   if (fromNameAsId) return fromNameAsId;
 
   if (request.technicianName && !isLikelyIdentifier(request.technicianName)) {
@@ -156,11 +156,9 @@ export function RequestsScreen() {
   const [pdfRequestId, setPdfRequestId] = useState<string | null>(null);
   const creatingRequestRef = useRef(false);
   const { create, update } = useRequestMutations();
-  const techniciansQuery = useUsersQuery({
-    role: "technician",
+  const usersQuery = useUsersAllQuery({
+    role: "all",
     status: "all",
-    page: 1,
-    pageSize: 100,
   });
   const isLocalSearch = Boolean(query.trim());
 
@@ -207,14 +205,14 @@ export function RequestsScreen() {
   const pulledCount = metricRequests.filter((request) => request.status === "pulltocenter").length;
   const hasDateFilter = Boolean(dateFilter.from || dateFilter.to);
   const defaultRequestType = routeType === "all" ? undefined : routeType;
-  const techniciansById = useMemo(() => {
+  const usersById = useMemo(() => {
     const map = new Map<string, string>();
-    for (const technician of techniciansQuery.data?.items ?? []) {
-      map.set(technician.id, technician.fullName);
-      if (technician.userNumber) map.set(technician.userNumber, technician.fullName);
+    for (const user of usersQuery.data ?? []) {
+      map.set(user.id, user.fullName);
+      if (user.userNumber) map.set(user.userNumber, user.fullName);
     }
     return map;
-  }, [techniciansQuery.data?.items]);
+  }, [usersQuery.data]);
 
   useEffect(() => {
     if (isError && listError) {
@@ -336,6 +334,10 @@ export function RequestsScreen() {
           statusHistoryError={
             statusHistoryQuery.error ? getApiErrorMessage(statusHistoryQuery.error) : undefined
           }
+          technicianDisplayName={
+            detailsRequest ? technicianDisplayName(detailsRequest, usersById) : undefined
+          }
+          usersById={usersById}
           downloadingPdf={pdfRequestId === selectedRequestId}
           onClose={() => setSelectedRequestId(null)}
           onEdit={(request) => {
@@ -473,7 +475,7 @@ export function RequestsScreen() {
                       </td>
                       <td className="px-4 py-4 text-content-muted">{primaryDevice(request)}</td>
                       <td className="px-4 py-4 text-content">
-                        {technicianDisplayName(request, techniciansById)}
+                        {technicianDisplayName(request, usersById)}
                       </td>
                       <td className="px-4 py-4">
                         <Badge tone={REQUEST_STATUS_TONE[request.status]} dot>

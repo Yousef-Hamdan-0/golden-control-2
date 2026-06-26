@@ -22,27 +22,70 @@ import type { Invoice, InvoicePayment } from "@/features/operations/types";
 
 export type { InvoiceListParams, PaymentListParams, PaymentPayloadInput };
 
-export const invoiceRepository = {
-  async list(params: InvoiceListParams = {}) {
-    const page = params.page ?? 1;
-    const pageSize = params.pageSize ?? PAGE_SIZE;
-    const searchParams = new URLSearchParams({
-      page: String(page),
-      limit: String(pageSize),
+type InvoiceListAllParams = Omit<InvoiceListParams, "page">;
+
+function normalizePageParams(params: InvoiceListParams) {
+  return {
+    page: params.page ?? 1,
+    pageSize: params.pageSize ?? PAGE_SIZE,
+  };
+}
+
+async function fetchInvoicePage(params: InvoiceListParams = {}) {
+  const { page, pageSize } = normalizePageParams(params);
+  const searchParams = new URLSearchParams({
+    page: String(page),
+    limit: String(pageSize),
+  });
+
+  if (params.requestId?.trim()) searchParams.set("requestId", params.requestId.trim());
+  if (params.type && params.type !== "all") searchParams.set("type", params.type);
+  if (params.status && params.status !== "all" && params.status !== "unpaid") {
+    searchParams.set("status", toApiInvoiceStatus(params.status));
+  }
+
+  const payload = await requestAuthenticatedApi(
+    `${API_ENDPOINTS.invoices.root}?${searchParams}`,
+    { method: "GET" },
+  );
+
+  return normalizeInvoiceListResponse(payload, { page, pageSize });
+}
+
+async function fetchAllInvoices(params: InvoiceListAllParams = {}) {
+  const pageSize = params.pageSize ?? PAGE_SIZE;
+  const firstPage = await fetchInvoicePage({ ...params, page: 1, pageSize });
+  const byId = new Map(firstPage.items.map((invoice) => [invoice.id, invoice]));
+  const knownPages =
+    firstPage.total > firstPage.items.length
+      ? Math.max(1, Math.ceil(firstPage.total / firstPage.pageSize))
+      : undefined;
+  let page = 2;
+
+  while (
+    knownPages ? page <= knownPages : firstPage.items.length >= pageSize && page <= 100
+  ) {
+    const result = await fetchInvoicePage({ ...params, page, pageSize });
+    let addedNewInvoice = false;
+    result.items.forEach((invoice) => {
+      if (!byId.has(invoice.id)) addedNewInvoice = true;
+      byId.set(invoice.id, invoice);
     });
 
-    if (params.requestId?.trim()) searchParams.set("requestId", params.requestId.trim());
-    if (params.type && params.type !== "all") searchParams.set("type", params.type);
-    if (params.status && params.status !== "all" && params.status !== "unpaid") {
-      searchParams.set("status", toApiInvoiceStatus(params.status));
-    }
+    if (!knownPages && (!addedNewInvoice || result.items.length < pageSize)) break;
+    page += 1;
+  }
 
-    const payload = await requestAuthenticatedApi(
-      `${API_ENDPOINTS.invoices.root}?${searchParams}`,
-      { method: "GET" },
-    );
+  return Array.from(byId.values());
+}
 
-    return normalizeInvoiceListResponse(payload, { page, pageSize });
+export const invoiceRepository = {
+  async list(params: InvoiceListParams = {}) {
+    return fetchInvoicePage(params);
+  },
+
+  async listAll(params: InvoiceListAllParams = {}) {
+    return fetchAllInvoices({ ...params, pageSize: params.pageSize ?? PAGE_SIZE });
   },
 
   async getById(id: string): Promise<Invoice> {

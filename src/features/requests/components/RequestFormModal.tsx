@@ -7,7 +7,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
 import { Icon } from "@/lib/icons";
-import { useUsersQuery } from "@/features/users/hooks/use-users-query";
+import { useUsersAllQuery } from "@/features/users/hooks/use-users-query";
 import {
   RepairRequestInputSchema,
   REQUEST_PRIORITY_OPTIONS,
@@ -123,11 +123,9 @@ export function RequestFormModal({
   const isTypeLocked = !isEdit && Boolean(defaultType);
   const [draft, setDraft] = useState<RequestFormDraft>(() => initialDraft(request, defaultType));
   const [errors, setErrors] = useState<FieldErrors>({});
-  const { data: technicians } = useUsersQuery({
+  const { data: technicians = [] } = useUsersAllQuery({
     role: "technician",
     status: "available",
-    page: 1,
-    pageSize: 100,
   });
 
   function setCustomerField(
@@ -373,7 +371,7 @@ export function RequestFormModal({
                 disabled={submitting}
               >
                 <option value="">بدون تحديد</option>
-                {(technicians?.items ?? []).map((technician) => (
+                {technicians.map((technician) => (
                   <option key={technician.id} value={technician.id}>
                     {technician.fullName}
                   </option>

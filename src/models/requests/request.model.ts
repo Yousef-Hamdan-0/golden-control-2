@@ -126,6 +126,7 @@ export interface RepairRequestStatusHistoryItem {
   status: RepairRequestStatus;
   note: string;
   owner: string;
+  ownerId: string;
   date: string;
 }
 
@@ -296,12 +297,66 @@ function dateValue(...values: unknown[]): string {
 function nestedName(value: unknown): string {
   if (typeof value === "string" || typeof value === "number") return String(value);
   if (!isRecord(value)) return "";
-  return stringValue(value.fullName, value.name, value.username, value.email);
+  const firstLast = [
+    stringValue(value.firstName, value.first_name),
+    stringValue(value.lastName, value.last_name),
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return stringValue(
+    value.fullName,
+    value.full_name,
+    value.displayName,
+    value.display_name,
+    value.name,
+    value.username,
+    value.email,
+    firstLast,
+    nestedName(value.user),
+    nestedName(value.profile),
+    nestedName(value.account),
+    nestedName(value.employee),
+    nestedName(value.admin),
+    nestedName(value.manager),
+  );
+}
+
+function nestedId(value: unknown): string {
+  if (typeof value === "string" || typeof value === "number") return String(value);
+  if (!isRecord(value)) return "";
+  return stringValue(
+    value.id,
+    value._id,
+    value.userId,
+    value.user_id,
+    value.userNumber,
+    value.user_number,
+    nestedId(value.user),
+    nestedId(value.profile),
+    nestedId(value.account),
+  );
+}
+
+function isLikelyIdentifier(value: string): boolean {
+  const trimmed = value.trim();
+  return (
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      trimmed,
+    ) || /^[0-9a-f]{24}$/i.test(trimmed)
+  );
+}
+
+function displayNameValue(...values: unknown[]): string {
+  for (const value of values) {
+    const name = nestedName(value).trim();
+    if (name && !isLikelyIdentifier(name)) return name;
+  }
+  return "";
 }
 
 function nestedObjectName(value: unknown): string {
   if (!isRecord(value)) return "";
-  return stringValue(value.fullName, value.name, value.username, value.email);
+  return nestedName(value);
 }
 
 function firstRecord(...values: unknown[]): JsonRecord {
@@ -322,6 +377,9 @@ function technicianAssignment(payload: JsonRecord) {
     payload.technician_assignment,
     payload.latestTechnicianAssignment,
     payload.latest_technician_assignment,
+    payload.latestAssignment,
+    payload.latest_assignment,
+    payload.assignment,
     payload.assignments,
     payload.technicianAssignments,
     payload.technician_assignments,
@@ -492,6 +550,10 @@ export function normalizeRepairRequest(payload: unknown, fallbackId?: string): R
     technicianId: stringValue(
       payload.technicianId,
       payload.technician_id,
+      payload.assignedToId,
+      payload.assigned_to_id,
+      payload.responsibleTechnicianId,
+      payload.responsible_technician_id,
       assignment.technicianId,
       assignment.technician_id,
       assignmentTechnician.id,
@@ -503,13 +565,36 @@ export function normalizeRepairRequest(payload: unknown, fallbackId?: string): R
     technicianName: stringValue(
       payload.technicianName,
       payload.technician_name,
+      payload.technicianFullName,
+      payload.technician_full_name,
       nestedObjectName(payload.technician),
+      nestedObjectName(payload.technicianUser),
+      nestedObjectName(payload.technician_user),
+      nestedObjectName(payload.currentTechnician),
+      nestedObjectName(payload.current_technician),
       nestedObjectName(payload.assignedTechnician),
+      nestedObjectName(payload.assigned_technician),
+      nestedObjectName(payload.assignedTo),
+      nestedObjectName(payload.assigned_to),
+      nestedObjectName(payload.responsibleTechnician),
+      nestedObjectName(payload.responsible_technician),
+      nestedObjectName(payload.user),
       nestedObjectName(assignmentTechnician),
       nestedObjectName(assignment),
     ),
     createdAt: dateValue(payload.createdAt, payload.created_at),
-    updatedAt: dateValue(payload.updatedAt, payload.updated_at),
+    updatedAt: dateValue(
+      payload.updatedAt,
+      payload.updated_at,
+      payload.modifiedAt,
+      payload.modified_at,
+      payload.changedAt,
+      payload.changed_at,
+      payload.lastUpdatedAt,
+      payload.last_updated_at,
+      payload.createdAt,
+      payload.created_at,
+    ),
     records: rawRecords.map(normalizeRequestRecord),
   };
 }
@@ -597,10 +682,121 @@ function normalizeStatusHistoryItem(
 
   return {
     id: stringValue(raw.id, raw._id, `history-${index + 1}`),
-    status: normalizeRequestStatus(raw.status),
-    note: stringValue(raw.note, raw.notes, raw.message, raw.description),
-    owner: stringValue(raw.owner, raw.createdBy, raw.created_by, nestedName(raw.user)),
-    date: dateValue(raw.date, raw.createdAt, raw.created_at, raw.updatedAt, raw.updated_at),
+    status: normalizeRequestStatus(raw.status ?? raw.toStatus ?? raw.to_status ?? raw.newStatus ?? raw.new_status),
+    note: stringValue(raw.note, raw.notes, raw.message, raw.description, raw.reason),
+    owner: stringValue(
+      displayNameValue(
+        raw.owner,
+        raw.user,
+        raw.changer,
+        raw.creator,
+        raw.createdBy,
+        raw.created_by,
+        raw.createdByUser,
+        raw.created_by_user,
+        raw.changedBy,
+        raw.changed_by,
+        raw.changedByUser,
+        raw.changed_by_user,
+        raw.updatedBy,
+        raw.updated_by,
+        raw.updatedByUser,
+        raw.updated_by_user,
+        raw.modifiedBy,
+        raw.modified_by,
+        raw.performedBy,
+        raw.performed_by,
+        raw.statusChangedBy,
+        raw.status_changed_by,
+        raw.actor,
+        raw.admin,
+        raw.manager,
+        raw.employee,
+        raw.responsible,
+        raw.responsibleUser,
+        raw.responsible_user,
+      ),
+      stringValue(raw.ownerName, raw.owner_name),
+      stringValue(raw.userName, raw.user_name),
+      stringValue(raw.changerName, raw.changer_name),
+      stringValue(raw.creatorName, raw.creator_name),
+      stringValue(raw.createdByName, raw.created_by_name),
+      stringValue(raw.changedByName, raw.changed_by_name),
+      stringValue(raw.updatedByName, raw.updated_by_name),
+      stringValue(raw.performedByName, raw.performed_by_name),
+      stringValue(raw.statusChangedByName, raw.status_changed_by_name),
+      "غير محدد",
+    ),
+    ownerId: stringValue(
+      raw.ownerId,
+      raw.owner_id,
+      raw.userId,
+      raw.user_id,
+      raw.creatorId,
+      raw.creator_id,
+      raw.createdById,
+      raw.created_by_id,
+      raw.changedById,
+      raw.changed_by_id,
+      raw.updatedById,
+      raw.updated_by_id,
+      raw.modifiedById,
+      raw.modified_by_id,
+      raw.performedById,
+      raw.performed_by_id,
+      raw.statusChangedById,
+      raw.status_changed_by_id,
+      raw.actorId,
+      raw.actor_id,
+      raw.adminId,
+      raw.admin_id,
+      raw.managerId,
+      raw.manager_id,
+      raw.employeeId,
+      raw.employee_id,
+      raw.responsibleId,
+      raw.responsible_id,
+      nestedId(raw.owner),
+      nestedId(raw.user),
+      nestedId(raw.changer),
+      nestedId(raw.creator),
+      nestedId(raw.createdBy),
+      nestedId(raw.created_by),
+      nestedId(raw.createdByUser),
+      nestedId(raw.created_by_user),
+      nestedId(raw.changedBy),
+      nestedId(raw.changed_by),
+      nestedId(raw.changedByUser),
+      nestedId(raw.changed_by_user),
+      nestedId(raw.updatedBy),
+      nestedId(raw.updated_by),
+      nestedId(raw.updatedByUser),
+      nestedId(raw.updated_by_user),
+      nestedId(raw.performedBy),
+      nestedId(raw.performed_by),
+      nestedId(raw.statusChangedBy),
+      nestedId(raw.status_changed_by),
+      nestedId(raw.actor),
+      nestedId(raw.responsible),
+      nestedId(raw.responsibleUser),
+      nestedId(raw.responsible_user),
+    ),
+    date: dateValue(
+      raw.date,
+      raw.changedAt,
+      raw.changed_at,
+      raw.timestamp,
+      raw.performedAt,
+      raw.performed_at,
+      raw.modifiedAt,
+      raw.modified_at,
+      raw.createdAt,
+      raw.created_at,
+      raw.updatedAt,
+      raw.updated_at,
+      raw.assignedAt,
+      raw.assigned_at,
+    ),
   };
 }
 

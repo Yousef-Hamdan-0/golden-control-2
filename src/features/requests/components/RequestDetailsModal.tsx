@@ -43,6 +43,34 @@ function fallback(value: string, empty = "غير محدد") {
   return value.trim() || empty;
 }
 
+function isLikelyIdentifier(value: string) {
+  const trimmed = value.trim();
+  return (
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      trimmed,
+    ) || /^[0-9a-f]{24}$/i.test(trimmed)
+  );
+}
+
+function userDisplayName(value: string, usersById: Map<string, string>) {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  const mapped = usersById.get(trimmed);
+  if (mapped) return mapped;
+  return isLikelyIdentifier(trimmed) ? "" : trimmed;
+}
+
+function statusHistoryOwner(
+  item: RepairRequestStatusHistoryItem,
+  usersById: Map<string, string>,
+) {
+  return (
+    userDisplayName(item.ownerId, usersById) ||
+    userDisplayName(item.owner, usersById) ||
+    "غير محدد"
+  );
+}
+
 function formatDate(value: string) {
   return value ? value.slice(0, 10) : "غير محدد";
 }
@@ -77,6 +105,8 @@ export function RequestDetailsModal({
   statusHistory,
   statusHistoryLoading,
   statusHistoryError,
+  technicianDisplayName,
+  usersById,
   downloadingPdf,
   onClose,
   onEdit,
@@ -88,6 +118,8 @@ export function RequestDetailsModal({
   statusHistory: RepairRequestStatusHistoryItem[];
   statusHistoryLoading: boolean;
   statusHistoryError?: string;
+  technicianDisplayName?: string;
+  usersById?: Map<string, string>;
   downloadingPdf: boolean;
   onClose: () => void;
   onEdit: (request: RepairRequest) => void;
@@ -202,7 +234,7 @@ export function RequestDetailsModal({
   return (
     <>
       <Modal
-        title={request ? `تفاصيل الطلب ${request.requestNumber}` : "تفاصيل الطلب"}
+        title="تفاصيل الطلب"
         description="بيانات العميل، الأجهزة، الحالة، سجل الحالة، الفواتير، والتسجيلات الصوتية."
         onClose={onClose}
         widthClassName="max-w-5xl"
@@ -262,9 +294,9 @@ export function RequestDetailsModal({
                   }
                 />
                 <DetailItem label="تاريخ الصيانة" value={formatDate(request.scheduledDate)} />
-                <DetailItem label="الفني" value={fallback(request.technicianName)} />
+                <DetailItem label="الفني" value={fallback(technicianDisplayName ?? request.technicianName)} />
                 <DetailItem label="تاريخ الإنشاء" value={formatDate(request.createdAt)} />
-                <DetailItem label="آخر تعديل" value={formatDate(request.updatedAt)} />
+                <DetailItem label="آخر تعديل" value={formatDate(request.updatedAt || request.createdAt)} />
               </div>
             </section>
 
@@ -381,7 +413,9 @@ export function RequestDetailsModal({
                           <td className="px-4 py-3 text-content-muted">
                             {fallback(item.note, "لا توجد ملاحظة")}
                           </td>
-                          <td className="px-4 py-3 text-content">{fallback(item.owner)}</td>
+                          <td className="px-4 py-3 text-content">
+                            {statusHistoryOwner(item, usersById ?? new Map())}
+                          </td>
                           <td className="px-4 py-3 text-content-muted">{formatDate(item.date)}</td>
                         </tr>
                       ))

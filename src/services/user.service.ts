@@ -16,6 +16,10 @@ export const userService = {
     return userRepository.list(params);
   },
 
+  listAllByRole(params: Omit<UserListParams, "page" | "pageSize">): Promise<User[]> {
+    return userRepository.listAll(params);
+  },
+
   getCounts(): Promise<UserCounts> {
     return userRepository.counts();
   },

@@ -16,6 +16,13 @@ export function useUsersQuery(params: UserListParams) {
   });
 }
 
+export function useUsersAllQuery(params: Omit<UserListParams, "page" | "pageSize">) {
+  return useQuery({
+    queryKey: queryKeys.users.listAll(params),
+    queryFn: () => userService.listAllByRole(params),
+  });
+}
+
 export function useUserCountsQuery() {
   return useQuery({
     queryKey: queryKeys.users.counts(),

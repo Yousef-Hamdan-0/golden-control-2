@@ -18,6 +18,17 @@ export function useInvoicesQuery(params: InvoiceListParams, enabled = true) {
   });
 }
 
+export function useInvoicesAllQuery(
+  params: Omit<InvoiceListParams, "page">,
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: queryKeys.invoices.listAll(params),
+    queryFn: () => invoiceService.listAll(params),
+    enabled,
+  });
+}
+
 export function useInvoiceQuery(id: string | null) {
   return useQuery({
     queryKey: queryKeys.invoices.detail(id ?? ""),
