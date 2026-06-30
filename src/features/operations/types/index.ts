@@ -139,6 +139,7 @@ export interface Invoice {
   clientPhone: string;
   clientPhone2?: string;
   clientAddress?: string;
+  technicianId?: string;
   technician: string;
   technicianPhone?: string;
   status: PaymentStatus;

@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { ApiError } from "@/helpers/api.helper";
 import { localDateKey } from "@/lib/format/date";
+import type { Invoice } from "@/features/operations/types";
+import { normalizeInvoice } from "@/models/invoices/invoice.model";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -147,6 +149,7 @@ export interface RepairRequest {
   createdAt: string;
   updatedAt: string;
   records: RepairRequestRecord[];
+  invoices: Invoice[];
 }
 
 export const RequestListQuerySchema = z.object({
@@ -499,6 +502,33 @@ function normalizeRequestRecord(payload: unknown, index: number): RepairRequestR
   };
 }
 
+function normalizeRequestInvoices(
+  payload: JsonRecord,
+  requestId: string,
+  requestNumber: string,
+) {
+  const rawInvoices =
+    (Array.isArray(payload.invoices) && payload.invoices) ||
+    (Array.isArray(payload.requestInvoices) && payload.requestInvoices) ||
+    (Array.isArray(payload.request_invoices) && payload.request_invoices) ||
+    (isRecord(payload.invoice) ? [payload.invoice] : []);
+
+  return rawInvoices.flatMap((rawInvoice) => {
+    try {
+      const invoice = normalizeInvoice(rawInvoice);
+      return [
+        {
+          ...invoice,
+          orderId: invoice.orderId || requestId,
+          requestNumber: invoice.requestNumber || requestNumber,
+        },
+      ];
+    } catch {
+      return [];
+    }
+  });
+}
+
 export function normalizeRepairRequest(payload: unknown, fallbackId?: string): RepairRequest {
   if (!isRecord(payload)) {
     throw new ApiError("استجابة الطلب غير مطابقة للنموذج المتوقع.");
@@ -533,9 +563,11 @@ export function normalizeRepairRequest(payload: unknown, fallbackId?: string): R
   const assignment = technicianAssignment(payload);
   const assignmentTechnician = firstRecord(assignment.technician, assignment.user);
 
+  const requestNumber = stringValue(payload.requestNumber, payload.request_number, id);
+
   return {
     id,
-    requestNumber: stringValue(payload.requestNumber, payload.request_number, id),
+    requestNumber,
     customer: normalizeRequestCustomer(payload.customer, payload),
     type: normalizeRequestType(payload.type),
     priority: normalizeRequestPriority(payload.priority),
@@ -597,14 +629,31 @@ export function normalizeRepairRequest(payload: unknown, fallbackId?: string): R
       payload.created_at,
     ),
     records: rawRecords.map(normalizeRequestRecord),
+    invoices: normalizeRequestInvoices(payload, id, requestNumber),
   };
 }
 
 function dataFromResponse(payload: unknown): unknown {
   if (!isRecord(payload)) return payload;
   const data = payload.data;
-  if (isRecord(data) && "request" in data) return data.request;
-  if (isRecord(data) && "repairRequest" in data) return data.repairRequest;
+  if (isRecord(data) && "request" in data) {
+    return isRecord(data.request)
+      ? {
+          ...data.request,
+          invoices: data.request.invoices ?? data.invoices,
+          invoice: data.request.invoice ?? data.invoice,
+        }
+      : data.request;
+  }
+  if (isRecord(data) && "repairRequest" in data) {
+    return isRecord(data.repairRequest)
+      ? {
+          ...data.repairRequest,
+          invoices: data.repairRequest.invoices ?? data.invoices,
+          invoice: data.repairRequest.invoice ?? data.invoice,
+        }
+      : data.repairRequest;
+  }
   if (data !== undefined && !Array.isArray(data)) return data;
   return payload.request ?? payload.repairRequest ?? payload;
 }

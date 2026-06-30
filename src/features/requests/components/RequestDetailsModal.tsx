@@ -1,13 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { Spinner } from "@/components/ui/Spinner";
 import { useToast } from "@/components/ui/Toast";
-import { PAGE_SIZE } from "@/config/constants";
 import { getApiErrorMessage } from "@/helpers/api.helper";
+import { queryKeys } from "@/hooks/query-keys";
 import { Icon } from "@/lib/icons";
 import { formatMoney } from "@/lib/format/currency";
 import { localDateKey } from "@/lib/format/date";
@@ -29,7 +30,6 @@ import {
   useInvoiceMutations,
   useInvoicePaymentsQuery,
   useInvoiceQuery,
-  useInvoicesQuery,
 } from "@/features/invoices/hooks/use-invoices";
 import {
   REQUEST_PRIORITY_LABELS,
@@ -127,24 +127,14 @@ export function RequestDetailsModal({
   onDownloadPdf: (request: RepairRequest) => void;
 }) {
   const toast = useToast();
+  const queryClient = useQueryClient();
   const [showInvoiceForm, setShowInvoiceForm] = useState(false);
   const [invoiceNotice, setInvoiceNotice] = useState<string | null>(null);
   const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null);
   const [paymentInvoice, setPaymentInvoice] = useState<Invoice | null>(null);
   const [invoicePdfId, setInvoicePdfId] = useState<string | null>(null);
   const { create, recordPayment } = useInvoiceMutations();
-  const invoiceListParams = useMemo(
-    () => ({
-      page: 1,
-      pageSize: PAGE_SIZE,
-      requestId: request?.id ?? "",
-      type: "all" as const,
-      status: "all" as const,
-    }),
-    [request?.id],
-  );
-  const invoicesQuery = useInvoicesQuery(invoiceListParams, Boolean(request?.id));
-  const invoices = invoicesQuery.data?.items ?? [];
+  const invoices = request?.invoices ?? [];
   const hasPaidInvoice = invoices.some((invoice) => invoice.status === "paid");
   const canCreateRequestInvoice = Boolean(
     request && canCreateInvoiceForRequest(request) && !hasPaidInvoice,
@@ -190,7 +180,7 @@ export function RequestDetailsModal({
         };
         setShowInvoiceForm(false);
         setViewingInvoice(linkedInvoice);
-        void invoicesQuery.refetch();
+        void queryClient.invalidateQueries({ queryKey: queryKeys.requests.detail(request.id) });
         toast.success("تم إنشاء الفاتورة", `تم إنشاء الفاتورة ${invoiceDisplayNumber(linkedInvoice)} للطلب ${request.requestNumber}.`);
       },
       onError: (error) => toast.error("تعذر إنشاء الفاتورة", getApiErrorMessage(error)),
@@ -211,7 +201,9 @@ export function RequestDetailsModal({
       {
         onSuccess: () => {
           setPaymentInvoice(null);
-          void invoicesQuery.refetch();
+          void queryClient.invalidateQueries({
+            queryKey: queryKeys.requests.detail(request?.id ?? paymentInvoice.orderId),
+          });
           toast.success("تم حفظ الدفعة", `تم تسجيل دفعة على الفاتورة ${invoiceDisplayNumber(paymentInvoice)} بنجاح.`);
         },
         onError: (error) => toast.error("تعذر حفظ الدفعة", getApiErrorMessage(error)),
@@ -453,12 +445,6 @@ export function RequestDetailsModal({
                   {invoiceNotice}
                 </div>
               ) : null}
-              {invoicesQuery.isError ? (
-                <div className="rounded-md border border-danger/30 bg-danger-soft p-3 text-sm text-danger">
-                  تعذر تحميل سجل الفواتير. {getApiErrorMessage(invoicesQuery.error)}
-                </div>
-              ) : null}
-
               <div className="overflow-x-auto rounded-md border border-border">
                 <table className="min-w-[820px] w-full text-right text-sm">
                   <thead>
@@ -471,13 +457,7 @@ export function RequestDetailsModal({
                     </tr>
                   </thead>
                   <tbody>
-                    {invoicesQuery.isLoading ? (
-                      <tr className="border-t border-border">
-                        <td className="px-4 py-6 text-center text-content-muted" colSpan={7}>
-                          جاري تحميل سجل الفواتير...
-                        </td>
-                      </tr>
-                    ) : invoices.length ? (
+                    {invoices.length ? (
                       invoices.map((invoice) => (
                         <tr key={invoice.id} className="border-t border-border">
                           <td className="px-4 py-3 font-bold text-gold" dir="ltr">

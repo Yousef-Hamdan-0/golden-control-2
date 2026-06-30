@@ -84,6 +84,27 @@ async function fetchAllParts(params: Omit<InventoryPartListParams, "page">) {
   return Array.from(byId.values());
 }
 
+function enrichMovementsWithParts(
+  movements: InventoryMovementLog[],
+  parts: InventoryPart[],
+): InventoryMovementLog[] {
+  const partsById = new Map(parts.map((part) => [part.id, part]));
+  const partsByNumber = new Map(parts.map((part) => [part.sparePartNumber, part]));
+
+  return movements.map((movement) => {
+    if (movement.partNumber && movement.partName) return movement;
+
+    const part = partsById.get(movement.partId) || partsByNumber.get(movement.partId);
+    if (!part) return movement;
+
+    return {
+      ...movement,
+      partNumber: movement.partNumber || part.sparePartNumber,
+      partName: movement.partName || part.name,
+    };
+  });
+}
+
 export const inventoryRepository = {
   async listDaily(
     params: InventoryDailyListParams = {},
@@ -189,7 +210,18 @@ export const inventoryRepository = {
     const payload = await requestAuthenticatedApi(API_ENDPOINTS.inventory.movements, {
       method: "GET",
     });
-    return normalizeInventoryMovementList(payload);
+    const movements = normalizeInventoryMovementList(payload);
+
+    if (movements.every((movement) => movement.partNumber && movement.partName)) {
+      return movements;
+    }
+
+    try {
+      const parts = await fetchAllParts({ pageSize: PAGE_SIZE });
+      return enrichMovementsWithParts(movements, parts);
+    } catch {
+      return movements;
+    }
   },
 
   async createMovement(input: InventoryMovementInput): Promise<void> {

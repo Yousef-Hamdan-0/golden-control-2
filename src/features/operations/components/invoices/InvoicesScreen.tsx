@@ -21,6 +21,7 @@ import {
 import { getApiErrorMessage } from "@/helpers/api.helper";
 import { isUuid } from "@/models/invoices/invoice.model";
 import { invoiceService } from "@/services/invoice.service";
+import { useUsersAllQuery } from "@/features/users/hooks/use-users-query";
 import {
   useInvoiceMutations,
   useInvoicePaymentsQuery,
@@ -59,7 +60,28 @@ function invoiceMatchesSearch(invoice: Invoice, query: string) {
     invoice.client,
     invoice.clientPhone,
     invoice.clientPhone2,
+    invoice.technician,
   ].some((value) => value?.toLowerCase().includes(normalized));
+}
+
+function isLikelyIdentifier(value?: string) {
+  const trimmed = value?.trim() ?? "";
+  return (
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      trimmed,
+    ) || /^[0-9a-f]{24}$/i.test(trimmed)
+  );
+}
+
+function invoiceTechnicianDisplay(invoice: Invoice, usersById: Map<string, string>) {
+  const byTechnicianId = invoice.technicianId ? usersById.get(invoice.technicianId) : undefined;
+  if (byTechnicianId) return byTechnicianId;
+
+  const byTechnicianValue = usersById.get(invoice.technician);
+  if (byTechnicianValue) return byTechnicianValue;
+
+  if (invoice.technician && !isLikelyIdentifier(invoice.technician)) return invoice.technician;
+  return "غير محدد";
 }
 
 function savePdf(response: Awaited<ReturnType<typeof invoiceService.downloadPdf>>, invoice: Invoice) {
@@ -90,6 +112,7 @@ export function InvoicesScreen() {
   const [pdfInvoiceId, setPdfInvoiceId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const { recordPayment } = useInvoiceMutations();
+  const usersQuery = useUsersAllQuery({ role: "technician", status: "all" });
   const queryIsRequestId = isUuid(query);
   const hasTextSearch = Boolean(query.trim());
   const hasLocalFilter =
@@ -147,6 +170,14 @@ export function InvoicesScreen() {
     ? filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
     : filtered;
   const tableTotal = hasLocalFilter ? filtered.length : (pagedInvoicesQuery.data?.total ?? 0);
+  const usersById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const user of usersQuery.data ?? []) {
+      map.set(user.id, user.fullName);
+      if (user.userNumber) map.set(user.userNumber, user.fullName);
+    }
+    return map;
+  }, [usersQuery.data]);
 
   function savePayment(payment: InvoicePayment, convertedAmount: number) {
     if (!paymentInvoice) return;
@@ -291,12 +322,24 @@ export function InvoicesScreen() {
       {activeListQuery.isError ? listErrorCard() : null}
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-[1020px] w-full text-right text-sm">
+          <table className="w-full border-separate border-spacing-y-1 text-right text-sm">
+            <colgroup>
+              <col className="w-[11%]" />
+              <col className="w-[11%]" />
+              <col className="w-[17%]" />
+              <col className="w-[13%]" />
+              <col className="w-[7%]" />
+              <col className="w-[8%]" />
+              <col className="w-[10%]" />
+              <col className="w-[8%]" />
+              <col className="w-[8%]" />
+              <col className="w-[7%]" />
+            </colgroup>
             <thead>
               <tr className="bg-surface-2 text-content-muted">
                 {["رقم الفاتورة", "الطلب", "العميل", "الفني", "النوع", "العملة", "الحالة", "الإجمالي", "المتبقي", "إجراءات"].map(
                   (header) => (
-                    <th key={header} className="px-4 py-3 font-medium">
+                    <th key={header} className="px-5 py-3 font-medium">
                       {header}
                     </th>
                   ),
@@ -310,35 +353,39 @@ export function InvoicesScreen() {
                 ))
               ) : visibleInvoices.map((invoice) => (
                 <tr key={invoice.id} className="border-b border-border last:border-0 hover:bg-gold-soft">
-                  <td className="px-4 py-4 font-bold text-gold">{invoiceDisplayNumber(invoice)}</td>
-                  <td className="px-4 py-4 text-content-muted">{invoiceRequestDisplay(invoice)}</td>
-                  <td className="px-4 py-4 text-content">
-                    <div className="font-medium">{invoice.client}</div>
-                    <div className="text-xs text-content-muted" dir="ltr">
+                  <td className="px-5 py-4 font-bold text-gold" dir="ltr">{invoiceDisplayNumber(invoice)}</td>
+                  <td className="px-5 py-4 text-content-muted" dir="ltr">{invoiceRequestDisplay(invoice)}</td>
+                  <td className="px-5 py-4 text-content">
+                    <div className="truncate font-medium" title={invoice.client}>{invoice.client}</div>
+                    <div className="truncate text-xs text-content-muted" dir="ltr" title={invoice.clientPhone}>
                       {invoice.clientPhone}
                     </div>
                   </td>
-                  <td className="px-4 py-4 text-content-muted">{invoice.technician}</td>
-                  <td className="px-4 py-4">
+                  <td className="px-5 py-4 text-content-muted">
+                    <span className="block truncate" title={invoiceTechnicianDisplay(invoice, usersById)}>
+                      {invoiceTechnicianDisplay(invoice, usersById)}
+                    </span>
+                  </td>
+                  <td className="px-5 py-4">
                     <Badge tone="neutral">{typeLabel(invoice.type)}</Badge>
                   </td>
-                  <td className="px-4 py-4">
+                  <td className="px-5 py-4">
                     <Badge tone={invoice.currency === "SYP" ? "gold" : "info"}>
                       {currencyLabel(invoice.currency)}
                     </Badge>
                   </td>
-                  <td className="px-4 py-4">
+                  <td className="px-5 py-4">
                     <Badge tone={PAYMENT_TONE[invoice.status]} dot>
                       {PAYMENT_LABELS[invoice.status]}
                     </Badge>
                   </td>
-                  <td className="px-4 py-4 text-content-muted">
+                  <td className="px-5 py-4 text-content-muted" dir="ltr">
                     {formatMoney(invoice.total, invoice.currency)}
                   </td>
-                  <td className="px-4 py-4 text-content-muted">
+                  <td className="px-5 py-4 text-content-muted" dir="ltr">
                     {formatMoney(remaining(invoice.total, invoice.paid), invoice.currency)}
                   </td>
-                  <td className="px-4 py-4">
+                  <td className="px-5 py-4">
                     <div className="flex items-center justify-start gap-2" dir="rtl">
                       <button
                         type="button"

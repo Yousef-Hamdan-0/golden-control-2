@@ -30,3 +30,30 @@
       sans-serif;
   }
 }
+
+table {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0 !important;
+  table-layout: fixed;
+}
+
+th,
+td {
+  overflow-wrap: anywhere;
+  word-break: normal;
+  vertical-align: middle;
+}
+
+th.whitespace-nowrap,
+td.whitespace-nowrap,
+th .whitespace-nowrap:not(.inline-flex),
+td .whitespace-nowrap:not(.inline-flex) {
+  white-space: normal;
+}
+
+th [dir="ltr"],
+td [dir="ltr"] {
+  direction: ltr;
+  unicode-bidi: plaintext;
+}

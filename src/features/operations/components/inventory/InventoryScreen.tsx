@@ -330,12 +330,12 @@ export function InventoryScreen({ section = "parts" }: { section?: string }) {
           </div>
           <Card className="overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="min-w-[860px] w-full text-right text-sm">
+              <table className="min-w-[920px] w-full text-right text-sm">
                 <thead>
                   <tr className="bg-surface-2 text-content-muted">
                     {["رقم الحركة", "القطعة", "نوع الحركة", "الكمية", "المسؤول", "المرجع", "التاريخ"].map(
                       (header) => (
-                        <th key={header} className="px-4 py-3 font-medium">
+                        <th key={header} className="whitespace-nowrap px-4 py-3 font-medium">
                           {header}
                         </th>
                       ),
@@ -350,11 +350,13 @@ export function InventoryScreen({ section = "parts" }: { section?: string }) {
                   ) : visibleMovements.length ? (
                     visibleMovements.map((movement) => (
                       <tr key={movement.id} className="border-b border-border last:border-0 hover:bg-gold-soft">
-                        <td className="px-4 py-4 font-bold text-gold">{movement.id}</td>
+                        <td className="whitespace-nowrap px-4 py-4 font-bold text-gold">
+                          {movement.movementNumber || movement.id}
+                        </td>
                         <td className="px-4 py-4 text-content">
-                          <div className="font-medium">{movement.partName || "قطعة غير محددة"}</div>
-                          <div className="text-xs text-content-muted" dir="ltr">
-                            {movement.partId}
+                          <div className="whitespace-nowrap font-medium">{movement.partName || "قطعة غير محددة"}</div>
+                          <div className="whitespace-nowrap text-xs text-content-muted" dir="ltr">
+                            {movement.partNumber || "رقم غير محدد"}
                           </div>
                         </td>
                         <td className="px-4 py-4">
@@ -362,10 +364,10 @@ export function InventoryScreen({ section = "parts" }: { section?: string }) {
                             {INVENTORY_MOVEMENT_LABELS[movement.movementType].label}
                           </Badge>
                         </td>
-                        <td className="px-4 py-4 text-content-muted">{movement.quantity}</td>
-                        <td className="px-4 py-4 text-content-muted">{movement.owner}</td>
-                        <td className="px-4 py-4 text-content-muted">{movement.reference || "غير محدد"}</td>
-                        <td className="px-4 py-4 text-content-muted">
+                        <td className="whitespace-nowrap px-4 py-4 text-content-muted">{movement.quantity}</td>
+                        <td className="whitespace-nowrap px-4 py-4 text-content-muted">{movement.owner}</td>
+                        <td className="whitespace-nowrap px-4 py-4 text-content-muted">{movement.reference || "غير محدد"}</td>
+                        <td className="whitespace-nowrap px-4 py-4 text-content-muted">
                           {localDateKey(movement.createdAt, "غير محدد")}
                         </td>
                       </tr>

@@ -39,7 +39,9 @@ export interface InventoryPart {
 
 export interface InventoryMovementLog {
   id: string;
+  movementNumber: string;
   partId: string;
+  partNumber: string;
   partName: string;
   movementType: InventoryMovementType;
   quantity: number;
@@ -256,11 +258,37 @@ function normalizeMovementType(value: unknown): InventoryMovementType {
 export function normalizeInventoryMovement(payload: unknown, index: number): InventoryMovementLog {
   const raw = isRecord(payload) ? payload : {};
   const part = isRecord(raw.part) ? raw.part : isRecord(raw.sparePart) ? raw.sparePart : {};
+  const id = stringValue(raw.id, raw._id, `movement-${index + 1}`);
+  const movementNumber = stringValue(
+    raw.movementNumber,
+    raw.movement_number,
+    raw.transactionNumber,
+    raw.transaction_number,
+    raw.number,
+    raw.code,
+    raw.serial,
+    raw.sequence,
+    id,
+  );
 
   return {
-    id: stringValue(raw.id, raw._id, raw.movementNumber, raw.movement_number, `MOV-${index + 1}`),
+    id,
+    movementNumber,
     partId: stringValue(raw.partId, raw.part_id, raw.sparePartId, raw.spare_part_id, part.id),
-    partName: stringValue(raw.partName, raw.part_name, nestedName(part), part.sparePartNumber),
+    partNumber: stringValue(
+      raw.sparePartNumber,
+      raw.spare_part_number,
+      raw.partNumber,
+      raw.part_number,
+      raw.partCode,
+      raw.part_code,
+      part.sparePartNumber,
+      part.spare_part_number,
+      part.partNumber,
+      part.part_number,
+      part.sku,
+    ),
+    partName: stringValue(raw.partName, raw.part_name, raw.name, nestedName(part), part.sparePartNumber),
     movementType: normalizeMovementType(raw.movementType ?? raw.movement_type ?? raw.type),
     quantity: numberValue(raw.quantity, raw.qty),
     owner: stringValue(raw.owner, raw.createdBy, raw.created_by, raw.userName, "إدارة المخزون"),

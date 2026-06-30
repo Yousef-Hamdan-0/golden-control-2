@@ -66,10 +66,21 @@ function stringValue(...values: unknown[]): string {
 
 function numberValue(...values: unknown[]): number {
   for (const value of values) {
+    if (value === undefined || value === null || value === "") continue;
     const number = typeof value === "number" ? value : Number(value);
     if (Number.isFinite(number)) return number;
   }
   return 0;
+}
+
+function maybeNumberValue(...values: unknown[]): number | undefined {
+  for (const value of values) {
+    if (value === undefined || value === null || value === "") continue;
+    const number = typeof value === "number" ? value : Number(value);
+    if (Number.isFinite(number)) return number;
+  }
+
+  return undefined;
 }
 
 function dateValue(...values: unknown[]) {
@@ -94,26 +105,128 @@ function arrayData(payload: unknown, ...keys: string[]) {
   return [];
 }
 
+function firstArray(...values: unknown[]): unknown[] {
+  for (const value of values) {
+    if (Array.isArray(value)) return value;
+    if (isRecord(value)) {
+      if (Array.isArray(value.items)) return value.items;
+      if (Array.isArray(value.data)) return value.data;
+    }
+  }
+
+  return [];
+}
+
+function firstRecord(...values: unknown[]): JsonRecord {
+  for (const value of values) {
+    if (isRecord(value)) return value;
+    if (Array.isArray(value)) {
+      const record = value.find(isRecord);
+      if (record) return record;
+    }
+  }
+
+  return {};
+}
+
 function invoiceDataRecord(payload: unknown) {
   const root = isRecord(payload) ? payload : {};
   if (isRecord(root.invoice)) return root.invoice;
   if (isRecord(root.invoiceData)) return root.invoiceData;
+  if (isRecord(root.invoice_data)) return root.invoice_data;
   if (isRecord(root.data) && !Array.isArray(root.data)) {
     const data = root.data;
     if (isRecord(data.invoice)) return data.invoice;
     if (isRecord(data.invoiceData)) return data.invoiceData;
+    if (isRecord(data.invoice_data)) return data.invoice_data;
   }
   return root;
 }
 
-function nestedName(value: unknown) {
+function nestedName(value: unknown): string {
+  if (typeof value === "string" || typeof value === "number") return String(value);
   if (!isRecord(value)) return "";
-  return stringValue(value.fullName, value.full_name, value.name, value.title);
+  const firstLast = [
+    stringValue(value.firstName, value.first_name),
+    stringValue(value.lastName, value.last_name),
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return stringValue(
+    value.fullName,
+    value.full_name,
+    value.displayName,
+    value.display_name,
+    value.name,
+    value.username,
+    value.title,
+    value.email,
+    firstLast,
+    nestedName(value.user),
+    nestedName(value.profile),
+    nestedName(value.account),
+    nestedName(value.employee),
+  );
 }
 
-function nestedPhone(value: unknown) {
+function nestedPhone(value: unknown): string {
   if (!isRecord(value)) return "";
-  return stringValue(value.firstPhone, value.first_phone, value.phone, value.mobile);
+  return stringValue(
+    value.firstPhone,
+    value.first_phone,
+    value.phone,
+    value.mobile,
+    value.phoneNumber,
+    value.phone_number,
+    value.whatsapp,
+    isRecord(value.user) ? nestedPhone(value.user) : undefined,
+    isRecord(value.profile) ? nestedPhone(value.profile) : undefined,
+  );
+}
+
+function nestedAddress(value: unknown) {
+  if (!isRecord(value)) return "";
+  return stringValue(value.address, value.location, value.street);
+}
+
+function nestedLocationUrl(value: unknown) {
+  if (!isRecord(value)) return "";
+  return stringValue(
+    value.locationURL,
+    value.locationUrl,
+    value.location_url,
+    value.locationLink,
+    value.location_link,
+    value.mapUrl,
+    value.map_url,
+  );
+}
+
+function isLikelyIdentifier(value: string): boolean {
+  const trimmed = value.trim();
+  return UUID_PATTERN.test(trimmed) || /^[0-9a-f]{24}$/i.test(trimmed);
+}
+
+function displayNameValue(...values: unknown[]): string {
+  for (const value of values) {
+    const name = nestedName(value).trim();
+    if (name && !isLikelyIdentifier(name)) return name;
+  }
+
+  return "";
+}
+
+function booleanText(value: unknown) {
+  if (typeof value === "boolean") return value ? "نعم" : "";
+  return "";
+}
+
+function booleanValue(value: unknown) {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value !== 0;
+  if (typeof value === "string") return value.toLowerCase() === "true";
+  return false;
 }
 
 function normalizeCurrency(value: unknown): Currency {
@@ -147,98 +260,389 @@ export function toUiPaymentMethod(method: unknown): PaymentMethod {
 
 function normalizeInvoicePart(payload: unknown, index: number): InvoicePart {
   const raw = isRecord(payload) ? payload : {};
-  const sparePart = isRecord(raw.sparePart) ? raw.sparePart : {};
-  const sparePartId = stringValue(raw.sparePartId, raw.spare_part_id, sparePart.id);
-  const quantity = Math.max(1, numberValue(raw.quantity, raw.qty, 1));
-  const unitPrice = numberValue(raw.unitPrice, raw.unit_price, raw.price);
-  const totalPrice = numberValue(raw.totalPrice, raw.total_price, quantity * unitPrice);
+  const sparePart = firstRecord(
+    raw.sparePart,
+    raw.spare_part,
+    raw.part,
+    raw.inventoryPart,
+    raw.inventory_part,
+    raw.item,
+  );
+  const sparePartId = stringValue(
+    raw.sparePartId,
+    raw.spare_part_id,
+    raw.partId,
+    raw.part_id,
+    raw.inventoryPartId,
+    raw.inventory_part_id,
+    sparePart.id,
+  );
+  const quantity = Math.max(1, numberValue(raw.quantity, raw.qty, raw.count, 1));
+  const unitPrice = numberValue(
+    raw.unitPrice,
+    raw.unit_price,
+    raw.price,
+    raw.cost,
+    raw.amount,
+    raw.unitAmount,
+    raw.unit_amount,
+  );
+  const totalPrice = numberValue(
+    raw.totalPrice,
+    raw.total_price,
+    raw.total,
+    raw.totalAmount,
+    raw.total_amount,
+    quantity * unitPrice,
+  );
 
   return {
     id: stringValue(raw.id, raw._id, sparePartId, `PRT-${index + 1}`),
     sparePartId,
-    name: stringValue(raw.sparePartName, raw.spare_part_name, nestedName(sparePart), "قطعة غير محددة"),
+    name: stringValue(
+      raw.sparePartName,
+      raw.spare_part_name,
+      raw.partName,
+      raw.part_name,
+      raw.name,
+      raw.description,
+      nestedName(sparePart),
+      sparePart.sparePartNumber,
+      sparePart.spare_part_number,
+      "قطعة غير محددة",
+    ),
     quantity,
     unitPrice,
-    currency: normalizeCurrency(raw.currency),
+    currency: normalizeCurrency(raw.currency ?? sparePart.currency),
     totalPrice,
   };
 }
 
 export function normalizeInvoicePayment(payload: unknown, index = 0): InvoicePayment {
   const raw = isRecord(payload) ? payload : {};
+  const amount = numberValue(raw.amount, raw.paidAmount, raw.paid_amount, raw.value);
 
   return {
     id: stringValue(raw.id, raw._id, `PAY-${index + 1}`),
-    amount: numberValue(raw.amount),
+    amount,
     currency: normalizeCurrency(raw.currency),
     method: toUiPaymentMethod(raw.paymentMethod ?? raw.payment_method ?? raw.method),
-    dollarExchangeRate: numberValue(raw.dollarExchangeRate, raw.dollar_exchange_rate) || undefined,
-    convertedAmount: numberValue(raw.convertedAmount, raw.converted_amount, raw.amount),
-    paidAt: dateValue(raw.paidAt, raw.paid_at, raw.createdAt, raw.created_at),
+    dollarExchangeRate: maybeNumberValue(raw.dollarExchangeRate, raw.dollar_exchange_rate),
+    convertedAmount: maybeNumberValue(
+      raw.convertedAmount,
+      raw.converted_amount,
+      raw.convertedValue,
+      raw.converted_value,
+    ),
+    paidAt: dateValue(raw.paidAt, raw.paid_at, raw.paymentDate, raw.payment_date, raw.createdAt, raw.created_at),
   };
 }
 
 export function normalizeInvoice(payload: unknown): Invoice {
   if (!isRecord(payload)) throw new ApiError("استجابة الفاتورة غير صالحة.");
+  const root = isRecord(payload) ? payload : {};
+  const data = dataRecord(payload);
   const invoice = invoiceDataRecord(payload);
-  const request = isRecord(invoice.request) ? invoice.request : {};
-  const customer = isRecord(request.customer) ? request.customer : {};
-  const directCustomer = isRecord(invoice.customer) ? invoice.customer : {};
-  const technician = isRecord(invoice.technician) ? invoice.technician : {};
-  const items = arrayData(invoice.items, "items").map(normalizeInvoicePart);
-  const payments = arrayData(invoice.payments, "payments").map(normalizeInvoicePayment);
-  const total = numberValue(invoice.totalAmount, invoice.total_amount, invoice.total);
+  const request = firstRecord(
+    invoice.request,
+    invoice.repairRequest,
+    invoice.repair_request,
+    invoice.serviceRequest,
+    invoice.service_request,
+    invoice.order,
+    isRecord(data) ? data.request : undefined,
+    isRecord(data) ? data.repairRequest : undefined,
+    root.request,
+  );
+  const customer = firstRecord(
+    request.customer,
+    invoice.customer,
+    invoice.client,
+    isRecord(data) ? data.customer : undefined,
+    root.customer,
+  );
+  const assignment = firstRecord(
+    invoice.technicianAssignment,
+    invoice.technician_assignment,
+    invoice.latestTechnicianAssignment,
+    invoice.latest_technician_assignment,
+    invoice.technicianAssignments,
+    invoice.technician_assignments,
+    invoice.assignedTechnicians,
+    invoice.assigned_technicians,
+    invoice.assignment,
+    invoice.assignments,
+    request.technicianAssignment,
+    request.technician_assignment,
+    request.latestTechnicianAssignment,
+    request.latest_technician_assignment,
+    request.technicianAssignments,
+    request.technician_assignments,
+    request.assignedTechnicians,
+    request.assigned_technicians,
+    request.latestAssignment,
+    request.latest_assignment,
+    request.assignment,
+    request.assignments,
+  );
+  const assignmentTechnician = firstRecord(assignment.technician, assignment.user);
+  const technician = firstRecord(
+    invoice.technician,
+    invoice.technicianUser,
+    invoice.technician_user,
+    invoice.assignedTechnician,
+    invoice.assigned_technician,
+    invoice.assignedTo,
+    invoice.assigned_to,
+    request.technician,
+    request.technicianUser,
+    request.technician_user,
+    request.currentTechnician,
+    request.current_technician,
+    request.assignedTechnician,
+    request.assigned_technician,
+    request.assignedTo,
+    request.assigned_to,
+    request.responsibleTechnician,
+    request.responsible_technician,
+    assignmentTechnician,
+    assignment,
+  );
+  const rawItems = firstArray(
+    invoice.items,
+    invoice.invoiceItems,
+    invoice.invoice_items,
+    invoice.parts,
+    invoice.spareParts,
+    invoice.spare_parts,
+    invoice.usedParts,
+    invoice.used_parts,
+    invoice.lineItems,
+    invoice.line_items,
+    invoice.details,
+    invoice.invoiceDetails,
+    invoice.invoice_details,
+    isRecord(data) ? data.items : undefined,
+    isRecord(data) ? data.invoiceItems : undefined,
+    isRecord(data) ? data.invoice_items : undefined,
+  );
+  const rawPaymentItems = firstArray(
+    invoice.payments,
+    invoice.invoicePayments,
+    invoice.invoice_payments,
+    invoice.paymentRecords,
+    invoice.payment_records,
+    invoice.transactions,
+    invoice.receipts,
+    isRecord(data) ? data.payments : undefined,
+    isRecord(data) ? data.invoicePayments : undefined,
+    isRecord(data) ? data.invoice_payments : undefined,
+    root.payments,
+  );
+  const singlePayment = firstRecord(invoice.payment, invoice.initialPayment, invoice.latestPayment);
+  const paymentItems = rawPaymentItems.length
+    ? rawPaymentItems
+    : Object.keys(singlePayment).length
+      ? [singlePayment]
+      : [];
+  const items = rawItems.map(normalizeInvoicePart);
+  const payments = paymentItems.map(normalizeInvoicePayment);
+  const itemsTotal = items.reduce(
+    (sum, item) => sum + (item.totalPrice ?? item.quantity * item.unitPrice),
+    0,
+  );
+  const total = numberValue(
+    invoice.totalAmount,
+    invoice.total_amount,
+    invoice.total,
+    invoice.grandTotal,
+    invoice.grand_total,
+    invoice.amount,
+    itemsTotal,
+  );
   const paid = numberValue(
     invoice.paidAmount,
     invoice.paid_amount,
+    invoice.paid,
+    invoice.totalPaid,
+    invoice.total_paid,
     payments.reduce((sum, payment) => sum + (payment.convertedAmount ?? payment.amount), 0),
   );
-  const currency = normalizeCurrency(invoice.totalCurrency ?? invoice.total_currency ?? invoice.currency);
+  const currency = normalizeCurrency(
+    invoice.totalCurrency ?? invoice.total_currency ?? invoice.currency ?? invoice.paymentCurrency,
+  );
   const status = toUiInvoiceStatus(invoice.status, paid, total);
   const firstPayment = payments[0];
-  const requestId = stringValue(invoice.requestId, invoice.request_id, request.id);
+  const requestId = stringValue(invoice.requestId, invoice.request_id, request.id, request._id);
   const requestNumber = stringValue(
     invoice.requestNumber,
     invoice.request_number,
+    invoice.orderNumber,
+    invoice.order_number,
     request.requestNumber,
     request.request_number,
+    request.orderNumber,
+    request.order_number,
+  );
+  const technicianId = stringValue(
+    invoice.technicianId,
+    invoice.technician_id,
+    invoice.assignedTechnicianId,
+    invoice.assigned_technician_id,
+    invoice.assignedToId,
+    invoice.assigned_to_id,
+    request.technicianId,
+    request.technician_id,
+    request.assignedTechnicianId,
+    request.assigned_technician_id,
+    request.assignedToId,
+    request.assigned_to_id,
+    technician.id,
+    technician._id,
+    technician.userNumber,
+    technician.user_number,
+    assignment.technicianId,
+    assignment.technician_id,
+    assignment.userId,
+    assignment.user_id,
+    assignmentTechnician.id,
+    assignmentTechnician._id,
+    assignmentTechnician.userNumber,
+    assignmentTechnician.user_number,
+  );
+  const invoiceNumber = stringValue(
+    invoice.invoiceNumber,
+    invoice.invoice_number,
+    invoice.number,
+    invoice.code,
+  );
+  const technicianName = stringValue(
+    displayNameValue(
+      invoice.technicianName,
+      invoice.technician_name,
+      invoice.technicianFullName,
+      invoice.technician_full_name,
+      invoice.technician,
+      invoice.technicianUser,
+      invoice.technician_user,
+      invoice.assignedTechnician,
+      invoice.assigned_technician,
+      invoice.assignedTo,
+      invoice.assigned_to,
+      request.technicianName,
+      request.technician_name,
+      request.technicianFullName,
+      request.technician_full_name,
+      request.technician,
+      request.technicianUser,
+      request.technician_user,
+      request.currentTechnician,
+      request.current_technician,
+      request.assignedTechnician,
+      request.assigned_technician,
+      request.assignedTo,
+      request.assigned_to,
+      request.responsibleTechnician,
+      request.responsible_technician,
+      assignmentTechnician,
+      assignment,
+    ),
+    "غير محدد",
   );
 
   return {
-    id: stringValue(invoice.id, invoice._id, invoice.invoiceNumber, invoice.invoice_number),
-    invoiceNumber: stringValue(invoice.invoiceNumber, invoice.invoice_number),
+    id: stringValue(invoice.id, invoice._id, invoiceNumber),
+    invoiceNumber,
     orderId: requestId || requestNumber,
     requestNumber,
     type: stringValue(invoice.type, request.type).toLowerCase() === "internal" ? "internal" : "external",
     client: stringValue(
       nestedName(customer),
-      nestedName(directCustomer),
       invoice.customerName,
       invoice.customer_name,
+      invoice.clientName,
+      invoice.client_name,
+      typeof invoice.client === "string" ? invoice.client : undefined,
+      request.customerName,
+      request.customer_name,
       "غير محدد",
     ),
     clientPhone: stringValue(
       nestedPhone(customer),
-      nestedPhone(directCustomer),
       invoice.customerPhone,
       invoice.customer_phone,
+      invoice.clientPhone,
+      invoice.client_phone,
+      request.customerPhone,
+      request.customer_phone,
+      request.phone,
       "غير محدد",
     ),
-    clientPhone2: stringValue(customer.secondPhone, customer.second_phone, "لا يوجد"),
-    clientAddress: stringValue(customer.address, directCustomer.address, request.address, "غير محدد"),
-    technician: stringValue(nestedName(technician), invoice.technicianName, invoice.technician_name, "غير محدد"),
-    technicianPhone: stringValue(technician.phone, invoice.technicianPhone, "لا يوجد"),
+    clientPhone2: stringValue(
+      customer.secondPhone,
+      customer.second_phone,
+      customer.phone2,
+      invoice.customerSecondPhone,
+      invoice.customer_second_phone,
+      invoice.clientPhone2,
+      invoice.client_phone_2,
+      request.secondPhone,
+      request.second_phone,
+      request.phone2,
+      "لا يوجد",
+    ),
+    clientAddress: stringValue(
+      nestedAddress(customer),
+      invoice.customerAddress,
+      invoice.customer_address,
+      invoice.clientAddress,
+      invoice.client_address,
+      request.address,
+      "غير محدد",
+    ),
+    technicianId,
+    technician: technicianName,
+    technicianPhone: stringValue(
+      nestedPhone(technician),
+      nestedPhone(assignmentTechnician),
+      invoice.technicianPhone,
+      invoice.technician_phone,
+      request.technicianPhone,
+      request.technician_phone,
+      "لا يوجد",
+    ),
     status,
     currency,
-    paymentMethod: firstPayment?.method ?? "cash",
+    paymentMethod: toUiPaymentMethod(invoice.paymentMethod ?? invoice.payment_method ?? firstPayment?.method),
     total,
     paid: Math.min(total, Math.max(0, paid)),
-    issuedAt: dateValue(invoice.createdAt, invoice.created_at),
-    warrantyDuration: stringValue(invoice.warrantyPeriod, invoice.warranty_period),
-    locationURL: stringValue(invoice.locationURL, invoice.locationUrl, invoice.location_url),
-    centerPullItems: stringValue(invoice.needsCenterMaintenance, invoice.needs_center_maintenance),
-    notes: stringValue(invoice.notes),
-    returned: status === "refunded",
+    issuedAt: dateValue(invoice.issuedAt, invoice.issued_at, invoice.createdAt, invoice.created_at),
+    warrantyDuration: stringValue(
+      invoice.warrantyDuration,
+      invoice.warranty_duration,
+      invoice.warrantyPeriod,
+      invoice.warranty_period,
+      invoice.warranty,
+    ),
+    locationURL: stringValue(
+      invoice.locationURL,
+      invoice.locationUrl,
+      invoice.location_url,
+      nestedLocationUrl(customer),
+      nestedLocationUrl(request),
+    ),
+    centerPullItems: stringValue(
+      invoice.centerPullItems,
+      invoice.center_pull_items,
+      invoice.needsCenterMaintenance,
+      invoice.needs_center_maintenance,
+      invoice.centerMaintenanceNotes,
+      invoice.center_maintenance_notes,
+      booleanText(invoice.needsCenterMaintenance),
+      booleanText(invoice.needs_center_maintenance),
+    ),
+    notes: stringValue(invoice.notes, invoice.note, invoice.description),
+    returned: status === "refunded" || booleanValue(invoice.returned),
     parts: items,
     payments,
   };
