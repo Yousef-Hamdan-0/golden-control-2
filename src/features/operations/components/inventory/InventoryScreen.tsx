@@ -42,24 +42,6 @@ function isSparePartNumberSearch(value: string) {
   return /^SP[-\s]?\d+/i.test(term) || /^\d+$/.test(term);
 }
 
-function normalizeSearch(value: string) {
-  return value.trim().toLowerCase();
-}
-
-function normalizePartNumberSearch(value: string) {
-  return normalizeSearch(value).replace(/[^a-z0-9]/g, "");
-}
-
-function partMatchesSearch(part: InventoryPart, query: string) {
-  const term = normalizeSearch(query);
-  if (!term) return true;
-
-  return (
-    normalizeSearch(part.name).includes(term) ||
-    normalizePartNumberSearch(part.sparePartNumber).includes(normalizePartNumberSearch(term))
-  );
-}
-
 function partListParams(query: string, page: number) {
   const search = query.trim();
   const params: { page: number; pageSize: number; name?: string; sparePartNumber?: string } = {
@@ -103,7 +85,7 @@ export function InventoryScreen({ section = "parts" }: { section?: string }) {
   const movementsQuery = useInventoryMovementsQuery();
   const { createPart, updatePart, deletePart, createMovement } = useInventoryMutations();
   const inventoryItems = partsQuery.data?.items ?? EMPTY_PARTS;
-  const visibleParts = inventoryItems.filter((item) => partMatchesSearch(item, query));
+  const visibleParts = inventoryItems;
   const inventoryMovements = movementsQuery.data ?? EMPTY_MOVEMENTS;
   const lowStock = visibleParts.filter((item) => item.quantity <= 0);
   const inventoryValueSyp = visibleParts.reduce(
@@ -127,11 +109,7 @@ export function InventoryScreen({ section = "parts" }: { section?: string }) {
     (currentMovementPage - 1) * PAGE_SIZE,
     currentMovementPage * PAGE_SIZE,
   );
-  const hasServerPartPagination = (partsQuery.data?.total ?? 0) > inventoryItems.length;
-  const displayedTotalParts =
-    query.trim() && !hasServerPartPagination
-      ? visibleParts.length
-      : (partsQuery.data?.total ?? inventoryItems.length);
+  const displayedTotalParts = partsQuery.data?.total ?? inventoryItems.length;
   const currentPartPage = partsQuery.data?.page ?? partPage;
   const isPartSubmitting = createPart.isPending || updatePart.isPending;
   const partSubmitError =

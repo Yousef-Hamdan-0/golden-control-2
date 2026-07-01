@@ -95,22 +95,6 @@ function getPdfDownloadErrorMessage(error: unknown) {
   return message;
 }
 
-function normalizeSearchText(value: string) {
-  return value.trim().toLowerCase();
-}
-
-function requestMatchesSearch(request: RepairRequest, search: string) {
-  const term = normalizeSearchText(search);
-  if (!term) return true;
-
-  return [
-    request.requestNumber,
-    request.customer.name,
-    request.customer.firstPhone,
-    request.customer.secondPhone,
-  ].some((value) => normalizeSearchText(value).includes(term));
-}
-
 function isLikelyIdentifier(value: string) {
   const trimmed = value.trim();
   return (
@@ -160,7 +144,6 @@ export function RequestsScreen() {
     role: "all",
     status: "all",
   });
-  const isLocalSearch = Boolean(query.trim());
 
   const listParams = useMemo(
     () => ({
@@ -169,10 +152,11 @@ export function RequestsScreen() {
       type,
       startDate: dateFilter.from,
       endDate: dateFilter.to,
-      page: isLocalSearch ? 1 : page,
+      search: query,
+      page,
       pageSize: PAGE_SIZE,
     }),
-    [dateFilter.from, dateFilter.to, isLocalSearch, page, priority, status, type],
+    [dateFilter.from, dateFilter.to, page, priority, query, status, type],
   );
   const {
     data,
@@ -182,22 +166,15 @@ export function RequestsScreen() {
     refetch,
   } = useRequestsQuery(listParams);
   const requests = data?.items ?? EMPTY_REQUESTS;
-  const filteredRequests = useMemo(
-    () => requests.filter((request) => requestMatchesSearch(request, query)),
-    [query, requests],
-  );
-  const localPages = Math.max(1, Math.ceil(filteredRequests.length / PAGE_SIZE));
-  const currentPage = isLocalSearch ? Math.min(page, localPages) : (data?.page ?? page);
-  const tableRequests = isLocalSearch
-    ? filteredRequests.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
-    : requests;
+  const currentPage = data?.page ?? page;
+  const tableRequests = requests;
   const selectedPreview =
     requests.find((request) => request.id === selectedRequestId) ?? null;
   const detailsQuery = useRequestQuery(selectedRequestId);
   const detailsRequest = detailsQuery.data ?? selectedPreview;
   const statusHistoryQuery = useRequestStatusHistoryQuery(selectedRequestId);
-  const totalRequests = isLocalSearch ? filteredRequests.length : (data?.total ?? 0);
-  const metricRequests = isLocalSearch ? filteredRequests : requests;
+  const totalRequests = data?.total ?? 0;
+  const metricRequests = requests;
   const completedCount = metricRequests.filter((request) => request.status === "completed").length;
   const incompletedCount = metricRequests.filter(
     (request) => request.status === "incompleted",

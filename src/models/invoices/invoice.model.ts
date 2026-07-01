@@ -23,8 +23,13 @@ export interface InvoiceListParams {
   page?: number;
   pageSize?: number;
   requestId?: string;
+  search?: string;
   type?: InvoiceType | "all";
   status?: PaymentStatus | "all";
+  currency?: Currency | "all";
+  paymentMethod?: PaymentMethod | "all";
+  startDate?: string;
+  endDate?: string;
 }
 
 export interface PaymentListParams {

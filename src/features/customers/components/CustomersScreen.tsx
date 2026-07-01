@@ -390,7 +390,6 @@ function CustomerDetailsModal({
 
 export function CustomersScreen() {
   const toast = useToast();
-  const [searchDraft, setSearchDraft] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -425,13 +424,7 @@ export function CustomersScreen() {
     }
   }, [isError, listError, toast]);
 
-  function applyFilters() {
-    setSearch(searchDraft.trim());
-    setPage(1);
-  }
-
   function clearFilters() {
-    setSearchDraft("");
     setSearch("");
     setPage(1);
   }
@@ -545,28 +538,22 @@ export function CustomersScreen() {
       ) : null}
 
       <Card className="p-4">
-        <form
-          className="grid gap-3 md:grid-cols-[1fr_auto_auto]"
-          onSubmit={(event) => {
-            event.preventDefault();
-            applyFilters();
-          }}
-        >
+        <div className="grid gap-3 md:grid-cols-[1fr_auto]">
           <Field label="بحث العملاء">
             <Input
-              value={searchDraft}
-              onChange={(event) => setSearchDraft(event.target.value)}
+              value={search}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setPage(1);
+              }}
               placeholder="اسم العميل أو رقم الهاتف"
               aria-label="بحث العملاء بالاسم أو رقم الهاتف"
             />
           </Field>
-          <Button type="submit" className="self-end">
-            بحث
-          </Button>
           <Button type="button" variant="outline" className="self-end" onClick={clearFilters}>
             مسح
           </Button>
-        </form>
+        </div>
       </Card>
 
       {isError && !data ? (

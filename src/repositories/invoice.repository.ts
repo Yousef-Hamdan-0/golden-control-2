@@ -39,10 +39,17 @@ async function fetchInvoicePage(params: InvoiceListParams = {}) {
   });
 
   if (params.requestId?.trim()) searchParams.set("requestId", params.requestId.trim());
+  if (params.search?.trim()) searchParams.set("search", params.search.trim());
   if (params.type && params.type !== "all") searchParams.set("type", params.type);
   if (params.status && params.status !== "all" && params.status !== "unpaid") {
     searchParams.set("status", toApiInvoiceStatus(params.status));
   }
+  if (params.currency && params.currency !== "all") searchParams.set("currency", params.currency);
+  if (params.paymentMethod && params.paymentMethod !== "all") {
+    searchParams.set("paymentMethod", toApiPaymentMethod(params.paymentMethod));
+  }
+  if (params.startDate?.trim()) searchParams.set("startDate", params.startDate.trim());
+  if (params.endDate?.trim()) searchParams.set("endDate", params.endDate.trim());
 
   const payload = await requestAuthenticatedApi(
     `${API_ENDPOINTS.invoices.root}?${searchParams}`,

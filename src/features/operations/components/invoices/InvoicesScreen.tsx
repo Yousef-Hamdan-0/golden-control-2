@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -25,11 +25,9 @@ import {
   useInvoiceMutations,
   useInvoicePaymentsQuery,
   useInvoiceQuery,
-  useInvoicesAllQuery,
   useInvoicesQuery,
 } from "@/features/invoices/hooks/use-invoices";
 import { useDollarExchangeRate } from "@/features/settings/hooks/use-settings";
-import { matchesDateValue } from "../../utils/filter";
 import { typeLabel, currencyLabel, remaining } from "../../utils/invoice";
 import { SectionTitle } from "../shared/SectionTitle";
 import { KpiCards } from "../shared/KpiCards";
@@ -41,22 +39,17 @@ import { AddPaymentModal } from "./AddPaymentModal";
 
 const EMPTY_INVOICES: Invoice[] = [];
 
-function invoiceDisplayNumber(invoice: Invoice) {
-  return invoice.invoiceNumber || invoice.id;
+function invoiceTypeFromParam(value: string | null): InvoiceType | "all" {
+  return value === "internal" || value === "external" ? value : "all";
 }
 
-function invoiceMatchesSearch(invoice: Invoice, query: string) {
-  const normalized = query.trim().toLowerCase();
-  if (!normalized) return true;
-  return [
-    invoice.invoiceNumber,
-    invoice.id,
-    invoice.requestNumber,
-    invoice.orderId,
-    invoice.client,
-    invoice.clientPhone,
-    invoice.clientPhone2,
-  ].some((value) => value?.toLowerCase().includes(normalized));
+function invoiceCurrencyFromParam(value: string | null): Currency | "all" {
+  const normalized = value?.toUpperCase();
+  return normalized === "SYP" || normalized === "USD" ? normalized : "all";
+}
+
+function invoiceDisplayNumber(invoice: Invoice) {
+  return invoice.invoiceNumber || invoice.id;
 }
 
 function savePdf(response: Awaited<ReturnType<typeof invoiceService.downloadPdf>>, invoice: Invoice) {
@@ -71,12 +64,13 @@ function savePdf(response: Awaited<ReturnType<typeof invoiceService.downloadPdf>
 }
 
 export function InvoicesScreen() {
+  const router = useRouter();
   const params = useSearchParams();
   const toast = useToast();
-  const initialType = params.get("type") as InvoiceType | null;
-  const initialCurrency = params.get("currency")?.toUpperCase() as Currency | undefined;
-  const [type, setType] = useState<InvoiceType | "all">(initialType ?? "all");
-  const [currency, setCurrency] = useState<Currency | "all">(initialCurrency ?? "all");
+  const typeParam = params.get("type");
+  const currencyParam = params.get("currency");
+  const [type, setType] = useState<InvoiceType | "all">(() => invoiceTypeFromParam(typeParam));
+  const [currency, setCurrency] = useState<Currency | "all">(() => invoiceCurrencyFromParam(currencyParam));
   const [status, setStatus] = useState<PaymentStatus | "all">("all");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | "all">("all");
   const [query, setQuery] = useState("");
@@ -89,20 +83,19 @@ export function InvoicesScreen() {
   const { recordPayment } = useInvoiceMutations();
   const dollarExchangeRate = useDollarExchangeRate();
   const queryIsRequestId = isUuid(query);
-  const hasTextSearch = Boolean(query.trim());
-  const hasLocalFilter =
-    currency !== "all" ||
-    paymentMethod !== "all" ||
-    Boolean(dateFilter.from || dateFilter.to) ||
-    (hasTextSearch && !queryIsRequestId);
   const baseListParams = useMemo(
     () => ({
       pageSize: PAGE_SIZE,
       requestId: queryIsRequestId ? query.trim() : undefined,
+      search: !queryIsRequestId ? query : undefined,
       type,
       status,
+      currency,
+      paymentMethod,
+      startDate: dateFilter.from,
+      endDate: dateFilter.to,
     }),
-    [query, queryIsRequestId, status, type],
+    [currency, dateFilter.from, dateFilter.to, paymentMethod, query, queryIsRequestId, status, type],
   );
   const listParams = useMemo(
     () => ({
@@ -111,12 +104,8 @@ export function InvoicesScreen() {
     }),
     [baseListParams, page],
   );
-  const pagedInvoicesQuery = useInvoicesQuery(listParams, !hasLocalFilter);
-  const allInvoicesQuery = useInvoicesAllQuery(baseListParams, hasLocalFilter);
-  const activeListQuery = hasLocalFilter ? allInvoicesQuery : pagedInvoicesQuery;
-  const invoices = hasLocalFilter
-    ? allInvoicesQuery.data ?? EMPTY_INVOICES
-    : pagedInvoicesQuery.data?.items ?? EMPTY_INVOICES;
+  const activeListQuery = useInvoicesQuery(listParams);
+  const invoices = activeListQuery.data?.items ?? EMPTY_INVOICES;
   const detailQuery = useInvoiceQuery(viewingInvoice?.id ?? null);
   const paymentsQuery = useInvoicePaymentsQuery(viewingInvoice?.id ?? null);
   const activeViewingInvoice = detailQuery.data ?? viewingInvoice;
@@ -124,27 +113,20 @@ export function InvoicesScreen() {
     ? { ...activeViewingInvoice, payments: paymentsQuery.data ?? activeViewingInvoice.payments }
     : null;
 
-  const filtered = invoices.filter((invoice) => {
-    const byCurrency = currency === "all" || invoice.currency === currency;
-    const byPaymentMethod = paymentMethod === "all" || invoice.paymentMethod === paymentMethod;
-    const byDate = matchesDateValue(invoice.issuedAt, dateFilter);
-    const bySearch = queryIsRequestId || invoiceMatchesSearch(invoice, query);
-    return byCurrency && byPaymentMethod && byDate && bySearch;
-  });
+  useEffect(() => {
+    setType(invoiceTypeFromParam(typeParam));
+    setCurrency(invoiceCurrencyFromParam(currencyParam));
+    setPage(1);
+  }, [currencyParam, typeParam]);
 
-  const total = filtered.reduce((sum, invoice) => sum + invoice.total, 0);
-  const paid = filtered.reduce((sum, invoice) => sum + invoice.paid, 0);
+  const total = invoices.reduce((sum, invoice) => sum + invoice.total, 0);
+  const paid = invoices.reduce((sum, invoice) => sum + invoice.paid, 0);
   const completedInvoices = invoices.filter((invoice) => invoice.status === "paid").length;
   const incompletedInvoices = invoices.filter((invoice) => invoice.status !== "paid").length;
   const hasDateFilter = Boolean(dateFilter.from || dateFilter.to);
-  const localPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const currentPage = hasLocalFilter
-    ? Math.min(page, localPages)
-    : (pagedInvoicesQuery.data?.page ?? page);
-  const visibleInvoices = hasLocalFilter
-    ? filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
-    : filtered;
-  const tableTotal = hasLocalFilter ? filtered.length : (pagedInvoicesQuery.data?.total ?? 0);
+  const currentPage = activeListQuery.data?.page ?? page;
+  const visibleInvoices = invoices;
+  const tableTotal = activeListQuery.data?.total ?? 0;
 
   function savePayment(payment: InvoicePayment, convertedAmount: number) {
     if (!paymentInvoice) return;
@@ -187,6 +169,24 @@ export function InvoicesScreen() {
 
   function refreshList() {
     void activeListQuery.refetch();
+  }
+
+  function updateInvoiceUrl(next: {
+    type?: InvoiceType | "all";
+    currency?: Currency | "all";
+  }) {
+    const searchParams = new URLSearchParams(params.toString());
+    const nextType = next.type ?? type;
+    const nextCurrency = next.currency ?? currency;
+
+    if (nextType === "all") searchParams.delete("type");
+    else searchParams.set("type", nextType);
+
+    if (nextCurrency === "all") searchParams.delete("currency");
+    else searchParams.set("currency", nextCurrency.toLowerCase());
+
+    const queryString = searchParams.toString();
+    router.replace(queryString ? `/invoices?${queryString}` : "/invoices");
   }
 
   function canAddPayment(invoice: Invoice) {
@@ -257,12 +257,28 @@ export function InvoicesScreen() {
           placeholder="بحث برقم الفاتورة، العميل أو الهاتف"
           aria-label="بحث الفواتير"
         />
-        <Select value={type} onChange={(event) => { setType(event.target.value as InvoiceType | "all"); setPage(1); }}>
+        <Select
+          value={type}
+          onChange={(event) => {
+            const nextType = event.target.value as InvoiceType | "all";
+            setType(nextType);
+            setPage(1);
+            updateInvoiceUrl({ type: nextType });
+          }}
+        >
           <option value="all">كل الفواتير</option>
           <option value="external">فواتير خارجية</option>
           <option value="internal">فواتير داخلية</option>
         </Select>
-        <Select value={currency} onChange={(event) => { setCurrency(event.target.value as Currency | "all"); setPage(1); }}>
+        <Select
+          value={currency}
+          onChange={(event) => {
+            const nextCurrency = event.target.value as Currency | "all";
+            setCurrency(nextCurrency);
+            setPage(1);
+            updateInvoiceUrl({ currency: nextCurrency });
+          }}
+        >
           <option value="all">كل العملات</option>
           <option value="SYP">ليرة سورية</option>
           <option value="USD">دولار</option>

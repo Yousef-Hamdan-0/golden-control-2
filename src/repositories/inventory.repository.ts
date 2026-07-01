@@ -29,14 +29,6 @@ export interface InventoryPartListParams {
   pageSize?: number;
 }
 
-function normalizePartSearch(value: string) {
-  return value.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
-}
-
-function partNumberMatches(part: InventoryPart, query: string) {
-  return normalizePartSearch(part.sparePartNumber).includes(normalizePartSearch(query));
-}
-
 async function fetchPartsPage(params: InventoryPartListParams): Promise<InventoryListResult<InventoryPart>> {
   const page = params.page ?? 1;
   const pageSize = params.pageSize ?? PAGE_SIZE;
@@ -139,33 +131,6 @@ export const inventoryRepository = {
   },
 
   async listParts(params: InventoryPartListParams = {}): Promise<InventoryListResult<InventoryPart>> {
-    const page = params.page ?? 1;
-    const pageSize = params.pageSize ?? PAGE_SIZE;
-    const sparePartNumber = params.sparePartNumber?.trim();
-
-    if (sparePartNumber) {
-      let matches: InventoryPart[];
-      try {
-        const allParts = await fetchAllParts({ sparePartNumber, pageSize });
-        matches = allParts.filter((part) => partNumberMatches(part, sparePartNumber));
-      } catch {
-        matches = [];
-      }
-
-      if (!matches.length) {
-        const allParts = await fetchAllParts({ pageSize });
-        matches = allParts.filter((part) => partNumberMatches(part, sparePartNumber));
-      }
-      const start = (page - 1) * pageSize;
-
-      return {
-        items: matches.slice(start, start + pageSize),
-        total: matches.length,
-        page,
-        pageSize,
-      };
-    }
-
     return fetchPartsPage(params);
   },
 
