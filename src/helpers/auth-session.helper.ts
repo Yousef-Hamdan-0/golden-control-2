@@ -16,10 +16,15 @@ export const AuthSessionSchema = z.object({
 
 export type AuthSession = z.infer<typeof AuthSessionSchema>;
 
+function maskedToken(value: string | null) {
+  if (!value) return "not found";
+  if (value.length <= 16) return `${value.slice(0, 4)}...****`;
+  return `${value.slice(0, 12)}...****...${value.slice(-8)}`;
+}
+
 function printAccessToken(accessToken: string | null) {
   if (process.env.NODE_ENV !== "development") return;
-
-  console.log("accessToken:", accessToken);
+  console.log("[auth] access token:", maskedToken(accessToken));
 }
 
 export function createAuthSession(

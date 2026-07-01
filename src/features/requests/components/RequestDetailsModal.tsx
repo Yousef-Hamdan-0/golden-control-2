@@ -31,6 +31,7 @@ import {
   useInvoicePaymentsQuery,
   useInvoiceQuery,
 } from "@/features/invoices/hooks/use-invoices";
+import { useDollarExchangeRate } from "@/features/settings/hooks/use-settings";
 import {
   REQUEST_PRIORITY_LABELS,
   REQUEST_STATUS_LABELS,
@@ -134,6 +135,7 @@ export function RequestDetailsModal({
   const [paymentInvoice, setPaymentInvoice] = useState<Invoice | null>(null);
   const [invoicePdfId, setInvoicePdfId] = useState<string | null>(null);
   const { create, recordPayment } = useInvoiceMutations();
+  const dollarExchangeRate = useDollarExchangeRate();
   const invoices = request?.invoices ?? [];
   const hasPaidInvoice = invoices.some((invoice) => invoice.status === "paid");
   const canCreateRequestInvoice = Boolean(
@@ -551,6 +553,7 @@ export function RequestDetailsModal({
           onSave={saveInvoice}
           submitting={create.isPending}
           submitError={create.error ? getApiErrorMessage(create.error) : undefined}
+          dollarExchangeRate={dollarExchangeRate}
         />
       ) : null}
       {activeViewingInvoiceWithPayments ? (
@@ -573,6 +576,7 @@ export function RequestDetailsModal({
           onSave={savePayment}
           submitting={recordPayment.isPending}
           submitError={recordPayment.error ? getApiErrorMessage(recordPayment.error) : undefined}
+          dollarExchangeRate={dollarExchangeRate}
         />
       ) : null}
     </>

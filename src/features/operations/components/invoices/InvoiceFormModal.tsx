@@ -37,6 +37,7 @@ export function InvoiceFormModal({
   submitting = false,
   submitError,
   lockRequest = false,
+  dollarExchangeRate = USD_TO_SYP_RATE,
 }: {
   invoice: Invoice;
   mode?: "create" | "edit";
@@ -45,6 +46,7 @@ export function InvoiceFormModal({
   submitting?: boolean;
   submitError?: string;
   lockRequest?: boolean;
+  dollarExchangeRate?: number;
 }) {
   const [draft, setDraft] = useState<Invoice>(invoice);
   const [pendingInvoice, setPendingInvoice] = useState<Invoice | null>(null);
@@ -195,6 +197,7 @@ export function InvoiceFormModal({
 
     return {
       ...draft,
+      dollarExchangeRate,
       client: draft.client || "عميل غير محدد",
       clientPhone: draft.clientPhone || "غير محدد",
       clientPhone2: draft.clientPhone2 || "لا يوجد",
@@ -420,7 +423,7 @@ export function InvoiceFormModal({
           </Card>
 
           <p className="text-sm font-medium text-content-muted">
-            ملاحظة: سعر الصرف الحالي لكل 1 دولار = {formatMoney(USD_TO_SYP_RATE, "SYP")}
+            ملاحظة: سعر الصرف الحالي لكل 1 دولار = {formatMoney(dollarExchangeRate, "SYP")}
           </p>
 
           <Card className="space-y-4 p-4 shadow-none">

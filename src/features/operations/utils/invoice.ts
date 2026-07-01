@@ -40,10 +40,11 @@ export function convertPaymentToInvoiceCurrency(
   amount: number,
   paymentCurrency: PaymentCurrency,
   invoiceCurrency: Currency,
+  rate: number = USD_TO_SYP_RATE,
 ): number {
   if (paymentCurrency === invoiceCurrency) return amount;
-  if (invoiceCurrency === "SYP") return amount * USD_TO_SYP_RATE;
-  return amount / USD_TO_SYP_RATE;
+  if (invoiceCurrency === "SYP") return amount * rate;
+  return amount / rate;
 }
 
 export function normalizeInvoice(invoice: Partial<Invoice>): Invoice {

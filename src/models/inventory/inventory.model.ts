@@ -137,6 +137,24 @@ function nestedName(value: unknown) {
   return stringValue(value.fullName, value.full_name, value.name, value.title);
 }
 
+function isLikelyPrivateIdentifier(value: string) {
+  const trimmed = value.trim();
+  return (
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      trimmed,
+    ) || /^[0-9a-f]{24}$/i.test(trimmed)
+  );
+}
+
+function publicCodeValue(...values: unknown[]) {
+  for (const value of values) {
+    const code = stringValue(value).trim();
+    if (code && !isLikelyPrivateIdentifier(code)) return code;
+  }
+
+  return "";
+}
+
 function normalizeUsedPart(payload: unknown, index: number): InventoryDailyUsedPart {
   const raw = isRecord(payload) ? payload : {};
   const part = isRecord(raw.part) ? raw.part : {};
@@ -259,16 +277,36 @@ export function normalizeInventoryMovement(payload: unknown, index: number): Inv
   const raw = isRecord(payload) ? payload : {};
   const part = isRecord(raw.part) ? raw.part : isRecord(raw.sparePart) ? raw.sparePart : {};
   const id = stringValue(raw.id, raw._id, `movement-${index + 1}`);
-  const movementNumber = stringValue(
+  const movementNumber = publicCodeValue(
     raw.movementNumber,
     raw.movement_number,
+    raw.movementNo,
+    raw.movement_no,
+    raw.movementCode,
+    raw.movement_code,
+    raw.movementId,
+    raw.movement_id,
+    raw.inventoryMovementNumber,
+    raw.inventory_movement_number,
+    raw.stockMovementNumber,
+    raw.stock_movement_number,
+    raw.displayNumber,
+    raw.display_number,
+    raw.publicNumber,
+    raw.public_number,
+    raw.publicId,
+    raw.public_id,
     raw.transactionNumber,
     raw.transaction_number,
+    raw.transactionNo,
+    raw.transaction_no,
+    raw.transactionCode,
+    raw.transaction_code,
     raw.number,
     raw.code,
     raw.serial,
     raw.sequence,
-    id,
+    raw.reference,
   );
 
   return {
@@ -288,7 +326,15 @@ export function normalizeInventoryMovement(payload: unknown, index: number): Inv
       part.part_number,
       part.sku,
     ),
-    partName: stringValue(raw.partName, raw.part_name, raw.name, nestedName(part), part.sparePartNumber),
+    partName: stringValue(
+      raw.partName,
+      raw.part_name,
+      raw.sparePartName,
+      raw.spare_part_name,
+      raw.name,
+      nestedName(part),
+      part.sparePartNumber,
+    ),
     movementType: normalizeMovementType(raw.movementType ?? raw.movement_type ?? raw.type),
     quantity: numberValue(raw.quantity, raw.qty),
     owner: stringValue(raw.owner, raw.createdBy, raw.created_by, raw.userName, "إدارة المخزون"),

@@ -18,19 +18,26 @@ export function AddPaymentModal({
   onSave,
   submitting = false,
   submitError,
+  dollarExchangeRate = USD_TO_SYP_RATE,
 }: {
   invoice: Invoice;
   onClose: () => void;
   onSave: (payment: InvoicePayment, convertedAmount: number) => void;
   submitting?: boolean;
   submitError?: string;
+  dollarExchangeRate?: number;
 }) {
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState<PaymentMethod>("cash");
   const [currency, setCurrency] = useState<PaymentCurrency>("SYP");
   const remainingBefore = remaining(invoice.total, invoice.paid);
   const numericAmount = Number(amount) || 0;
-  const convertedAmount = convertPaymentToInvoiceCurrency(numericAmount, currency, invoice.currency);
+  const convertedAmount = convertPaymentToInvoiceCurrency(
+    numericAmount,
+    currency,
+    invoice.currency,
+    dollarExchangeRate,
+  );
   const remainingAfter = Math.max(0, remainingBefore - convertedAmount);
 
   function save() {
@@ -68,7 +75,7 @@ export function AddPaymentModal({
           />
         </div>
         <div className="rounded-md border border-gold/30 bg-gold-soft p-3 text-sm text-content-muted">
-          سعر صرف الدولار المستخدم مؤقتاً: {formatMoney(USD_TO_SYP_RATE, "SYP")} لكل 1 دولار. سيتم ربطه لاحقاً بمصدر API.
+          سعر صرف الدولار المستخدم: {formatMoney(dollarExchangeRate, "SYP")} لكل 1 دولار (من إعدادات المركز).
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="مبلغ الدفعة الجديدة">

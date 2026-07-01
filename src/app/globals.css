@@ -33,23 +33,18 @@
 
 table {
   width: 100%;
-  max-width: 100%;
-  min-width: 0 !important;
-  table-layout: fixed;
+}
+
+th,
+td,
+th *,
+td * {
+  white-space: nowrap;
 }
 
 th,
 td {
-  overflow-wrap: anywhere;
-  word-break: normal;
   vertical-align: middle;
-}
-
-th.whitespace-nowrap,
-td.whitespace-nowrap,
-th .whitespace-nowrap:not(.inline-flex),
-td .whitespace-nowrap:not(.inline-flex) {
-  white-space: normal;
 }
 
 th [dir="ltr"],

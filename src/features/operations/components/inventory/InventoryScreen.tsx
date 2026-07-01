@@ -351,13 +351,10 @@ export function InventoryScreen({ section = "parts" }: { section?: string }) {
                     visibleMovements.map((movement) => (
                       <tr key={movement.id} className="border-b border-border last:border-0 hover:bg-gold-soft">
                         <td className="whitespace-nowrap px-4 py-4 font-bold text-gold">
-                          {movement.movementNumber || movement.id}
+                          {movement.movementNumber || "رقم غير متاح"}
                         </td>
                         <td className="px-4 py-4 text-content">
                           <div className="whitespace-nowrap font-medium">{movement.partName || "قطعة غير محددة"}</div>
-                          <div className="whitespace-nowrap text-xs text-content-muted" dir="ltr">
-                            {movement.partNumber || "رقم غير محدد"}
-                          </div>
                         </td>
                         <td className="px-4 py-4">
                           <Badge tone={INVENTORY_MOVEMENT_LABELS[movement.movementType].tone} dot>

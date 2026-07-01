@@ -177,8 +177,14 @@ function nestedPhone(value: unknown): string {
     value.first_phone,
     value.phone,
     value.mobile,
+    value.tel,
+    value.telephone,
     value.phoneNumber,
     value.phone_number,
+    value.mobileNumber,
+    value.mobile_number,
+    value.contactPhone,
+    value.contact_phone,
     value.whatsapp,
     isRecord(value.user) ? nestedPhone(value.user) : undefined,
     isRecord(value.profile) ? nestedPhone(value.profile) : undefined,
@@ -187,7 +193,18 @@ function nestedPhone(value: unknown): string {
 
 function nestedAddress(value: unknown) {
   if (!isRecord(value)) return "";
-  return stringValue(value.address, value.location, value.street);
+  return stringValue(
+    value.address,
+    value.fullAddress,
+    value.full_address,
+    value.customerAddress,
+    value.customer_address,
+    value.clientAddress,
+    value.client_address,
+    value.location,
+    value.street,
+    value.area,
+  );
 }
 
 function nestedLocationUrl(value: unknown) {
@@ -264,15 +281,22 @@ function normalizeInvoicePart(payload: unknown, index: number): InvoicePart {
     raw.sparePart,
     raw.spare_part,
     raw.part,
+    raw.partData,
+    raw.part_data,
     raw.inventoryPart,
     raw.inventory_part,
     raw.item,
+    raw.product,
   );
   const sparePartId = stringValue(
     raw.sparePartId,
     raw.spare_part_id,
     raw.partId,
     raw.part_id,
+    raw.itemId,
+    raw.item_id,
+    raw.productId,
+    raw.product_id,
     raw.inventoryPartId,
     raw.inventory_part_id,
     sparePart.id,
@@ -304,11 +328,19 @@ function normalizeInvoicePart(payload: unknown, index: number): InvoicePart {
       raw.spare_part_name,
       raw.partName,
       raw.part_name,
+      raw.itemName,
+      raw.item_name,
+      raw.productName,
+      raw.product_name,
+      raw.title,
       raw.name,
       raw.description,
       nestedName(sparePart),
       sparePart.sparePartNumber,
       sparePart.spare_part_number,
+      sparePart.partNumber,
+      sparePart.part_number,
+      sparePart.sku,
       "قطعة غير محددة",
     ),
     quantity,
@@ -320,7 +352,15 @@ function normalizeInvoicePart(payload: unknown, index: number): InvoicePart {
 
 export function normalizeInvoicePayment(payload: unknown, index = 0): InvoicePayment {
   const raw = isRecord(payload) ? payload : {};
-  const amount = numberValue(raw.amount, raw.paidAmount, raw.paid_amount, raw.value);
+  const amount = numberValue(
+    raw.amount,
+    raw.paidAmount,
+    raw.paid_amount,
+    raw.paymentAmount,
+    raw.payment_amount,
+    raw.value,
+    raw.total,
+  );
 
   return {
     id: stringValue(raw.id, raw._id, `PAY-${index + 1}`),
@@ -333,8 +373,18 @@ export function normalizeInvoicePayment(payload: unknown, index = 0): InvoicePay
       raw.converted_amount,
       raw.convertedValue,
       raw.converted_value,
+      raw.convertedAmountValue,
+      raw.converted_amount_value,
     ),
-    paidAt: dateValue(raw.paidAt, raw.paid_at, raw.paymentDate, raw.payment_date, raw.createdAt, raw.created_at),
+    paidAt: dateValue(
+      raw.paidAt,
+      raw.paid_at,
+      raw.paymentDate,
+      raw.payment_date,
+      raw.date,
+      raw.createdAt,
+      raw.created_at,
+    ),
   };
 }
 
@@ -349,16 +399,35 @@ export function normalizeInvoice(payload: unknown): Invoice {
     invoice.repair_request,
     invoice.serviceRequest,
     invoice.service_request,
+    invoice.maintenanceRequest,
+    invoice.maintenance_request,
     invoice.order,
+    invoice.orderData,
+    invoice.order_data,
     isRecord(data) ? data.request : undefined,
     isRecord(data) ? data.repairRequest : undefined,
+    isRecord(data) ? data.repair_request : undefined,
+    isRecord(data) ? data.serviceRequest : undefined,
+    isRecord(data) ? data.service_request : undefined,
     root.request,
   );
   const customer = firstRecord(
     request.customer,
+    request.customerData,
+    request.customer_data,
+    request.client,
+    request.clientData,
+    request.client_data,
     invoice.customer,
+    invoice.customerData,
+    invoice.customer_data,
     invoice.client,
+    invoice.clientData,
+    invoice.client_data,
     isRecord(data) ? data.customer : undefined,
+    isRecord(data) ? data.customerData : undefined,
+    isRecord(data) ? data.customer_data : undefined,
+    isRecord(data) ? data.client : undefined,
     root.customer,
   );
   const assignment = firstRecord(
@@ -422,6 +491,10 @@ export function normalizeInvoice(payload: unknown): Invoice {
     invoice.details,
     invoice.invoiceDetails,
     invoice.invoice_details,
+    invoice.expenses,
+    invoice.services,
+    invoice.serviceItems,
+    invoice.service_items,
     isRecord(data) ? data.items : undefined,
     isRecord(data) ? data.invoiceItems : undefined,
     isRecord(data) ? data.invoice_items : undefined,
@@ -479,10 +552,14 @@ export function normalizeInvoice(payload: unknown): Invoice {
     invoice.request_number,
     invoice.orderNumber,
     invoice.order_number,
+    invoice.requestCode,
+    invoice.request_code,
     request.requestNumber,
     request.request_number,
     request.orderNumber,
     request.order_number,
+    request.number,
+    request.code,
   );
   const technicianId = stringValue(
     invoice.technicianId,
@@ -513,8 +590,13 @@ export function normalizeInvoice(payload: unknown): Invoice {
   const invoiceNumber = stringValue(
     invoice.invoiceNumber,
     invoice.invoice_number,
+    invoice.invoiceNo,
+    invoice.invoice_no,
+    invoice.invoiceCode,
+    invoice.invoice_code,
     invoice.number,
     invoice.code,
+    invoice.serial,
   );
   const technicianName = stringValue(
     displayNameValue(
@@ -565,6 +647,9 @@ export function normalizeInvoice(payload: unknown): Invoice {
       typeof invoice.client === "string" ? invoice.client : undefined,
       request.customerName,
       request.customer_name,
+      request.clientName,
+      request.client_name,
+      request.name,
       "غير محدد",
     ),
     clientPhone: stringValue(
@@ -575,6 +660,10 @@ export function normalizeInvoice(payload: unknown): Invoice {
       invoice.client_phone,
       request.customerPhone,
       request.customer_phone,
+      request.clientPhone,
+      request.client_phone,
+      request.firstPhone,
+      request.first_phone,
       request.phone,
       "غير محدد",
     ),
@@ -588,6 +677,10 @@ export function normalizeInvoice(payload: unknown): Invoice {
       invoice.client_phone_2,
       request.secondPhone,
       request.second_phone,
+      request.customerSecondPhone,
+      request.customer_second_phone,
+      request.clientPhone2,
+      request.client_phone_2,
       request.phone2,
       "لا يوجد",
     ),
@@ -597,6 +690,7 @@ export function normalizeInvoice(payload: unknown): Invoice {
       invoice.customer_address,
       invoice.clientAddress,
       invoice.client_address,
+      nestedAddress(request),
       request.address,
       "غير محدد",
     ),
@@ -707,9 +801,9 @@ export function normalizePaymentResponse(payload: unknown) {
   return normalizeInvoicePayment(dataRecord(payload));
 }
 
-function invoicePaymentConvertedAmount(amount: number, currency: Currency) {
-  if (currency === "SYP") return Number((amount / USD_TO_SYP_RATE).toFixed(2));
-  return Number((amount * USD_TO_SYP_RATE).toFixed(2));
+function invoicePaymentConvertedAmount(amount: number, currency: Currency, rate: number) {
+  if (currency === "SYP") return Number((amount / rate).toFixed(2));
+  return Number((amount * rate).toFixed(2));
 }
 
 export class InvoicePayloadModel {
@@ -727,13 +821,18 @@ export class InvoicePayloadModel {
     if (totalAmount <= 0) throw new ApiError("المبلغ الكلي مطلوب لإنشاء الفاتورة.");
     if (paidAmount <= 0) throw new ApiError("مبلغ الدفعة الأولى مطلوب لإنشاء الفاتورة.");
 
+    const dollarExchangeRate =
+      Number(this.input.dollarExchangeRate) > 0
+        ? Number(this.input.dollarExchangeRate)
+        : USD_TO_SYP_RATE;
+
     return {
       payment: {
         amount: paidAmount,
         currency,
         paymentMethod: toApiPaymentMethod(this.input.paymentMethod),
-        dollarExchangeRate: USD_TO_SYP_RATE,
-        convertedAmount: invoicePaymentConvertedAmount(paidAmount, currency),
+        dollarExchangeRate,
+        convertedAmount: invoicePaymentConvertedAmount(paidAmount, currency, dollarExchangeRate),
       },
       requestId,
       status: toApiInvoiceStatus(this.input.status),

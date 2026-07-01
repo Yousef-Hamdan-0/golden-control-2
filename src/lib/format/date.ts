@@ -1,7 +1,7 @@
 const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const DATE_TIME_WITHOUT_ZONE_PATTERN = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})/;
 const TIME_ZONE_PATTERN = /(?:z|[+-]\d{2}:?\d{2})$/i;
-const APP_TIME_ZONE = "Asia/Amman";
+const APP_TIME_ZONE = "Asia/Damascus";
 
 function part(
   parts: Intl.DateTimeFormatPart[],

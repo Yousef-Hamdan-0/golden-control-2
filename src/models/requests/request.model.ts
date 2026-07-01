@@ -428,7 +428,24 @@ export function normalizeRequestPriority(value: unknown): RepairRequestPriority 
 
 function normalizeRequestCustomer(payload: unknown, rawRequest: JsonRecord): RepairRequestCustomer {
   const raw = isRecord(payload) ? payload : {};
-  const id = stringValue(raw.id, raw._id, raw.customerId, raw.customer_id, rawRequest.customerId);
+  const client = isRecord(rawRequest.client) ? rawRequest.client : {};
+  const customerData = isRecord(rawRequest.customerData)
+    ? rawRequest.customerData
+    : isRecord(rawRequest.customer_data)
+      ? rawRequest.customer_data
+      : {};
+  const id = stringValue(
+    raw.id,
+    raw._id,
+    raw.customerId,
+    raw.customer_id,
+    customerData.id,
+    customerData._id,
+    client.id,
+    client._id,
+    rawRequest.customerId,
+    rawRequest.customer_id,
+  );
 
   return {
     id,
@@ -436,36 +453,103 @@ function normalizeRequestCustomer(payload: unknown, rawRequest: JsonRecord): Rep
       raw.name,
       raw.fullName,
       raw.full_name,
+      raw.displayName,
+      raw.display_name,
+      customerData.name,
+      customerData.fullName,
+      customerData.full_name,
+      client.name,
+      client.fullName,
+      client.full_name,
       rawRequest.customerName,
       rawRequest.client,
+      rawRequest.clientName,
+      rawRequest.client_name,
+      rawRequest.name,
       "عميل غير محدد",
     ),
     firstPhone: stringValue(
       raw.firstPhone,
       raw.first_phone,
       raw.phone,
+      raw.phoneNumber,
+      raw.phone_number,
+      raw.mobile,
+      customerData.firstPhone,
+      customerData.first_phone,
+      customerData.phone,
+      customerData.phoneNumber,
+      customerData.phone_number,
+      client.firstPhone,
+      client.first_phone,
+      client.phone,
+      client.phoneNumber,
+      client.phone_number,
       rawRequest.firstPhone,
       rawRequest.first_phone,
       rawRequest.phone,
+      rawRequest.phoneNumber,
+      rawRequest.phone_number,
       rawRequest.customerPhone,
+      rawRequest.customer_phone,
+      rawRequest.clientPhone,
+      rawRequest.client_phone,
     ),
     secondPhone: stringValue(
       raw.secondPhone,
       raw.second_phone,
       raw.phone2,
+      customerData.secondPhone,
+      customerData.second_phone,
+      customerData.phone2,
+      client.secondPhone,
+      client.second_phone,
+      client.phone2,
       rawRequest.secondPhone,
       rawRequest.second_phone,
+      rawRequest.customerSecondPhone,
+      rawRequest.customer_second_phone,
+      rawRequest.clientPhone2,
+      rawRequest.client_phone_2,
       rawRequest.phone2,
     ),
-    address: stringValue(raw.address, rawRequest.address),
+    address: stringValue(
+      raw.address,
+      raw.fullAddress,
+      raw.full_address,
+      customerData.address,
+      customerData.fullAddress,
+      customerData.full_address,
+      client.address,
+      client.fullAddress,
+      client.full_address,
+      rawRequest.address,
+      rawRequest.customerAddress,
+      rawRequest.customer_address,
+      rawRequest.clientAddress,
+      rawRequest.client_address,
+    ),
     locationLink: stringValue(
       raw.locationLink,
       raw.location_link,
       raw.locationUrl,
       raw.location_url,
+      raw.mapUrl,
+      raw.map_url,
+      customerData.locationLink,
+      customerData.location_link,
+      customerData.locationUrl,
+      customerData.location_url,
+      client.locationLink,
+      client.location_link,
+      client.locationUrl,
+      client.location_url,
       rawRequest.locationLink,
       rawRequest.location_link,
       rawRequest.locationUrl,
+      rawRequest.location_url,
+      rawRequest.mapUrl,
+      rawRequest.map_url,
     ),
   };
 }
@@ -474,10 +558,10 @@ function normalizeRequestDevice(payload: unknown, index: number): RepairRequestD
   const raw = isRecord(payload) ? payload : {};
 
   return {
-    deviceType: stringValue(raw.deviceType, raw.device_type, raw.type, `جهاز ${index + 1}`),
-    deviceName: stringValue(raw.deviceName, raw.device_name, raw.name, raw.title),
-    brand: stringValue(raw.brand, raw.manufacturer),
-    model: stringValue(raw.model, raw.modelNumber, raw.model_number),
+    deviceType: stringValue(raw.deviceType, raw.device_type, raw.type, raw.category, `جهاز ${index + 1}`),
+    deviceName: stringValue(raw.deviceName, raw.device_name, raw.name, raw.title, raw.device, raw.description),
+    brand: stringValue(raw.brand, raw.manufacturer, raw.make),
+    model: stringValue(raw.model, raw.modelNumber, raw.model_number, raw.serialNumber, raw.serial_number),
   };
 }
 
@@ -540,6 +624,9 @@ export function normalizeRepairRequest(payload: unknown, fallbackId?: string): R
   const rawDevices =
     (Array.isArray(payload.devices) && payload.devices) ||
     (Array.isArray(payload.requestDevices) && payload.requestDevices) ||
+    (Array.isArray(payload.request_devices) && payload.request_devices) ||
+    (Array.isArray(payload.appliances) && payload.appliances) ||
+    (Array.isArray(payload.equipment) && payload.equipment) ||
     (Array.isArray(payload.items) && payload.items) ||
     [];
   const devices = rawDevices.length
@@ -548,7 +635,7 @@ export function normalizeRepairRequest(payload: unknown, fallbackId?: string): R
         normalizeRequestDevice(
           {
             deviceType: payload.deviceType ?? payload.device_type ?? payload.device,
-            deviceName: payload.deviceName ?? payload.device_name ?? payload.device,
+            deviceName: payload.deviceName ?? payload.device_name ?? payload.deviceNameArabic ?? payload.device_name_arabic ?? payload.device,
             brand: payload.brand,
             model: payload.model,
           },

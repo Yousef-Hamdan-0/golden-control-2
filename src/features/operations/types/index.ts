@@ -145,6 +145,8 @@ export interface Invoice {
   status: PaymentStatus;
   currency: Currency;
   paymentMethod: PaymentMethod;
+  /** USD→SYP rate captured at creation, sourced from center settings. */
+  dollarExchangeRate?: number;
   total: number;
   paid: number;
   issuedAt: string;
