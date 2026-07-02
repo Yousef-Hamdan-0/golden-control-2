@@ -7,6 +7,7 @@ import { Field, Input } from "@/components/ui/Input";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Icon } from "@/lib/icons";
 import { cn } from "@/lib/utils/cn";
+import { dashboardService } from "@/services/dashboard.service";
 
 export type ReportType =
   | "orders"
@@ -50,6 +51,7 @@ export const REPORT_TYPES = Object.keys(REPORT_DEFINITIONS) as ReportType[];
 
 export function ReportPdfScreen({ type }: { type: ReportType }) {
   const report = REPORT_DEFINITIONS[type];
+  const usesDashboardFinancialReport = type === "financial";
   const [showDateFilter, setShowDateFilter] = useState(false);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -79,27 +81,36 @@ export function ReportPdfScreen({ type }: { type: ReportType }) {
     setError("");
 
     try {
-      const search = new URLSearchParams({ from, to });
-      const response = await fetch(`${REPORTS_API_BASE}/${type}?${search.toString()}`, {
-        headers: { Accept: "application/pdf" },
-      });
+      const reportResponse = usesDashboardFinancialReport
+        ? await dashboardService.downloadFinancialReport("pdf")
+        : await (async () => {
+            const search = new URLSearchParams({ from, to });
+            const response = await fetch(`${REPORTS_API_BASE}/${type}?${search.toString()}`, {
+              headers: { Accept: "application/pdf" },
+            });
 
-      if (!response.ok) {
-        throw new Error("تعذر جلب التقرير من الخادم.");
-      }
+            if (!response.ok) {
+              throw new Error("تعذر جلب التقرير من الخادم.");
+            }
 
-      const contentType = response.headers.get("content-type") ?? "";
-      if (!contentType.includes("application/pdf")) {
+            return {
+              blob: await response.blob(),
+              contentType: response.headers.get("content-type") ?? "",
+              fileName: undefined,
+            };
+          })();
+
+      if (!reportResponse.contentType.includes("application/pdf")) {
         throw new Error("استجابة الخادم ليست ملف PDF صالحًا.");
       }
 
-      const blob = await response.blob();
+      const blob = reportResponse.blob;
       const nextPdfUrl = URL.createObjectURL(blob);
 
       if (action === "download") {
         const downloadLink = document.createElement("a");
         downloadLink.href = nextPdfUrl;
-        downloadLink.download = report.fileName;
+        downloadLink.download = reportResponse.fileName ?? report.fileName;
         document.body.appendChild(downloadLink);
         downloadLink.click();
         downloadLink.remove();

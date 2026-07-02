@@ -33,9 +33,10 @@ export function Shell({ title = "نظرة عامة", children }: { title?: strin
         return;
       }
 
+      if (isActive) setIsSessionVerified(true);
+
       try {
         await authService.refresh({ refreshToken: session.refreshToken });
-        if (isActive) setIsSessionVerified(true);
       } catch {
         clearAuthSession();
         if (isActive) router.replace("/login");

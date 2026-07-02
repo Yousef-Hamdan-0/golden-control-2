@@ -16,6 +16,12 @@ import type {
  * exactly that slice and caches each combination separately.
  */
 export const queryKeys = {
+  dashboard: {
+    all: ["dashboard"] as const,
+    stats: () => ["dashboard", "stats"] as const,
+    technicianPerformance: () =>
+      ["dashboard", "technician-performance"] as const,
+  },
   users: {
     all: ["users"] as const,
     me: () => ["users", "me"] as const,

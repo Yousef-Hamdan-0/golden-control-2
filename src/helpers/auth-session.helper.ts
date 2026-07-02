@@ -22,8 +22,15 @@ function maskedToken(value: string | null) {
   return `${value.slice(0, 12)}...****...${value.slice(-8)}`;
 }
 
-function printAccessToken(accessToken: string | null) {
+function printAccessToken(accessToken: string | null, reveal = false) {
   if (process.env.NODE_ENV !== "development") return;
+
+  if (reveal && accessToken) {
+    console.info("[auth] access token for Swagger:", accessToken);
+    console.info("[auth] authorization header:", `Bearer ${accessToken}`);
+    return;
+  }
+
   console.log("[auth] access token:", maskedToken(accessToken));
 }
 
@@ -72,6 +79,7 @@ export function writeAuthSession(session: AuthSession, remember: boolean) {
   window.localStorage.removeItem(LEGACY_SESSION_STORAGE_KEY);
   window.sessionStorage.removeItem(LEGACY_SESSION_STORAGE_KEY);
   storage.setItem(AUTH_SESSION_STORAGE_KEY, JSON.stringify(session));
+  printAccessToken(session.accessToken, true);
 }
 
 export function getAccessToken() {

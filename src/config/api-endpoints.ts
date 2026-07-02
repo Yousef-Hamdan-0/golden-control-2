@@ -13,6 +13,12 @@ export const API_ROUTES = {
     refresh: "/api/auth/refresh",
     logout: "/api/auth/logout",
   },
+  dashboard: {
+    stats: "/api/dashboard/stats",
+    technicianPerformance: "/api/dashboard/technician-performance",
+    financialReport: (format: string) =>
+      `/api/dashboard/financial-report?${new URLSearchParams({ format })}`,
+  },
   users: {
     root: "/api/users",
     me: "/api/users/me",
@@ -65,6 +71,7 @@ export const API_ENDPOINTS = {
     refresh: API_ROUTES.auth.refresh,
     logout: API_ROUTES.auth.logout,
   },
+  dashboard: API_ROUTES.dashboard,
   users: API_ROUTES.users,
   customers: API_ROUTES.customers,
   requests: API_ROUTES.requests,
@@ -80,6 +87,22 @@ export const BACKEND_API_ENDPOINTS = {
     login: createApiUrl(API_ROUTES.auth.login),
     refresh: createApiUrl(API_ROUTES.auth.refresh),
     logout: createApiUrl(API_ROUTES.auth.logout),
+  },
+  dashboard: {
+    // Dashboard backend routes are currently namespaced under /api/api.
+    stats: [
+      createApiUrl("/api/api/dashboard/stats"),
+      createApiUrl("/api/dashboard/stats"),
+    ],
+    technicianPerformance: [
+      createApiUrl("/api/api/dashboard/technician-performance"),
+      createApiUrl("/api/dashboard/technician-performance"),
+    ],
+    financialReport: (format: string) =>
+      [
+        createApiUrl("/api/api/dashboard/financial-report"),
+        createApiUrl("/api/dashboard/financial-report"),
+      ].map((url) => `${url}?${new URLSearchParams({ format })}`),
   },
   users: {
     root: createApiUrl(API_ROUTES.users.root),
