@@ -29,7 +29,7 @@ function formatHours(hours: number | null) {
 export function TechnicianPerformanceCard({
   technician,
 }: TechnicianPerformanceCardProps) {
-  const summary = summarizeOrders(technician.orders);
+  const summary = technician.summary ?? summarizeOrders(technician.orders);
   const breakdown = [
     { label: "مكتملة", value: summary.completedOrders, className: "text-success" },
     { label: "غير مكتملة", value: summary.incompleteOrders, className: "text-danger" },
@@ -107,7 +107,7 @@ export function TechnicianPerformanceCard({
               </tr>
             </thead>
             <tbody>
-              {technician.orders.map((order) => {
+              {technician.orders.length ? technician.orders.map((order) => {
                 const status = STATUS_DETAILS[order.status];
 
                 return (
@@ -134,7 +134,13 @@ export function TechnicianPerformanceCard({
                     </td>
                   </tr>
                 );
-              })}
+              }) : (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8 text-center text-content-muted">
+                    لا توجد تفاصيل خط زمني مرسلة من الـ API لهذا الفني.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

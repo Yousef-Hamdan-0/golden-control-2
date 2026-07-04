@@ -12,58 +12,72 @@ import { TablePagination } from "@/components/ui/TablePagination";
 import { useToast } from "@/components/ui/Toast";
 import { PAGE_SIZE } from "@/config/constants";
 import { ExpenseFormModal } from "@/features/expenses/components/ExpenseFormModal";
+import { DEFAULT_EXPENSE_MONTH } from "@/features/expenses/data/expenses.mock";
 import {
-  DEFAULT_EXPENSE_MONTH,
-  EXPENSES_STORAGE_KEY,
-  INITIAL_EXPENSES,
-} from "@/features/expenses/data/expenses.mock";
+  useExpenseMutations,
+  useExpensesQuery,
+} from "@/features/expenses/hooks/use-expenses";
 import {
   EXPENSE_CATEGORY_LABELS,
   formatExpenseMonth,
-  nextExpenseId,
   type ExpenseCategoryFilter,
   type ExpenseInput,
   type ExpenseRecord,
 } from "@/features/expenses/models/expense.model";
+import { getApiErrorMessage } from "@/helpers/api.helper";
 import { formatMoney } from "@/lib/format/currency";
 import { Icon } from "@/lib/icons";
-import { readStoredList, writeStoredList } from "@/features/operations/utils/storage";
 
 interface ExpensesScreenProps {
   initialCategory?: ExpenseCategoryFilter;
 }
 
+const EMPTY_EXPENSES: ExpenseRecord[] = [];
+
 export function ExpensesScreen({ initialCategory = "all" }: ExpensesScreenProps) {
   const toast = useToast();
-  const [expenses, setExpenses] = useState<ExpenseRecord[]>(() =>
-    readStoredList(EXPENSES_STORAGE_KEY, [...INITIAL_EXPENSES]),
+  const [category, setCategory] = useState<ExpenseCategoryFilter>(
+    initialCategory === "fixed" || initialCategory === "variable"
+      ? initialCategory
+      : "all",
   );
-  const [category, setCategory] = useState<ExpenseCategoryFilter>(initialCategory);
   const [month, setMonth] = useState(DEFAULT_EXPENSE_MONTH);
   const [page, setPage] = useState(1);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingExpense, setEditingExpense] = useState<ExpenseRecord | null>(null);
   const [expenseToDelete, setExpenseToDelete] = useState<ExpenseRecord | null>(null);
+  const [yearValue, monthValue] = month.split("-").map(Number);
+  const listParams = useMemo(
+    () => ({
+      type: category,
+      month: monthValue,
+      year: yearValue,
+    }),
+    [category, monthValue, yearValue],
+  );
+  const expensesQuery = useExpensesQuery(listParams);
+  const { create, update, remove } = useExpenseMutations();
+  const expenses = expensesQuery.data ?? EMPTY_EXPENSES;
+  const isSubmitting = create.isPending || update.isPending;
+  const submitError = create.error ?? update.error;
 
   useEffect(() => {
-    writeStoredList(EXPENSES_STORAGE_KEY, expenses);
-  }, [expenses]);
+    if (expensesQuery.isError && expensesQuery.error) {
+      toast.error("تعذر تحميل المصروفات", getApiErrorMessage(expensesQuery.error));
+    }
+  }, [expensesQuery.error, expensesQuery.isError, toast]);
 
   const monthlyFixedTotal = useMemo(
     () =>
       expenses
-        .filter((expense) => expense.category === "fixed" && expense.month === month)
+        .filter((expense) => expense.category === "fixed")
         .reduce((total, expense) => total + expense.amount, 0),
-    [expenses, month],
+    [expenses],
   );
 
   const filteredExpenses = useMemo(
-    () =>
-      expenses.filter(
-        (expense) =>
-          expense.month === month && (category === "all" || expense.category === category),
-      ),
-    [category, expenses, month],
+    () => expenses,
+    [expenses],
   );
 
   const pages = Math.max(1, Math.ceil(filteredExpenses.length / PAGE_SIZE));
@@ -75,31 +89,40 @@ export function ExpensesScreen({ initialCategory = "all" }: ExpensesScreenProps)
 
   function saveExpense(input: ExpenseInput) {
     const isEdit = Boolean(editingExpense);
-    setExpenses((current) => {
-      if (editingExpense) {
-        return current.map((expense) =>
-          expense.id === editingExpense.id ? { ...expense, ...input } : expense,
-        );
-      }
+    const onSuccess = () => {
+      setMonth(input.month);
+      setCategory("all");
+      setPage(1);
+      setEditingExpense(null);
+      setShowCreateModal(false);
+      toast.success(
+        isEdit ? "تم تعديل المصروف" : "تم إنشاء المصروف",
+        isEdit ? `تم حفظ تعديلات ${input.title} بنجاح.` : `تمت إضافة ${input.title} بنجاح.`,
+      );
+    };
+    const onError = (error: unknown) =>
+      toast.error(
+        isEdit ? "تعذر تعديل المصروف" : "تعذر إنشاء المصروف",
+        getApiErrorMessage(error),
+      );
 
-      return [{ id: nextExpenseId(current), ...input }, ...current];
-    });
-    setMonth(input.month);
-    setCategory("all");
-    setPage(1);
-    setEditingExpense(null);
-    setShowCreateModal(false);
-    toast.success(
-      isEdit ? "تم تعديل المصروف" : "تم إنشاء المصروف",
-      isEdit ? `تم حفظ تعديلات ${input.title} بنجاح.` : `تمت إضافة ${input.title} بنجاح.`,
-    );
+    if (editingExpense) {
+      update.mutate({ id: editingExpense.id, input }, { onSuccess, onError });
+      return;
+    }
+
+    create.mutate(input, { onSuccess, onError });
   }
 
   function deleteExpense(expenseId: string) {
     const expense = expenses.find((item) => item.id === expenseId);
-    setExpenses((current) => current.filter((expense) => expense.id !== expenseId));
-    setExpenseToDelete(null);
-    toast.success("تم حذف المصروف", `تم حذف ${expense?.title ?? "المصروف"} بنجاح.`);
+    remove.mutate(expenseId, {
+      onSuccess: () => {
+        setExpenseToDelete(null);
+        toast.success("تم حذف المصروف", `تم حذف ${expense?.title ?? "المصروف"} بنجاح.`);
+      },
+      onError: (error) => toast.error("تعذر حذف المصروف", getApiErrorMessage(error)),
+    });
   }
 
   return (
@@ -118,6 +141,8 @@ export function ExpensesScreen({ initialCategory = "all" }: ExpensesScreenProps)
       {showCreateModal ? (
         <ExpenseFormModal
           initialMonth={month}
+          submitting={isSubmitting}
+          submitError={submitError ? getApiErrorMessage(submitError) : undefined}
           onClose={() => setShowCreateModal(false)}
           onSave={saveExpense}
         />
@@ -127,6 +152,8 @@ export function ExpensesScreen({ initialCategory = "all" }: ExpensesScreenProps)
         <ExpenseFormModal
           expense={editingExpense}
           initialMonth={month}
+          submitting={isSubmitting}
+          submitError={submitError ? getApiErrorMessage(submitError) : undefined}
           onClose={() => setEditingExpense(null)}
           onSave={saveExpense}
         />
@@ -136,6 +163,8 @@ export function ExpensesScreen({ initialCategory = "all" }: ExpensesScreenProps)
         <ConfirmToast
           title="تأكيد حذف المصروف"
           message={`هل تريد حذف بند ${expenseToDelete.title} من المصروفات؟`}
+          confirmLabel={remove.isPending ? "جاري الحذف..." : "تأكيد الحذف"}
+          isLoading={remove.isPending}
           onCancel={() => setExpenseToDelete(null)}
           onConfirm={() => deleteExpense(expenseToDelete.id)}
         />
@@ -149,7 +178,9 @@ export function ExpensesScreen({ initialCategory = "all" }: ExpensesScreenProps)
             onChange={(event) => {
               const nextCategory = event.target.value;
               setCategory(
-                nextCategory === "fixed" || nextCategory === "variable" ? nextCategory : "all",
+                nextCategory === "fixed" || nextCategory === "variable"
+                  ? nextCategory
+                  : "all",
               );
               setPage(1);
             }}
@@ -187,7 +218,13 @@ export function ExpensesScreen({ initialCategory = "all" }: ExpensesScreenProps)
               </tr>
             </thead>
             <tbody>
-              {visibleExpenses.length ? (
+              {expensesQuery.isLoading ? (
+                <tr>
+                  <td colSpan={5} className="px-4 py-12 text-center text-content-muted">
+                    جاري تحميل المصروفات...
+                  </td>
+                </tr>
+              ) : visibleExpenses.length ? (
                 visibleExpenses.map((expense) => (
                   <tr key={expense.id} className="border-t border-border hover:bg-gold-soft">
                     <td className="px-4 py-4 font-semibold text-content">{expense.title}</td>
@@ -229,7 +266,9 @@ export function ExpensesScreen({ initialCategory = "all" }: ExpensesScreenProps)
               ) : (
                 <tr>
                   <td colSpan={5} className="px-4 py-12 text-center text-content-muted">
-                    لا توجد مصروفات مطابقة للفلاتر المختارة.
+                    {expensesQuery.isError
+                      ? "تعذر تحميل المصروفات من الخادم."
+                      : "لا توجد مصروفات مطابقة للفلاتر المختارة."}
                   </td>
                 </tr>
               )}

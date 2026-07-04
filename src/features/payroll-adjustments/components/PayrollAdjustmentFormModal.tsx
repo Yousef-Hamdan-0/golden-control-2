@@ -16,28 +16,72 @@ import type { User } from "@/models/auth/user.model";
 
 interface PayrollAdjustmentFormModalProps {
   users: readonly User[];
+  initialMonth: string;
   onClose: () => void;
   onSave: (input: PayrollAdjustmentInput) => void;
+  submitting?: boolean;
+  submitError?: string;
+  submitLabel?: string;
+}
+
+const MONTH_OPTIONS = [
+  { value: 1, label: "كانون الثاني" },
+  { value: 2, label: "شباط" },
+  { value: 3, label: "آذار" },
+  { value: 4, label: "نيسان" },
+  { value: 5, label: "أيار" },
+  { value: 6, label: "حزيران" },
+  { value: 7, label: "تموز" },
+  { value: 8, label: "آب" },
+  { value: 9, label: "أيلول" },
+  { value: 10, label: "تشرين الأول" },
+  { value: 11, label: "تشرين الثاني" },
+  { value: 12, label: "كانون الأول" },
+];
+
+function monthParts(value: string) {
+  const [year, month] = value.split("-").map(Number);
+  const today = new Date();
+
+  return {
+    year: Number.isFinite(year) ? year : today.getFullYear(),
+    month: Number.isFinite(month) && month >= 1 && month <= 12
+      ? month
+      : today.getMonth() + 1,
+  };
 }
 
 export function PayrollAdjustmentFormModal({
   users,
+  initialMonth,
   onClose,
   onSave,
+  submitting = false,
+  submitError = "",
+  submitLabel = "إنشاء التسوية",
 }: PayrollAdjustmentFormModalProps) {
+  const initialDateParts = monthParts(initialMonth);
   const [draft, setDraft] = useState<PayrollAdjustmentInput>({
     userId: users[0]?.id ?? "",
-    type: "advance",
+    type: "salary",
     amount: 0,
+    month: initialDateParts.month,
+    year: initialDateParts.year,
     note: "",
   });
+  const [amountValue, setAmountValue] = useState("");
+  const [yearValue, setYearValue] = useState(String(initialDateParts.year));
   const [error, setError] = useState("");
 
   function submitAdjustment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const amount = Number(amountValue);
+    const year = Number(yearValue);
     const normalized: PayrollAdjustmentInput = {
       ...draft,
-      amount: Number(draft.amount),
+      amount,
+      month: Number(draft.month),
+      year,
       note: draft.note.trim(),
     };
 
@@ -51,9 +95,18 @@ export function PayrollAdjustmentFormModal({
       return;
     }
 
+    if (!Number.isInteger(normalized.month) || normalized.month < 1 || normalized.month > 12) {
+      setError("يرجى اختيار شهر صحيح.");
+      return;
+    }
+
+    if (!Number.isInteger(normalized.year) || normalized.year < 2000 || normalized.year > 2100) {
+      setError("يرجى إدخال سنة صحيحة بين 2000 و 2100.");
+      return;
+    }
+
     setError("");
     onSave(normalized);
-    onClose();
   }
 
   return (
@@ -69,6 +122,7 @@ export function PayrollAdjustmentFormModal({
             <Select
               id="payroll-user"
               value={draft.userId}
+              disabled={submitting}
               onChange={(event) =>
                 setDraft((current) => ({ ...current, userId: event.target.value }))
               }
@@ -85,12 +139,19 @@ export function PayrollAdjustmentFormModal({
             <Select
               id="payroll-type"
               value={draft.type}
+              disabled={submitting}
               onChange={(event) => {
                 const value = event.target.value;
                 setDraft((current) => ({
                   ...current,
                   type:
-                    value === "deduction" || value === "increase" ? value : "advance",
+                    value === "salary" ||
+                    value === "bonus" ||
+                    value === "deduction" ||
+                    value === "overtime" ||
+                    value === "commission"
+                      ? value
+                      : "salary",
                 }));
               }}
             >
@@ -100,6 +161,46 @@ export function PayrollAdjustmentFormModal({
                 </option>
               ))}
             </Select>
+          </Field>
+
+          <Field label="الشهر" htmlFor="payroll-month">
+            <Select
+              id="payroll-month"
+              value={draft.month}
+              disabled={submitting}
+              onChange={(event) =>
+                setDraft((current) => ({
+                  ...current,
+                  month: Number(event.target.value),
+                }))
+              }
+            >
+              {MONTH_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </Select>
+          </Field>
+
+          <Field label="السنة" htmlFor="payroll-year">
+            <Input
+              id="payroll-year"
+              type="number"
+              min="2000"
+              max="2100"
+              inputMode="numeric"
+              dir="ltr"
+              value={yearValue}
+              disabled={submitting}
+              onChange={(event) => {
+                setYearValue(event.target.value);
+                setDraft((current) => ({
+                  ...current,
+                  year: Number(event.target.value),
+                }));
+              }}
+            />
           </Field>
 
           <Field label="المبلغ" htmlFor="payroll-amount" className="sm:col-span-2">
@@ -112,14 +213,16 @@ export function PayrollAdjustmentFormModal({
                 inputMode="numeric"
                 dir="ltr"
                 className="pl-14"
-                value={draft.amount || ""}
+                value={amountValue}
                 placeholder="0"
-                onChange={(event) =>
+                disabled={submitting}
+                onChange={(event) => {
+                  setAmountValue(event.target.value);
                   setDraft((current) => ({
                     ...current,
                     amount: Number(event.target.value),
-                  }))
-                }
+                  }));
+                }}
               />
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-content-muted">
                 {CURRENCY_SYMBOL}
@@ -134,6 +237,7 @@ export function PayrollAdjustmentFormModal({
               maxLength={300}
               value={draft.note}
               placeholder="اكتب ملاحظة عن التسوية..."
+              disabled={submitting}
               onChange={(event) =>
                 setDraft((current) => ({ ...current, note: event.target.value }))
               }
@@ -141,19 +245,19 @@ export function PayrollAdjustmentFormModal({
           </Field>
         </div>
 
-        {error ? (
+        {error || submitError ? (
           <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger">
-            {error}
+            {error || submitError}
           </p>
         ) : null}
 
         <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border pt-4">
-          <Button type="button" variant="outline" onClick={onClose}>
+          <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>
             إلغاء
           </Button>
-          <Button type="submit">
+          <Button type="submit" disabled={submitting}>
             <Icon name="plus" size={17} />
-            إنشاء التسوية
+            {submitLabel}
           </Button>
         </div>
       </form>

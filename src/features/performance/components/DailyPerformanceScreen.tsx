@@ -1,12 +1,22 @@
+"use client";
+
 import { PageHeader } from "@/components/layout/PageHeader";
+import { Card } from "@/components/ui/Card";
+import { useDashboardTechnicianPerformanceQuery } from "@/features/dashboard/hooks/use-dashboard";
 import { PerformanceKpiCards } from "@/features/performance/components/PerformanceKpiCards";
 import { TechnicianPerformanceCard } from "@/features/performance/components/TechnicianPerformanceCard";
-import { DAILY_TECHNICIAN_PERFORMANCE } from "@/features/performance/data/performance.mock";
-import { summarizeTechnicians } from "@/features/performance/models/performance.model";
-
-const PERFORMANCE_SUMMARY = summarizeTechnicians(DAILY_TECHNICIAN_PERFORMANCE);
+import {
+  performanceSummaryFromDashboard,
+  techniciansFromDashboardPerformance,
+} from "@/features/performance/models/performance.model";
+import { getApiErrorMessage } from "@/helpers/api.helper";
 
 export function DailyPerformanceScreen() {
+  const performanceQuery = useDashboardTechnicianPerformanceQuery();
+  const performance = performanceQuery.data;
+  const technicians = techniciansFromDashboardPerformance(performance);
+  const summary = performanceSummaryFromDashboard(performance);
+
   return (
     <div className="space-y-6" dir="rtl">
       <PageHeader
@@ -14,7 +24,13 @@ export function DailyPerformanceScreen() {
         subtitle="متابعة إنجاز الطلبات، أوقات الصيانة، والإيرادات اليومية لكل فني."
       />
 
-      <PerformanceKpiCards summary={PERFORMANCE_SUMMARY} />
+      {performanceQuery.isError ? (
+        <Card className="border-danger/30 bg-danger-soft p-4 text-sm text-danger">
+          {getApiErrorMessage(performanceQuery.error)}
+        </Card>
+      ) : null}
+
+      <PerformanceKpiCards summary={summary} />
 
       <section aria-labelledby="technician-performance-title" className="space-y-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
@@ -30,12 +46,17 @@ export function DailyPerformanceScreen() {
             </p>
           </div>
           <span className="text-sm text-content-muted">
-            {DAILY_TECHNICIAN_PERFORMANCE.length} فنيين
+            {performanceQuery.isLoading ? "..." : `${technicians.length} فنيين`}
           </span>
         </div>
 
         <div className="space-y-7 sm:space-y-8">
-          {DAILY_TECHNICIAN_PERFORMANCE.map((technician, index) => (
+          {performanceQuery.isLoading ? (
+            <Card className="px-4 py-12 text-center text-content-muted">
+              جاري تحميل أداء الفنيين...
+            </Card>
+          ) : technicians.length ? (
+            technicians.map((technician, index) => (
             <div key={technician.id} className="space-y-7 sm:space-y-8">
               {index > 0 && (
                 <div aria-hidden="true" className="flex items-center gap-3 px-2">
@@ -46,7 +67,12 @@ export function DailyPerformanceScreen() {
               )}
               <TechnicianPerformanceCard technician={technician} />
             </div>
-          ))}
+            ))
+          ) : (
+            <Card className="px-4 py-12 text-center text-content-muted">
+              لا توجد بيانات أداء فنيين من الـ API.
+            </Card>
+          )}
         </div>
       </section>
     </div>

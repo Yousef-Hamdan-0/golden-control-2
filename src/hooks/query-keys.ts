@@ -9,6 +9,11 @@ import type {
   InventoryDailyListParams,
   InventoryPartListParams,
 } from "@/repositories/inventory.repository";
+import type {
+  ExpenseListParams,
+  FinancialSummaryParams,
+} from "@/repositories/finance.repository";
+import type { PayrollRecordListParams } from "@/repositories/payroll.repository";
 
 /**
  * Single source for every cache key. Precise keys = precise invalidation.
@@ -54,6 +59,19 @@ export const queryKeys = {
   settings: {
     all: ["settings"] as const,
     detail: () => ["settings", "detail"] as const,
+  },
+  finance: {
+    all: ["finance"] as const,
+    expenses: {
+      all: ["finance", "expenses"] as const,
+      list: (params: ExpenseListParams) => ["finance", "expenses", "list", params] as const,
+      detail: (id: string) => ["finance", "expenses", "detail", id] as const,
+    },
+    summary: (params: FinancialSummaryParams) => ["finance", "summary", params] as const,
+  },
+  payroll: {
+    all: ["payroll-records"] as const,
+    list: (params: PayrollRecordListParams) => ["payroll-records", "list", params] as const,
   },
   technicians: {
     all: ["technicians"] as const,

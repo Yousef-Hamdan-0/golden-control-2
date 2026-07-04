@@ -1,12 +1,15 @@
 "use client";
 
+import { useEffect } from "react";
 import { useState } from "react";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { TablePagination } from "@/components/ui/TablePagination";
+import { useToast } from "@/components/ui/Toast";
+import { getApiErrorMessage } from "@/helpers/api.helper";
+import { useFinanceSummaryQuery } from "@/features/expenses/hooks/use-expenses";
 import { formatMoney } from "@/lib/format/currency";
 import { PAGE_SIZE } from "@/config/constants";
-import { FINANCE_RECORDS } from "../../data/seed";
 import { SectionTitle } from "../shared/SectionTitle";
 import { KpiCards } from "../shared/KpiCards";
 
@@ -23,29 +26,76 @@ function financeTitle(section?: string[]): string {
 }
 
 export function FinanceScreen({ section }: { section?: string[] }) {
+  const toast = useToast();
   const title = financeTitle(section);
-  const sales = FINANCE_RECORDS.filter((record) => record.category === "sales");
-  const expenses = FINANCE_RECORDS.filter((record) => record.category !== "sales");
-  const salesTotal = sales.reduce((sum, record) => sum + record.amount, 0);
-  const expensesTotal = expenses.reduce((sum, record) => sum + record.amount, 0);
-  const profit = salesTotal - expensesTotal;
   const isReport = section?.[0] === "reports";
   const [page, setPage] = useState(1);
+  const summaryQuery = useFinanceSummaryQuery({
+    startDate: "2000-01-01",
+    endDate: new Date().toISOString().slice(0, 10),
+  });
+  const summary = summaryQuery.data;
+  const salesTotal = summary?.totalRevenues ?? 0;
+  const expensesTotal = (summary?.fixedCosts ?? 0) + (summary?.variableCosts ?? 0);
+  const profit = summary?.netProfit ?? 0;
 
   const sectionKey = section?.join("/") ?? "";
-  const records = sectionKey.includes("fixed")
-    ? expenses.filter((record) => record.category === "fixed")
-    : sectionKey.includes("variable")
-      ? expenses.filter((record) => record.category === "variable")
-      : sectionKey.includes("sales")
-        ? sales
-        : FINANCE_RECORDS;
+  const records = [
+    {
+      id: "FIN-REVENUES",
+      title: "إجمالي الإيرادات",
+      category: "sales",
+      owner: "API المالية",
+      date: summary?.periodStart && summary?.periodEnd
+        ? `${summary.periodStart.slice(0, 10)} - ${summary.periodEnd.slice(0, 10)}`
+        : "غير محدد",
+      amount: salesTotal,
+    },
+    {
+      id: "FIN-FIXED",
+      title: "المصروفات الثابتة",
+      category: "fixed",
+      owner: "API المالية",
+      date: summary?.periodStart?.slice(0, 10) ?? "غير محدد",
+      amount: summary?.fixedCosts ?? 0,
+    },
+    {
+      id: "FIN-VARIABLE",
+      title: "المصروفات المتغيرة",
+      category: "variable",
+      owner: "API المالية",
+      date: summary?.periodStart?.slice(0, 10) ?? "غير محدد",
+      amount: summary?.variableCosts ?? 0,
+    },
+    {
+      id: "FIN-PARTS",
+      title: "تكلفة القطع",
+      category: "variable",
+      owner: "API المالية",
+      date: summary?.periodStart?.slice(0, 10) ?? "غير محدد",
+      amount: summary?.partsCosts ?? 0,
+    },
+  ].filter((record) =>
+    sectionKey.includes("fixed")
+      ? record.category === "fixed"
+      : sectionKey.includes("variable")
+        ? record.category === "variable"
+        : sectionKey.includes("sales")
+          ? record.category === "sales"
+          : true,
+  );
   const pages = Math.max(1, Math.ceil(records.length / PAGE_SIZE));
   const currentPage = Math.min(page, pages);
   const visibleRecords = records.slice(
     (currentPage - 1) * PAGE_SIZE,
     currentPage * PAGE_SIZE,
   );
+
+  useEffect(() => {
+    if (summaryQuery.isError && summaryQuery.error) {
+      toast.error("تعذر تحميل البيانات المالية", getApiErrorMessage(summaryQuery.error));
+    }
+  }, [summaryQuery.error, summaryQuery.isError, toast]);
 
   return (
     <div className="space-y-6">
@@ -58,7 +108,7 @@ export function FinanceScreen({ section }: { section?: string[] }) {
           { label: "المبيعات", value: formatMoney(salesTotal), icon: "chart", tone: "success" },
           { label: "المصروفات", value: formatMoney(expensesTotal), icon: "wallet", tone: "gold" },
           { label: "صافي الربح", value: formatMoney(profit), icon: "shield", tone: profit >= 0 ? "success" : "danger" },
-          { label: "الفواتير المفتوحة", value: "3", icon: "file", tone: "info" },
+          { label: "الفواتير المفتوحة", value: "غير متوفر", icon: "file", tone: "info" },
         ]}
       />
 
@@ -112,10 +162,17 @@ export function FinanceScreen({ section }: { section?: string[] }) {
                     <td className="px-4 py-4 text-content-muted">{record.owner}</td>
                     <td className="px-4 py-4 text-content-muted">{record.date}</td>
                     <td className="px-4 py-4 text-content-muted">
-                      {formatMoney(record.amount, record.currency)}
+                      {formatMoney(record.amount, "SYP")}
                     </td>
                   </tr>
                 ))}
+                {!summaryQuery.isLoading && !visibleRecords.length ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-12 text-center text-content-muted">
+                      لا توجد بيانات مالية من API لهذا القسم.
+                    </td>
+                  </tr>
+                ) : null}
               </tbody>
             </table>
           </div>

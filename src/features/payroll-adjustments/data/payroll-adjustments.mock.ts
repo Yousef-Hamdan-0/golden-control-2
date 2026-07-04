@@ -6,7 +6,7 @@ export const INITIAL_PAYROLL_ADJUSTMENTS: readonly PayrollAdjustment[] = [
   {
     id: "PAY-1009",
     userId: "#USR-723",
-    type: "advance",
+    type: "salary",
     amount: 1_500_000,
     note: "سلفة شخصية",
     date: "2026-06-18",
@@ -22,7 +22,7 @@ export const INITIAL_PAYROLL_ADJUSTMENTS: readonly PayrollAdjustment[] = [
   {
     id: "PAY-1007",
     userId: "#USR-481",
-    type: "increase",
+    type: "bonus",
     amount: 450_000,
     note: "مكافأة أداء",
     date: "2026-06-14",
@@ -30,7 +30,7 @@ export const INITIAL_PAYROLL_ADJUSTMENTS: readonly PayrollAdjustment[] = [
   {
     id: "PAY-1006",
     userId: "#USR-555",
-    type: "advance",
+    type: "salary",
     amount: 1_000_000,
     note: "",
     date: "2026-06-12",
@@ -38,7 +38,7 @@ export const INITIAL_PAYROLL_ADJUSTMENTS: readonly PayrollAdjustment[] = [
   {
     id: "PAY-1005",
     userId: "#USR-902",
-    type: "increase",
+    type: "bonus",
     amount: 750_000,
     note: "بدل مسؤولية",
     date: "2026-06-10",
@@ -54,7 +54,7 @@ export const INITIAL_PAYROLL_ADJUSTMENTS: readonly PayrollAdjustment[] = [
   {
     id: "PAY-1003",
     userId: "#USR-612",
-    type: "advance",
+    type: "salary",
     amount: 600_000,
     note: "سلفة طارئة",
     date: "2026-06-05",
@@ -62,7 +62,7 @@ export const INITIAL_PAYROLL_ADJUSTMENTS: readonly PayrollAdjustment[] = [
   {
     id: "PAY-1002",
     userId: "#USR-555",
-    type: "increase",
+    type: "bonus",
     amount: 400_000,
     note: "مكافأة شهرية",
     date: "2026-05-20",
@@ -70,7 +70,7 @@ export const INITIAL_PAYROLL_ADJUSTMENTS: readonly PayrollAdjustment[] = [
   {
     id: "PAY-1001",
     userId: "#USR-723",
-    type: "advance",
+    type: "salary",
     amount: 900_000,
     note: "",
     date: "2026-05-08",

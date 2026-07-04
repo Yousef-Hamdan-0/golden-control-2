@@ -2,20 +2,15 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
-import { SkeletonRow } from "@/components/ui/Spinner";
-import { TablePagination } from "@/components/ui/TablePagination";
 import { useToast } from "@/components/ui/Toast";
 import { PAGE_SIZE } from "@/config/constants";
 import { ApiError, getApiErrorMessage } from "@/helpers/api.helper";
 import { Icon } from "@/lib/icons";
 import { KpiCards } from "@/features/operations/components/shared/KpiCards";
 import { SectionTitle } from "@/features/operations/components/shared/SectionTitle";
-import { EmptyState } from "@/features/operations/components/shared/EmptyState";
 import { FilterCard } from "@/features/operations/components/shared/FilterCard";
 import { DateFilterModal } from "@/features/operations/components/shared/DateFilterModal";
 import type { DateFilter } from "@/features/operations/types";
@@ -26,11 +21,8 @@ import {
   normalizeRequestPriority,
   normalizeRequestStatus,
   normalizeRequestType,
-  REQUEST_PRIORITY_LABELS,
   REQUEST_PRIORITY_OPTIONS,
-  REQUEST_STATUS_LABELS,
   REQUEST_STATUS_OPTIONS,
-  REQUEST_STATUS_TONE,
   REQUEST_TYPE_OPTIONS,
   type RepairRequest,
   type RepairRequestInput,
@@ -46,6 +38,8 @@ import {
 } from "@/features/requests/hooks/use-requests";
 import { RequestDetailsModal } from "@/features/requests/components/RequestDetailsModal";
 import { RequestFormModal } from "@/features/requests/components/RequestFormModal";
+import { RequestsTable } from "@/features/requests/components/RequestsTable";
+import { technicianDisplayName } from "@/features/requests/components/request-display.helpers";
 import { useUsersAllQuery } from "@/features/users/hooks/use-users-query";
 
 type StatusFilter = RepairRequestStatus | "all";
@@ -64,13 +58,6 @@ function initialPriority(value: string | null): PriorityFilter {
 
 function initialType(value: string | null): TypeFilter {
   return value ? normalizeRequestType(value) : "all";
-}
-
-function primaryDevice(request: RepairRequest) {
-  const first = request.devices[0];
-  if (!first) return "غير محدد";
-  const name = first.deviceName || first.deviceType || "غير محدد";
-  return first.brand ? `${name} / ${first.brand}` : name;
 }
 
 function saveBlob(response: Awaited<ReturnType<typeof requestService.downloadReceipt>>, request: RepairRequest) {
@@ -93,29 +80,6 @@ function getPdfDownloadErrorMessage(error: unknown) {
   }
 
   return message;
-}
-
-function isLikelyIdentifier(value: string) {
-  const trimmed = value.trim();
-  return (
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-      trimmed,
-    ) || /^[0-9a-f]{24}$/i.test(trimmed)
-  );
-}
-
-function technicianDisplayName(request: RepairRequest, usersById: Map<string, string>) {
-  const fromTechnicianId = usersById.get(request.technicianId);
-  if (fromTechnicianId) return fromTechnicianId;
-
-  const fromNameAsId = usersById.get(request.technicianName);
-  if (fromNameAsId) return fromNameAsId;
-
-  if (request.technicianName && !isLikelyIdentifier(request.technicianName)) {
-    return request.technicianName;
-  }
-
-  return "غير محدد";
 }
 
 export function RequestsScreen() {
@@ -410,119 +374,21 @@ export function RequestsScreen() {
           </button>
         </div>
       ) : (
-        <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-[920px] w-full text-right text-sm">
-              <thead>
-                <tr className="bg-surface-2 text-content-muted">
-                  {[
-                    "رقم الطلب",
-                    "العميل",
-                    "الجهاز",
-                    "الفني",
-                    "الحالة",
-                    "الأولوية",
-                    "الإجراءات",
-                  ].map((header) => (
-                    <th key={header} className="px-4 py-3 font-medium">
-                      {header}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {isLoading ? (
-                  Array.from({ length: PAGE_SIZE }).map((_, index) => (
-                    <SkeletonRow key={index} cols={7} />
-                  ))
-                ) : tableRequests.length ? (
-                  tableRequests.map((request) => (
-                    <tr
-                      key={request.id}
-                      className="border-b border-border hover:bg-gold-soft"
-                    >
-                      <td className="px-4 py-4 font-bold text-gold" dir="ltr">
-                        {request.requestNumber}
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="font-semibold text-content">{request.customer.name}</div>
-                        <div className="text-xs text-content-muted" dir="ltr">
-                          {request.customer.firstPhone || "غير محدد"}
-                        </div>
-                      </td>
-                      <td className="px-4 py-4 text-content-muted">{primaryDevice(request)}</td>
-                      <td className="px-4 py-4 text-content">
-                        {technicianDisplayName(request, usersById)}
-                      </td>
-                      <td className="px-4 py-4">
-                        <Badge tone={REQUEST_STATUS_TONE[request.status]} dot>
-                          {REQUEST_STATUS_LABELS[request.status]}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-4">
-                        <Badge tone={request.priority === "emergency" ? "danger" : "neutral"}>
-                          {REQUEST_PRIORITY_LABELS[request.priority]}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="flex items-center justify-start gap-2" dir="rtl">
-                          <button
-                            type="button"
-                            aria-label={`تفاصيل ${request.requestNumber}`}
-                            title="تفاصيل الطلب"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setSelectedRequestId(request.id);
-                            }}
-                            className="rounded-sm p-1.5 text-content-muted hover:bg-surface-2"
-                          >
-                            <Icon name="eye" size={18} />
-                          </button>
-                          <button
-                            type="button"
-                            aria-label={`تعديل ${request.requestNumber}`}
-                            title="تعديل"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              update.reset();
-                              setEditingRequest(request);
-                            }}
-                            className="rounded-sm p-1.5 text-content-muted hover:bg-surface-2"
-                          >
-                            <Icon name="pencil" size={18} />
-                          </button>
-                          <button
-                            type="button"
-                            aria-label={`PDF ${request.requestNumber}`}
-                            title="تنزيل PDF"
-                            disabled={pdfRequestId === request.id}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              downloadPdf(request);
-                            }}
-                            className="rounded-sm p-1.5 text-content-muted hover:bg-surface-2 disabled:opacity-50"
-                          >
-                            <Icon name="file" size={18} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                ) : null}
-              </tbody>
-            </table>
-          </div>
-          {!isLoading && tableRequests.length === 0 ? (
-            <EmptyState title="لا توجد طلبات مطابقة للفلاتر." />
-          ) : null}
-          <TablePagination
-            page={currentPage}
-            total={totalRequests}
-            pageSize={PAGE_SIZE}
-            onPage={setPage}
-            itemLabel="طلب"
-          />
-        </Card>
+        <RequestsTable
+          requests={tableRequests}
+          isLoading={isLoading}
+          currentPage={currentPage}
+          totalRequests={totalRequests}
+          usersById={usersById}
+          pdfRequestId={pdfRequestId}
+          onPage={setPage}
+          onDetails={(request) => setSelectedRequestId(request.id)}
+          onEdit={(request) => {
+            update.reset();
+            setEditingRequest(request);
+          }}
+          onDownloadPdf={downloadPdf}
+        />
       )}
     </div>
   );

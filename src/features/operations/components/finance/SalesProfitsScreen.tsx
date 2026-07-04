@@ -2,23 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/Card";
+import { useToast } from "@/components/ui/Toast";
+import { getApiErrorMessage } from "@/helpers/api.helper";
+import { useFinanceSummaryQuery } from "@/features/expenses/hooks/use-expenses";
 import { Icon, type IconName } from "@/lib/icons";
 import { formatMoney } from "@/lib/format/currency";
-import { localDateKey } from "@/lib/format/date";
 import { cn } from "@/lib/utils/cn";
-import {
-  EXPENSES_STORAGE_KEY,
-  INITIAL_EXPENSES,
-} from "@/features/expenses/data/expenses.mock";
-import type { ExpenseRecord } from "@/features/expenses/models/expense.model";
-import {
-  INVENTORY_ITEMS_STORAGE_KEY,
-  INVOICES_STORAGE_KEY,
-  USD_TO_SYP_RATE,
-} from "../../constants";
-import { INVENTORY, INVOICES } from "../../data/seed";
-import type { InventoryItem, Invoice } from "../../types";
-import { readStoredInvoices, readStoredList } from "../../utils/storage";
 import { SectionTitle } from "../shared/SectionTitle";
 
 const MONTHS = [
@@ -89,17 +78,25 @@ const TONE_STYLES: Record<
   },
 };
 
-function toSyp(value: number, currency: "SYP" | "USD") {
-  return currency === "USD" ? value * USD_TO_SYP_RATE : value;
+function isoDate(year: string, month: string, day: string) {
+  return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
 }
 
-function matchesDate(date: string, filters: DateParts) {
-  const [year, month, day] = localDateKey(date).split("-");
-  return (
-    (!filters.year || filters.year === year) &&
-    (!filters.month || filters.month === String(Number(month))) &&
-    (!filters.day || filters.day === String(Number(day)))
-  );
+function todayKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function dateRangeFromFilters(filters: DateParts) {
+  if (filters.day && filters.month && filters.year) {
+    const date = isoDate(filters.year, filters.month, filters.day);
+    return { startDate: date, endDate: date };
+  }
+
+  return { startDate: "2000-01-01", endDate: todayKey() };
+}
+
+function seriesForValue(value: number) {
+  return [0, Math.max(0, value)];
 }
 
 function Sparkline({ series, tone }: { series: number[]; tone: MetricTone }) {
@@ -213,136 +210,44 @@ function SelectFilter({
 }
 
 export function SalesProfitsScreen() {
+  const toast = useToast();
   const [filters, setFilters] = useState<DateParts>({ day: "", month: "", year: "" });
-  const [invoices, setInvoices] = useState<Invoice[]>(readStoredInvoices);
-  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>(() =>
-    readStoredList(INVENTORY_ITEMS_STORAGE_KEY, INVENTORY),
-  );
-  const [expenses, setExpenses] = useState<ExpenseRecord[]>(() =>
-    readStoredList(EXPENSES_STORAGE_KEY, [...INITIAL_EXPENSES]),
-  );
+  const summaryParams = useMemo(() => dateRangeFromFilters(filters), [filters]);
+  const summaryQuery = useFinanceSummaryQuery(summaryParams);
 
   useEffect(() => {
-    const syncData = (event?: Event) => {
-      const key =
-        event instanceof StorageEvent
-          ? event.key
-          : event instanceof CustomEvent
-            ? event.detail?.key
-            : null;
-
-      if (!key || key === INVOICES_STORAGE_KEY) {
-        setInvoices(readStoredInvoices());
-      }
-      if (!key || key === INVENTORY_ITEMS_STORAGE_KEY) {
-        setInventoryItems(readStoredList(INVENTORY_ITEMS_STORAGE_KEY, INVENTORY));
-      }
-      if (!key || key === EXPENSES_STORAGE_KEY) {
-        setExpenses(readStoredList(EXPENSES_STORAGE_KEY, [...INITIAL_EXPENSES]));
-      }
-    };
-
-    window.addEventListener("storage", syncData);
-    window.addEventListener("golden-control:data-updated", syncData);
-    window.addEventListener("focus", syncData);
-
-    return () => {
-      window.removeEventListener("storage", syncData);
-      window.removeEventListener("golden-control:data-updated", syncData);
-      window.removeEventListener("focus", syncData);
-    };
-  }, []);
+    if (summaryQuery.isError && summaryQuery.error) {
+      toast.error("تعذر تحميل الملخص المالي", getApiErrorMessage(summaryQuery.error));
+    }
+  }, [summaryQuery.error, summaryQuery.isError, toast]);
 
   const years = useMemo(
-    () =>
-      Array.from(
-        new Set([
-          ...invoices.map((invoice) => localDateKey(invoice.issuedAt).slice(0, 4)),
-          ...expenses.map((expense) => expense.month.slice(0, 4)),
-        ]),
-      ).sort((a, b) => Number(b) - Number(a)),
-    [expenses, invoices],
+    () => {
+      const currentYear = new Date().getFullYear();
+      return Array.from({ length: 6 }, (_, index) => String(currentYear - index));
+    },
+    [],
   );
   const hasSpecificDate = Boolean(filters.day && filters.month && filters.year);
 
   const dashboard = useMemo(() => {
-    const activeFilters =
-      filters.day && filters.month && filters.year
-        ? filters
-        : { day: "", month: "", year: "" };
-    const filteredInvoices = invoices.filter((invoice) =>
-      matchesDate(invoice.issuedAt, activeFilters),
-    );
-    const expenseRecords = expenses.filter(
-      (expense) => matchesDate(`${expense.month}-01`, activeFilters),
-    );
-    const inventoryCost = new Map(inventoryItems.map((item) => [item.id, item.unitCost]));
-    const dateKeys = Array.from(
-      new Set([
-        ...filteredInvoices.map((invoice) => localDateKey(invoice.issuedAt)),
-        ...expenseRecords.map((expense) => `${expense.month}-01`),
-      ]),
-    ).sort();
-    const chartDates = dateKeys.length > 1 ? dateKeys : ["قبل", ...(dateKeys.length ? dateKeys : ["الآن"])];
-
-    const invoiceTotals = (date?: string) => {
-      const scoped = date
-        ? filteredInvoices.filter((invoice) => localDateKey(invoice.issuedAt) === date)
-        : filteredInvoices;
-      const sales = scoped.reduce(
-        (sum, invoice) => sum + toSyp(invoice.total, invoice.currency),
-        0,
-      );
-      const paid = scoped.reduce(
-        (sum, invoice) => sum + toSyp(invoice.paid, invoice.currency),
-        0,
-      );
-      const parts = scoped.reduce(
-        (sum, invoice) =>
-          sum +
-          invoice.parts.reduce(
-            (partsSum, part) =>
-              part.id.startsWith("PRT-")
-                ? partsSum + (inventoryCost.get(part.id) ?? 0) * part.quantity
-                : partsSum,
-            0,
-          ),
-        0,
-      );
-      return { sales, paid, remaining: sales - paid, parts };
-    };
-
-    const expenseTotal = (date?: string) =>
-      expenseRecords
-        .filter((expense) => !date || `${expense.month}-01` === date)
-        .reduce((sum, expense) => sum + expense.amount, 0);
-
-    const totals = invoiceTotals();
-    const totalExpenses = expenseTotal();
-    const netProfit = totals.sales - totalExpenses - totals.parts;
-    const seriesFor = (
-      pick: (invoice: ReturnType<typeof invoiceTotals>, expenses: number) => number,
-    ) =>
-      chartDates.map((date) => {
-        if (date === "قبل") return 0;
-        return Math.max(0, pick(invoiceTotals(date), expenseTotal(date)));
-      });
-
+    const summary = summaryQuery.data;
+    const expenses = (summary?.fixedCosts ?? 0) + (summary?.variableCosts ?? 0);
+    const sales = summary?.totalRevenues ?? 0;
+    const parts = summary?.partsCosts ?? 0;
+    const netProfit = summary?.netProfit ?? 0;
     return {
-      invoiceCount: filteredInvoices.length,
-      totals: { ...totals, expenses: totalExpenses, netProfit },
+      totals: { sales, paid: sales, remaining: 0, expenses, parts, netProfit },
       series: {
-        sales: seriesFor((invoice) => invoice.sales),
-        paid: seriesFor((invoice) => invoice.paid),
-        remaining: seriesFor((invoice) => invoice.remaining),
-        expenses: seriesFor((_, expense) => expense),
-        parts: seriesFor((invoice) => invoice.parts),
-        netProfit: seriesFor(
-          (invoice, expense) => invoice.sales - expense - invoice.parts,
-        ),
+        sales: seriesForValue(sales),
+        paid: seriesForValue(sales),
+        remaining: seriesForValue(0),
+        expenses: seriesForValue(expenses),
+        parts: seriesForValue(parts),
+        netProfit: seriesForValue(netProfit),
       },
     };
-  }, [expenses, filters, inventoryItems, invoices]);
+  }, [summaryQuery.data]);
 
   const hasFilterSelection = Boolean(filters.day || filters.month || filters.year);
   const filterDescription = hasSpecificDate
@@ -355,7 +260,7 @@ export function SalesProfitsScreen() {
     {
       label: "إجمالي المبيعات",
       value: dashboard.totals.sales,
-      helper: `${dashboard.invoiceCount} فواتير ضمن النطاق`,
+      helper: "من ملخص الإيرادات في API",
       icon: "chart",
       tone: "gold",
       series: dashboard.series.sales,
@@ -363,7 +268,7 @@ export function SalesProfitsScreen() {
     {
       label: "إجمالي المبالغ المدفوعة",
       value: dashboard.totals.paid,
-      helper: "المبالغ المحصلة فعليًا",
+      helper: "Revenue محسوبة من الدفعات",
       icon: "wallet",
       tone: "success",
       series: dashboard.series.paid,
@@ -371,7 +276,7 @@ export function SalesProfitsScreen() {
     {
       label: "إجمالي المبالغ المتبقية",
       value: dashboard.totals.remaining,
-      helper: "ذمم وفواتير قيد التحصيل",
+      helper: "غير متوفر من API الحالي",
       icon: "clock",
       tone: "info",
       series: dashboard.series.remaining,
@@ -379,7 +284,7 @@ export function SalesProfitsScreen() {
     {
       label: "إجمالي المصروفات",
       value: dashboard.totals.expenses,
-      helper: "المصروفات الثابتة والمتغيرة",
+      helper: "ثابتة ومتغيرة من API",
       icon: "file",
       tone: "danger",
       series: dashboard.series.expenses,
@@ -387,7 +292,7 @@ export function SalesProfitsScreen() {
     {
       label: "إجمالي سعر القطع المستهلكة",
       value: dashboard.totals.parts,
-      helper: "محسوب وفق تكلفة المخزون",
+      helper: "Parts costs من API",
       icon: "box",
       tone: "neutral",
       series: dashboard.series.parts,
@@ -395,7 +300,7 @@ export function SalesProfitsScreen() {
     {
       label: "صافي الربح",
       value: dashboard.totals.netProfit,
-      helper: "المبيعات ناقص المصروفات والقطع",
+      helper: "من الملخص المالي",
       icon: "shield",
       tone: dashboard.totals.netProfit >= 0 ? "success" : "danger",
       series: dashboard.series.netProfit,
@@ -467,7 +372,7 @@ export function SalesProfitsScreen() {
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-4 text-xs text-content-muted">
           <span>العرض الحالي: <strong className="font-semibold text-content">{filterDescription}</strong></span>
-          <span>{dashboard.invoiceCount} فواتير مطابقة</span>
+          <span>{summaryQuery.isLoading ? "جاري تحميل الملخص..." : "البيانات من API المالية"}</span>
         </div>
       </Card>
 

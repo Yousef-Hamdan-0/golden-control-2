@@ -46,6 +46,16 @@ export const API_ROUTES = {
     byInvoice: (invoiceId: string) =>
       `/api/payments/invoice/${encodeURIComponent(invoiceId)}`,
   },
+  payrollRecords: {
+    root: "/api/payroll-records",
+    byId: (id: string) => `/api/payroll-records/${encodeURIComponent(id)}`,
+  },
+  finance: {
+    expenses: "/api/finance/expenses",
+    expenseById: (id: string) => `/api/finance/expenses/${encodeURIComponent(id)}`,
+    summary: "/api/finance/summary",
+    reportPdf: "/api/finance/reports/pdf",
+  },
   inventory: {
     daily: "/api/inventory/daily",
     dailyById: (id: string) => `/api/inventory/daily/${encodeURIComponent(id)}`,
@@ -77,6 +87,8 @@ export const API_ENDPOINTS = {
   requests: API_ROUTES.requests,
   invoices: API_ROUTES.invoices,
   payments: API_ROUTES.payments,
+  payrollRecords: API_ROUTES.payrollRecords,
+  finance: API_ROUTES.finance,
   inventory: API_ROUTES.inventory,
   settings: API_ROUTES.settings,
 } as const;
@@ -129,6 +141,16 @@ export const BACKEND_API_ENDPOINTS = {
   payments: {
     root: createApiUrl(API_ROUTES.payments.root),
     byInvoice: (invoiceId: string) => createApiUrl(API_ROUTES.payments.byInvoice(invoiceId)),
+  },
+  payrollRecords: {
+    root: createApiUrl(API_ROUTES.payrollRecords.root),
+    byId: (id: string) => createApiUrl(API_ROUTES.payrollRecords.byId(id)),
+  },
+  finance: {
+    expenses: createApiUrl(API_ROUTES.finance.expenses),
+    expenseById: (id: string) => createApiUrl(API_ROUTES.finance.expenseById(id)),
+    summary: createApiUrl(API_ROUTES.finance.summary),
+    reportPdf: createApiUrl(API_ROUTES.finance.reportPdf),
   },
   inventory: {
     daily: createApiUrl(API_ROUTES.inventory.daily),

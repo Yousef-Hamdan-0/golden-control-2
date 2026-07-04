@@ -1,74 +1,27 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Badge, type BadgeTone } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
+import type { BadgeTone } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
-import { ConfirmToast } from "@/components/ui/ConfirmToast";
-import { Input } from "@/components/ui/Input";
-import { OverlayPortal } from "@/components/ui/OverlayPortal";
-import { Select } from "@/components/ui/Select";
-import { TablePagination } from "@/components/ui/TablePagination";
-import { Textarea } from "@/components/ui/Textarea";
 import { useToast } from "@/components/ui/Toast";
 import { getApiErrorMessage } from "@/helpers/api.helper";
 import { Icon } from "@/lib/icons";
 import { formatMoney } from "@/lib/format/currency";
 import { MaintenanceOrderModal } from "@/features/operations/components/OperationsScreens";
-import { PAGE_SIZE } from "@/config/constants";
 import { useDashboardStatsQuery } from "@/features/dashboard/hooks/use-dashboard";
-import type {
-  DashboardLastRequest,
-  DashboardStats,
-} from "@/models/dashboard/dashboard.model";
+import { DashboardOrderModal } from "@/features/dashboard/components/DashboardOrderModal";
+import { RecentOrdersTable } from "@/features/dashboard/components/RecentOrdersTable";
 import {
-  REQUEST_STATUS_LABELS,
-  REQUEST_STATUS_OPTIONS,
-  REQUEST_STATUS_TONE,
-  type RepairRequestStatus,
-} from "@/models/requests/request.model";
-
-type ModalMode = "view" | "edit";
-
-interface RecentOrder {
-  id: string;
-  requestNumber: string;
-  client: string;
-  phone: string;
-  device: string;
-  technician: string;
-  status: RepairRequestStatus;
-  notes: string;
-}
+  type ModalMode,
+  type RecentOrder,
+  recentOrderFromDashboard,
+} from "@/features/dashboard/components/dashboard-overview.helpers";
+import type { DashboardStats } from "@/models/dashboard/dashboard.model";
 
 const chartBars = ["h-16", "h-14", "h-10", "h-12", "h-7", "h-9", "h-5"];
 
-function requestStatusMeta(status: RepairRequestStatus): {
-  label: string;
-  tone: BadgeTone;
-} {
-  return {
-    label: REQUEST_STATUS_LABELS[status],
-    tone: REQUEST_STATUS_TONE[status],
-  };
-}
-
 function countText(value: number | undefined, loading: boolean) {
   return loading ? "..." : String(value ?? 0);
-}
-
-function recentOrderFromDashboard(request: DashboardLastRequest): RecentOrder {
-  return {
-    id: request.requestId,
-    requestNumber: request.requestNumber,
-    client: request.customerName,
-    phone: "غير متوفر",
-    device: request.deviceInfo,
-    technician: request.technicianName || "غير محدد",
-    status: request.status,
-    notes: "",
-  };
 }
 
 function NewOrderButton({ onClick }: { onClick: () => void }) {
@@ -257,240 +210,6 @@ function FinanceCard({
   );
 }
 
-function OrderModal({
-  order,
-  mode,
-  onClose,
-  onSave,
-}: {
-  order: RecentOrder;
-  mode: ModalMode;
-  onClose: () => void;
-  onSave: (order: RecentOrder) => void;
-}) {
-  const [draft, setDraft] = useState(order);
-  const [pendingEditOrder, setPendingEditOrder] = useState<RecentOrder | null>(null);
-  const isEdit = mode === "edit";
-
-  return (
-    <OverlayPortal>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="recent-order-modal-title"
-        className="fixed inset-0 z-[100] flex h-dvh min-h-dvh w-dvw items-center justify-center overflow-y-auto overscroll-contain bg-black/60 px-4 py-6"
-      >
-        <Card className="max-h-[calc(100dvh-3rem)] w-full max-w-2xl overflow-y-auto">
-          <div className="flex items-center justify-between border-b border-border px-5 py-4">
-            <div className="text-right">
-              <h3 id="recent-order-modal-title" className="font-heading text-lg font-bold text-content">
-                {isEdit ? "تعديل الطلب" : "تفاصيل الطلب"}
-              </h3>
-              <p className="text-sm text-content-muted">
-                #{order.requestNumber || order.id}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-sm px-3 py-1.5 text-sm text-content-muted transition hover:bg-surface-2"
-            >
-              إغلاق
-            </button>
-          </div>
-
-        <div className="grid gap-4 p-5 md:grid-cols-2">
-          <label className="space-y-1.5 text-right text-sm text-content-muted">
-            <span>العميل</span>
-            <Input
-              value={draft.client}
-              readOnly={!isEdit}
-              onChange={(event) => setDraft((value) => ({ ...value, client: event.target.value }))}
-            />
-          </label>
-          <label className="space-y-1.5 text-right text-sm text-content-muted">
-            <span>رقم الهاتف</span>
-            <Input
-              value={draft.phone}
-              dir="ltr"
-              readOnly={!isEdit}
-              onChange={(event) => setDraft((value) => ({ ...value, phone: event.target.value }))}
-            />
-          </label>
-          <label className="space-y-1.5 text-right text-sm text-content-muted">
-            <span>الجهاز</span>
-            <Input
-              value={draft.device}
-              readOnly={!isEdit}
-              onChange={(event) => setDraft((value) => ({ ...value, device: event.target.value }))}
-            />
-          </label>
-          <label className="space-y-1.5 text-right text-sm text-content-muted">
-            <span>الفني المسؤول</span>
-            <Input
-              value={draft.technician}
-              readOnly={!isEdit}
-              onChange={(event) =>
-                setDraft((value) => ({ ...value, technician: event.target.value }))
-              }
-            />
-          </label>
-          <label className="space-y-1.5 text-right text-sm text-content-muted">
-            <span>الحالة</span>
-            <Select
-              value={draft.status}
-              disabled={!isEdit}
-              onChange={(event) =>
-                setDraft((value) => ({
-                  ...value,
-                  status: event.target.value as RepairRequestStatus,
-                }))
-              }
-            >
-              {REQUEST_STATUS_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </Select>
-          </label>
-          <div className="flex items-end justify-end">
-            <Badge tone={requestStatusMeta(draft.status).tone} dot>
-              {requestStatusMeta(draft.status).label}
-            </Badge>
-          </div>
-          <label className="space-y-1.5 text-right text-sm text-content-muted md:col-span-2">
-            <span>الملاحظات</span>
-            <Textarea
-              className="min-h-28"
-              value={draft.notes}
-              readOnly={!isEdit}
-              onChange={(event) => setDraft((value) => ({ ...value, notes: event.target.value }))}
-            />
-          </label>
-        </div>
-
-        <div className="flex items-center justify-between border-t border-border px-5 py-4">
-          <Link
-            href={`/orders?id=${order.id}`}
-            className="text-sm font-medium text-gold transition hover:text-gold-hover"
-          >
-            فتح في صفحة الطلبات
-          </Link>
-          {isEdit ? (
-            <Button type="button" onClick={() => setPendingEditOrder(draft)}>
-              حفظ التعديل
-            </Button>
-          ) : (
-            <Button type="button" variant="outline" onClick={onClose}>
-              تم
-            </Button>
-          )}
-        </div>
-      </Card>
-      {pendingEditOrder ? (
-        <ConfirmToast
-          title="تأكيد تعديل الطلب"
-          message={`هل تريد حفظ التعديلات على الطلب ${pendingEditOrder.requestNumber}؟`}
-          tone="gold"
-          confirmLabel="تأكيد التعديل"
-          onCancel={() => setPendingEditOrder(null)}
-          onConfirm={() => onSave(pendingEditOrder)}
-        />
-      ) : null}
-      </div>
-    </OverlayPortal>
-  );
-}
-
-function RecentOrdersTable({
-  orders,
-  onOpen,
-}: {
-  orders: RecentOrder[];
-  onOpen: (order: RecentOrder, mode: ModalMode) => void;
-}) {
-  const [page, setPage] = useState(1);
-  const pages = Math.max(1, Math.ceil(orders.length / PAGE_SIZE));
-  const currentPage = Math.min(page, pages);
-  const visibleOrders = orders.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE,
-  );
-
-  return (
-    <Card className="overflow-hidden">
-      <div className="flex items-center justify-between border-b border-border px-5 py-4">
-        <h2 className="font-heading text-lg font-bold text-content">آخر الطلبات المحدثة</h2>
-        <Link href="/orders" className="text-sm font-medium text-gold transition hover:text-gold-hover">
-          عرض الكل
-        </Link>
-      </div>
-
-      <div className="overflow-x-auto">
-        <table className="min-w-[820px] w-full border-collapse text-right">
-          <thead>
-            <tr className="bg-surface-2 text-xs font-normal text-content-muted">
-              <th className="px-5 py-3 font-normal">رقم الطلب</th>
-              <th className="px-5 py-3 font-normal">العميل</th>
-              <th className="px-5 py-3 font-normal">اسم ونوع الجهاز</th>
-              <th className="px-5 py-3 font-normal">الفني المسؤول</th>
-              <th className="px-5 py-3 font-normal">الحالة</th>
-              <th className="px-5 py-3 font-normal">الإجراءات</th>
-            </tr>
-          </thead>
-          <tbody>
-            {visibleOrders.map((order) => (
-              <tr key={order.id} className="border-t border-border text-sm text-content hover:bg-gold-soft">
-                <td className="px-5 py-5 font-bold text-gold">
-                  #{order.requestNumber || order.id}
-                </td>
-                <td className="px-5 py-5">{order.client}</td>
-                <td className="px-5 py-5 text-content-muted">{order.device}</td>
-                <td className="px-5 py-5">{order.technician}</td>
-                <td className="px-5 py-5">
-                  <Badge tone={requestStatusMeta(order.status).tone} dot>
-                    {requestStatusMeta(order.status).label}
-                  </Badge>
-                </td>
-                <td className="px-5 py-5">
-                  <div className="flex items-center justify-start gap-2" dir="rtl">
-                    <button
-                      type="button"
-                      aria-label={`عرض ${order.id}`}
-                      title="عرض"
-                      onClick={() => onOpen(order, "view")}
-                      className="rounded-sm p-1.5 text-content-muted transition hover:bg-surface-2 hover:text-content"
-                    >
-                      <Icon name="eye" size={18} />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={`تعديل ${order.id}`}
-                      title="تعديل"
-                      onClick={() => onOpen(order, "edit")}
-                      className="rounded-sm p-1.5 text-content-muted transition hover:bg-surface-2 hover:text-content"
-                    >
-                      <Icon name="pencil" size={18} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <TablePagination
-        page={currentPage}
-        total={orders.length}
-        pageSize={PAGE_SIZE}
-        onPage={setPage}
-        itemLabel="طلب"
-      />
-    </Card>
-  );
-}
-
 export function DashboardOverviewScreen() {
   const toast = useToast();
   const statsQuery = useDashboardStatsQuery();
@@ -567,7 +286,7 @@ export function DashboardOverviewScreen() {
       />
 
       {modal ? (
-        <OrderModal
+        <DashboardOrderModal
           order={modal.order}
           mode={modal.mode}
           onClose={() => setModal(null)}

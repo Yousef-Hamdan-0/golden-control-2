@@ -18,6 +18,8 @@ import {
 interface ExpenseFormModalProps {
   initialMonth: string;
   expense?: ExpenseRecord;
+  submitting?: boolean;
+  submitError?: string;
   onClose: () => void;
   onSave: (input: ExpenseInput) => void;
 }
@@ -25,6 +27,8 @@ interface ExpenseFormModalProps {
 export function ExpenseFormModal({
   initialMonth,
   expense,
+  submitting = false,
+  submitError,
   onClose,
   onSave,
 }: ExpenseFormModalProps) {
@@ -68,14 +72,12 @@ export function ExpenseFormModal({
     }
 
     onSave(normalized);
-    onClose();
   }
 
   function confirmEdit() {
     if (!pendingEdit) return;
     onSave(pendingEdit);
     setPendingEdit(null);
-    onClose();
   }
 
   return (
@@ -95,9 +97,13 @@ export function ExpenseFormModal({
                 onChange={(event) =>
                   setDraft((current) => ({
                     ...current,
-                    category: event.target.value === "variable" ? "variable" : "fixed",
+                    category:
+                      event.target.value === "variable"
+                        ? event.target.value
+                        : "fixed",
                   }))
                 }
+                disabled={submitting}
               >
                 {Object.entries(EXPENSE_CATEGORY_LABELS).map(([value, label]) => (
                   <option key={value} value={value}>
@@ -113,6 +119,7 @@ export function ExpenseFormModal({
                 value={draft.title}
                 maxLength={100}
                 placeholder="مثال: إيجار المركز"
+                disabled={submitting}
                 onChange={(event) =>
                   setDraft((current) => ({ ...current, title: event.target.value }))
                 }
@@ -131,6 +138,7 @@ export function ExpenseFormModal({
                   className="pl-14"
                   value={draft.amount || ""}
                   placeholder="0"
+                  disabled={submitting}
                   onChange={(event) =>
                     setDraft((current) => ({
                       ...current,
@@ -150,6 +158,7 @@ export function ExpenseFormModal({
                 type="month"
                 dir="ltr"
                 value={draft.month}
+                disabled={submitting}
                 onChange={(event) =>
                   setDraft((current) => ({ ...current, month: event.target.value }))
                 }
@@ -157,19 +166,19 @@ export function ExpenseFormModal({
             </Field>
           </div>
 
-          {error ? (
+          {error || submitError ? (
             <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger">
-              {error}
+              {error || submitError}
             </p>
           ) : null}
 
           <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border pt-4">
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>
               إلغاء
             </Button>
-            <Button type="submit">
+            <Button type="submit" disabled={submitting}>
               <Icon name={isEdit ? "pencil" : "plus"} size={17} />
-              {isEdit ? "حفظ التعديل" : "إنشاء المصروف"}
+              {submitting ? "جاري الحفظ..." : isEdit ? "حفظ التعديل" : "إنشاء المصروف"}
             </Button>
           </div>
         </form>
@@ -183,6 +192,7 @@ export function ExpenseFormModal({
           tone="gold"
           onCancel={() => setPendingEdit(null)}
           onConfirm={confirmEdit}
+          isLoading={submitting}
         />
       ) : null}
     </>

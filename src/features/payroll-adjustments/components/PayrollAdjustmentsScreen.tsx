@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -12,31 +12,33 @@ import { TablePagination } from "@/components/ui/TablePagination";
 import { useToast } from "@/components/ui/Toast";
 import { PAGE_SIZE } from "@/config/constants";
 import { PayrollAdjustmentFormModal } from "@/features/payroll-adjustments/components/PayrollAdjustmentFormModal";
-import {
-  DEFAULT_PAYROLL_MONTH,
-  INITIAL_PAYROLL_ADJUSTMENTS,
-} from "@/features/payroll-adjustments/data/payroll-adjustments.mock";
+import { DEFAULT_PAYROLL_MONTH } from "@/features/payroll-adjustments/data/payroll-adjustments.mock";
+import { usePayrollRecordMutations, usePayrollRecordsQuery } from "@/features/payroll-adjustments/hooks/use-payroll-records";
 import {
   PAYROLL_ADJUSTMENT_LABELS,
-  adjustmentDateForMonth,
   formatPayrollDate,
   formatPayrollMonth,
-  nextPayrollAdjustmentId,
   type PayrollAdjustment,
   type PayrollAdjustmentFilter,
   type PayrollAdjustmentInput,
   type PayrollAdjustmentType,
 } from "@/features/payroll-adjustments/models/payroll-adjustment.model";
+import { useUsersQuery } from "@/features/users/hooks/use-users-query";
+import { getApiErrorMessage } from "@/helpers/api.helper";
 import { formatMoney } from "@/lib/format/currency";
 import { Icon, type IconName } from "@/lib/icons";
-import { MOCK_USERS } from "@/mocks/users.mock";
-import { ROLE_LABELS_AR } from "@/models/auth/user.model";
+import { ROLE_LABELS_AR, type User } from "@/models/auth/user.model";
 
 const ADJUSTMENT_TONES: Record<PayrollAdjustmentType, BadgeTone> = {
-  advance: "info",
+  salary: "gold",
+  bonus: "success",
   deduction: "danger",
-  increase: "success",
+  overtime: "info",
+  commission: "success",
 };
+
+const EMPTY_ADJUSTMENTS: readonly PayrollAdjustment[] = [];
+const EMPTY_USERS: readonly User[] = [];
 
 interface SummaryCard {
   label: string;
@@ -45,47 +47,80 @@ interface SummaryCard {
   iconClassName: string;
 }
 
+function payrollFilterFromValue(value: string): PayrollAdjustmentFilter {
+  if (
+    value === "salary" ||
+    value === "bonus" ||
+    value === "deduction" ||
+    value === "overtime" ||
+    value === "commission"
+  ) {
+    return value;
+  }
+
+  return "all";
+}
+
 export function PayrollAdjustmentsScreen() {
   const toast = useToast();
-  const [adjustments, setAdjustments] = useState<PayrollAdjustment[]>([
-    ...INITIAL_PAYROLL_ADJUSTMENTS,
-  ]);
   const [month, setMonth] = useState(DEFAULT_PAYROLL_MONTH);
   const [typeFilter, setTypeFilter] = useState<PayrollAdjustmentFilter>("all");
   const [page, setPage] = useState(1);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [adjustmentToDelete, setAdjustmentToDelete] =
     useState<PayrollAdjustment | null>(null);
+  const [yearValue, monthValue] = month.split("-").map(Number);
+  const listParams = useMemo(
+    () => ({
+      page,
+      pageSize: PAGE_SIZE,
+      type: typeFilter,
+      year: yearValue,
+      month: monthValue,
+    }),
+    [monthValue, page, typeFilter, yearValue],
+  );
+
+  const payrollQuery = usePayrollRecordsQuery(listParams);
+  const usersQuery = useUsersQuery({
+    role: "all",
+    status: "all",
+    page: 1,
+    pageSize: 1000,
+  });
+  const { create, remove } = usePayrollRecordMutations();
+  const adjustments = payrollQuery.data?.items ?? EMPTY_ADJUSTMENTS;
+  const users = usersQuery.data?.items ?? EMPTY_USERS;
 
   const usersById = useMemo(
-    () => new Map(MOCK_USERS.map((user) => [user.id, user])),
-    [],
+    () => new Map(users.map((user) => [user.id, user])),
+    [users],
   );
 
-  const monthlyAdjustments = useMemo(
-    () => adjustments.filter((adjustment) => adjustment.date.startsWith(month)),
-    [adjustments, month],
-  );
+  useEffect(() => {
+    if (payrollQuery.error) {
+      toast.error("تعذر جلب تسويات الرواتب", getApiErrorMessage(payrollQuery.error));
+    }
+  }, [payrollQuery.error, toast]);
+
+  useEffect(() => {
+    if (usersQuery.error) {
+      toast.error("تعذر جلب المستخدمين", getApiErrorMessage(usersQuery.error));
+    }
+  }, [usersQuery.error, toast]);
 
   const totals = useMemo(
     () =>
-      monthlyAdjustments.reduce(
+      adjustments.reduce(
         (summary, adjustment) => {
           summary[adjustment.type] += adjustment.amount;
           return summary;
         },
-        { advance: 0, deduction: 0, increase: 0 },
+        { salary: 0, bonus: 0, deduction: 0, overtime: 0, commission: 0 },
       ),
-    [monthlyAdjustments],
+    [adjustments],
   );
-
-  const filteredAdjustments = useMemo(
-    () =>
-      monthlyAdjustments.filter(
-        (adjustment) => typeFilter === "all" || adjustment.type === typeFilter,
-      ),
-    [monthlyAdjustments, typeFilter],
-  );
+  const additionsTotal = totals.bonus + totals.overtime + totals.commission;
 
   const summaryCards: readonly SummaryCard[] = [
     {
@@ -95,55 +130,60 @@ export function PayrollAdjustmentsScreen() {
       iconClassName: "bg-danger-soft text-danger",
     },
     {
-      label: "مجموع السلف",
-      value: totals.advance,
+      label: "مجموع الرواتب",
+      value: totals.salary,
       icon: "wallet",
       iconClassName: "bg-info-soft text-info",
     },
     {
-      label: "مجموع الزيادات",
-      value: totals.increase,
+      label: "مجموع الإضافات",
+      value: additionsTotal,
       icon: "chart",
       iconClassName: "bg-success-soft text-success",
     },
   ];
 
-  const pages = Math.max(1, Math.ceil(filteredAdjustments.length / PAGE_SIZE));
-  const currentPage = Math.min(page, pages);
-  const visibleAdjustments = filteredAdjustments.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE,
-  );
+  const totalAdjustments = payrollQuery.data?.total ?? adjustments.length;
+  const pages = Math.max(1, Math.ceil(totalAdjustments / PAGE_SIZE));
+  const currentPage = Math.min(payrollQuery.data?.page ?? page, pages);
+  const visibleAdjustments = adjustments;
+  const isLoading = payrollQuery.isLoading || usersQuery.isLoading;
+  const loadError = payrollQuery.error || usersQuery.error;
 
   function createAdjustment(input: PayrollAdjustmentInput) {
     const user = usersById.get(input.userId);
-    setAdjustments((current) => [
+    create.mutate(
+      { input, month },
       {
-        id: nextPayrollAdjustmentId(current),
-        ...input,
-        date: adjustmentDateForMonth(month),
+        onSuccess: () => {
+          setTypeFilter("all");
+          setPage(1);
+          setShowCreateModal(false);
+          toast.success(
+            "تم إنشاء تسوية الراتب",
+            `تمت إضافة تسوية ${PAYROLL_ADJUSTMENT_LABELS[input.type]} لـ ${user?.fullName ?? "المستخدم"} بنجاح.`,
+          );
+        },
+        onError: (error) => {
+          toast.error("تعذر إنشاء تسوية الراتب", getApiErrorMessage(error));
+        },
       },
-      ...current,
-    ]);
-    setTypeFilter("all");
-    setPage(1);
-    setShowCreateModal(false);
-    toast.success(
-      "تم إنشاء تسوية الراتب",
-      `تمت إضافة تسوية ${PAYROLL_ADJUSTMENT_LABELS[input.type]} لـ ${user?.fullName ?? "المستخدم"} بنجاح.`,
     );
   }
 
-  function deleteAdjustment(adjustmentId: string) {
-    const adjustment = adjustments.find((item) => item.id === adjustmentId);
-    setAdjustments((current) =>
-      current.filter((adjustment) => adjustment.id !== adjustmentId),
-    );
-    setAdjustmentToDelete(null);
-    toast.success(
-      "تم حذف تسوية الراتب",
-      `تم حذف تسوية ${adjustment ? PAYROLL_ADJUSTMENT_LABELS[adjustment.type] : "الراتب"} بنجاح.`,
-    );
+  function deleteAdjustment(adjustment: PayrollAdjustment) {
+    remove.mutate(adjustment.id, {
+      onSuccess: () => {
+        setAdjustmentToDelete(null);
+        toast.success(
+          "تم حذف تسوية الراتب",
+          `تم حذف تسوية ${PAYROLL_ADJUSTMENT_LABELS[adjustment.type]} بنجاح.`,
+        );
+      },
+      onError: (error) => {
+        toast.error("تعذر حذف تسوية الراتب", getApiErrorMessage(error));
+      },
+    });
   }
 
   return (
@@ -153,7 +193,18 @@ export function PayrollAdjustmentsScreen() {
           title="تسويات الرواتب"
           subtitle="إدارة السلف والخصومات والزيادات الشهرية لمستخدمي النظام."
         />
-        <Button type="button" onClick={() => setShowCreateModal(true)}>
+        <Button
+          type="button"
+          disabled={usersQuery.isLoading}
+          onClick={() => {
+            create.reset();
+            if (!users.length) {
+              toast.error("لا يمكن إنشاء تسوية", "تعذر العثور على مستخدمين من الـ API.");
+              return;
+            }
+            setShowCreateModal(true);
+          }}
+        >
           <Icon name="plus" size={18} />
           إنشاء تسوية رواتب
         </Button>
@@ -161,8 +212,14 @@ export function PayrollAdjustmentsScreen() {
 
       {showCreateModal ? (
         <PayrollAdjustmentFormModal
-          users={MOCK_USERS}
-          onClose={() => setShowCreateModal(false)}
+          users={users}
+          initialMonth={month}
+          submitting={create.isPending}
+          submitError={create.error ? getApiErrorMessage(create.error) : ""}
+          submitLabel={create.isPending ? "جاري الحفظ..." : "إنشاء التسوية"}
+          onClose={() => {
+            if (!create.isPending) setShowCreateModal(false);
+          }}
           onSave={createAdjustment}
         />
       ) : null}
@@ -171,8 +228,12 @@ export function PayrollAdjustmentsScreen() {
         <ConfirmToast
           title="تأكيد حذف تسوية الراتب"
           message={`هل تريد حذف تسوية ${PAYROLL_ADJUSTMENT_LABELS[adjustmentToDelete.type]}؟`}
-          onCancel={() => setAdjustmentToDelete(null)}
-          onConfirm={() => deleteAdjustment(adjustmentToDelete.id)}
+          confirmLabel={remove.isPending ? "جاري الحذف..." : "تأكيد الحذف"}
+          isLoading={remove.isPending}
+          onCancel={() => {
+            if (!remove.isPending) setAdjustmentToDelete(null);
+          }}
+          onConfirm={() => deleteAdjustment(adjustmentToDelete)}
         />
       ) : null}
 
@@ -201,19 +262,16 @@ export function PayrollAdjustmentsScreen() {
             id="payroll-filter-type"
             value={typeFilter}
             onChange={(event) => {
-              const value = event.target.value;
-              setTypeFilter(
-                value === "advance" || value === "deduction" || value === "increase"
-                  ? value
-                  : "all",
-              );
+              setTypeFilter(payrollFilterFromValue(event.target.value));
               setPage(1);
             }}
           >
             <option value="all">كل التسويات</option>
-            <option value="advance">سلفة</option>
+            <option value="salary">راتب</option>
+            <option value="bonus">مكافأة</option>
             <option value="deduction">خصم</option>
-            <option value="increase">زيادة</option>
+            <option value="overtime">عمل إضافي</option>
+            <option value="commission">عمولة</option>
           </Select>
         </Field>
 
@@ -252,14 +310,20 @@ export function PayrollAdjustmentsScreen() {
               </tr>
             </thead>
             <tbody>
-              {visibleAdjustments.length ? (
+              {isLoading ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-12 text-center text-content-muted">
+                    جاري تحميل تسويات الرواتب...
+                  </td>
+                </tr>
+              ) : visibleAdjustments.length ? (
                 visibleAdjustments.map((adjustment) => {
                   const user = usersById.get(adjustment.userId);
 
                   return (
                     <tr key={adjustment.id} className="border-t border-border hover:bg-gold-soft">
                       <td className="px-4 py-4 font-semibold text-content">
-                        {user?.fullName ?? "مستخدم محذوف"}
+                        {user?.fullName ?? "مستخدم غير محدد"}
                       </td>
                       <td className="px-4 py-4 text-content-muted">
                         {user ? ROLE_LABELS_AR[user.role] : "غير محدد"}
@@ -295,7 +359,9 @@ export function PayrollAdjustmentsScreen() {
               ) : (
                 <tr>
                   <td colSpan={7} className="px-4 py-12 text-center text-content-muted">
-                    لا توجد تسويات رواتب مطابقة للفلاتر المختارة.
+                    {loadError
+                      ? "تعذر تحميل تسويات الرواتب من الـ API."
+                      : "لا توجد تسويات رواتب مطابقة للفلاتر المختارة."}
                   </td>
                 </tr>
               )}
@@ -304,7 +370,7 @@ export function PayrollAdjustmentsScreen() {
         </div>
         <TablePagination
           page={currentPage}
-          total={filteredAdjustments.length}
+          total={totalAdjustments}
           pageSize={PAGE_SIZE}
           onPage={setPage}
           itemLabel="تسوية"

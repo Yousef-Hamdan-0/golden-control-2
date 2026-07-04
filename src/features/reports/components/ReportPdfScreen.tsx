@@ -7,7 +7,7 @@ import { Field, Input } from "@/components/ui/Input";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Icon } from "@/lib/icons";
 import { cn } from "@/lib/utils/cn";
-import { dashboardService } from "@/services/dashboard.service";
+import { financeService } from "@/services/finance.service";
 
 export type ReportType =
   | "orders"
@@ -51,7 +51,6 @@ export const REPORT_TYPES = Object.keys(REPORT_DEFINITIONS) as ReportType[];
 
 export function ReportPdfScreen({ type }: { type: ReportType }) {
   const report = REPORT_DEFINITIONS[type];
-  const usesDashboardFinancialReport = type === "financial";
   const [showDateFilter, setShowDateFilter] = useState(false);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -81,8 +80,8 @@ export function ReportPdfScreen({ type }: { type: ReportType }) {
     setError("");
 
     try {
-      const reportResponse = usesDashboardFinancialReport
-        ? await dashboardService.downloadFinancialReport("pdf")
+      const reportResponse = type === "financial"
+        ? await financeService.downloadReportPdf({ startDate: from, endDate: to })
         : await (async () => {
             const search = new URLSearchParams({ from, to });
             const response = await fetch(`${REPORTS_API_BASE}/${type}?${search.toString()}`, {
