@@ -369,7 +369,7 @@ function normalizeRequestRecord(payload: unknown, index: number): RepairRequestR
     return {
       id: `record-${index + 1}`,
       name: `تسجيل ${index + 1}`,
-      url: payload,
+      url: mediaUrl(payload),
       createdAt: "",
     };
   }

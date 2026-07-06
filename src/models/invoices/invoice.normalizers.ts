@@ -9,7 +9,6 @@ import type {
   PaymentMethod,
   PaymentStatus,
 } from "@/features/operations/types";
-import { USD_TO_SYP_RATE } from "@/features/operations/constants";
 import type { Currency } from "@/lib/format/currency";
 
 type JsonRecord = Record<string, unknown>;
@@ -800,11 +799,6 @@ export function normalizePaymentResponse(payload: unknown) {
   return normalizeInvoicePayment(dataRecord(payload));
 }
 
-function invoicePaymentConvertedAmount(amount: number, currency: Currency, rate: number) {
-  if (currency === "SYP") return Number((amount / rate).toFixed(2));
-  return Number((amount * rate).toFixed(2));
-}
-
 export class InvoicePayloadModel {
   constructor(private readonly input: Invoice) {}
 
@@ -820,18 +814,11 @@ export class InvoicePayloadModel {
     if (totalAmount <= 0) throw new ApiError("المبلغ الكلي مطلوب لإنشاء الفاتورة.");
     if (paidAmount <= 0) throw new ApiError("مبلغ الدفعة الأولى مطلوب لإنشاء الفاتورة.");
 
-    const dollarExchangeRate =
-      Number(this.input.dollarExchangeRate) > 0
-        ? Number(this.input.dollarExchangeRate)
-        : USD_TO_SYP_RATE;
-
     return {
       payment: {
         amount: paidAmount,
         currency,
         paymentMethod: toApiPaymentMethod(this.input.paymentMethod),
-        dollarExchangeRate,
-        convertedAmount: invoicePaymentConvertedAmount(paidAmount, currency, dollarExchangeRate),
       },
       requestId,
       status: toApiInvoiceStatus(this.input.status),
@@ -848,7 +835,6 @@ export class InvoicePayloadModel {
           sparePartId,
           quantity: Math.max(1, Number(part.quantity) || 1),
           unitPrice: Math.max(0, Number(part.unitPrice) || 0),
-          currency: part.currency ?? currency,
         };
       }),
     };

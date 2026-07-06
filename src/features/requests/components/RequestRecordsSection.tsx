@@ -3,6 +3,7 @@
 import { DetailItem } from "@/features/operations/components/shared/DetailItem";
 import type { RepairRequestRecord } from "@/models/requests/request.model";
 import { fallback, formatDateTime } from "@/features/requests/components/request-details.helpers";
+import { AuthenticatedAudioPlayer } from "@/components/media/AuthenticatedAudioPlayer";
 
 export function RequestRecordsSection({
   records,
@@ -19,7 +20,7 @@ export function RequestRecordsSection({
               <DetailItem label="الاسم" value={fallback(record.name)} />
               <DetailItem label="وقت الإنشاء" value={formatDateTime(record.createdAt)} />
               {record.url ? (
-                <audio controls preload="none" src={record.url} className="h-10 w-full" />
+                <AuthenticatedAudioPlayer url={record.url} />
               ) : (
                 <div className="text-sm text-content-muted">لا يوجد رابط تشغيل.</div>
               )}

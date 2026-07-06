@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Modal } from "@/components/ui/Modal";
+import { AuthenticatedAudioPlayer } from "@/components/media/AuthenticatedAudioPlayer";
 import { Icon } from "@/lib/icons";
 import { formatMoney } from "@/lib/format/currency";
 import { localDateTimeKey, localDisplayDateTime } from "@/lib/format/date";
@@ -193,7 +194,7 @@ export function OrderDetailsModal({
                   <DetailItem label="وقت الإنشاء" value={localDisplayDateTime(record.date, record.date)} />
                   <div>
                     <div className="mb-1.5 text-xs text-content-muted">تشغيل التسجيل</div>
-                    <audio controls preload="none" src={record.url} className="h-10 w-full" />
+                    <AuthenticatedAudioPlayer url={record.url} />
                   </div>
                 </div>
               ))}

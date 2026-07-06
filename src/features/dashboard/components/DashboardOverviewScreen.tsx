@@ -1,24 +1,61 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { BadgeTone } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
 import { useToast } from "@/components/ui/Toast";
-import { getApiErrorMessage } from "@/helpers/api.helper";
+import { ApiError, getApiErrorMessage } from "@/helpers/api.helper";
 import { Icon } from "@/lib/icons";
 import { formatMoney } from "@/lib/format/currency";
 import { useDashboardStatsQuery } from "@/features/dashboard/hooks/use-dashboard";
-import { DashboardOrderModal } from "@/features/dashboard/components/DashboardOrderModal";
 import { RecentOrdersTable } from "@/features/dashboard/components/RecentOrdersTable";
+import { RequestDetailsModal } from "@/features/requests/components/RequestDetailsModal";
 import { RequestFormModal } from "@/features/requests/components/RequestFormModal";
-import { useRequestMutations } from "@/features/requests/hooks/use-requests";
+import {
+  useRequestMutations,
+  useRequestQuery,
+  useRequestStatusHistoryQuery,
+} from "@/features/requests/hooks/use-requests";
+import { technicianDisplayName } from "@/features/requests/components/request-display.helpers";
+import { useUsersAllQuery } from "@/features/users/hooks/use-users-query";
+import { requestService } from "@/services/request.service";
 import {
   type ModalMode,
   type RecentOrder,
   recentOrderFromDashboard,
 } from "@/features/dashboard/components/dashboard-overview.helpers";
 import type { DashboardStats } from "@/models/dashboard/dashboard.model";
-import type { RepairRequestInput } from "@/models/requests/request.model";
+import {
+  createRepairRequestUpdatePatch,
+  hasRepairRequestPatch,
+  type RepairRequest,
+  type RepairRequestInput,
+} from "@/models/requests/request.model";
+
+function saveBlob(
+  response: Awaited<ReturnType<typeof requestService.downloadReceipt>>,
+  request: RepairRequest,
+) {
+  const url = URL.createObjectURL(response.blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = response.fileName ?? `request-${request.requestNumber}.pdf`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
+function getPdfDownloadErrorMessage(error: unknown) {
+  const message = getApiErrorMessage(error);
+  if (error instanceof ApiError && error.status >= 500) {
+    return message === "تعذر إكمال الطلب من الخادم."
+      ? "فشل توليد ملف PDF من خادم الطلبات. المسار صحيح لكن الخادم رجّع خطأ داخلي أثناء إنشاء الإيصال."
+      : message;
+  }
+
+  return message;
+}
 
 const chartBars = ["h-16", "h-14", "h-10", "h-12", "h-7", "h-9", "h-5"];
 
@@ -217,22 +254,43 @@ export function DashboardOverviewScreen() {
   const toast = useToast();
   const statsQuery = useDashboardStatsQuery();
   const [orders, setOrders] = useState<RecentOrder[]>([]);
-  const [modal, setModal] = useState<{ order: RecentOrder; mode: ModalMode } | null>(null);
   const [showOrderModal, setShowOrderModal] = useState(false);
-  const { create } = useRequestMutations();
+  const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
+  const [editingRequest, setEditingRequest] = useState<RepairRequest | null>(null);
+  const [editRequestId, setEditRequestId] = useState<string | null>(null);
+  const [pdfRequestId, setPdfRequestId] = useState<string | null>(null);
+  const { create, update } = useRequestMutations();
+  const usersQuery = useUsersAllQuery({ role: "all", status: "all" });
+
+  const detailsQuery = useRequestQuery(selectedRequestId);
+  const editQuery = useRequestQuery(editRequestId);
+  const statusHistoryQuery = useRequestStatusHistoryQuery(selectedRequestId);
+  const detailsRequest = detailsQuery.data ?? null;
+  const embeddedStatusHistory = detailsRequest?.statusHistory ?? [];
+  const visibleStatusHistory = statusHistoryQuery.data?.length
+    ? statusHistoryQuery.data
+    : embeddedStatusHistory;
+
+  const usersById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const user of usersQuery.data ?? []) {
+      map.set(user.id, user.fullName);
+      if (user.userNumber) map.set(user.userNumber, user.fullName);
+    }
+    return map;
+  }, [usersQuery.data]);
 
   useEffect(() => {
     if (!statsQuery.data) return;
     setOrders(statsQuery.data.lastRequests.map(recentOrderFromDashboard));
   }, [statsQuery.data]);
 
-  function handleSave(updatedOrder: RecentOrder) {
-    setOrders((current) =>
-      current.map((order) => (order.id === updatedOrder.id ? updatedOrder : order)),
-    );
-    setModal(null);
-    toast.success("تم تحديث الطلب", `تم حفظ تعديلات الطلب ${updatedOrder.id} بنجاح.`);
-  }
+  useEffect(() => {
+    if (editRequestId && editQuery.data) {
+      setEditingRequest(editQuery.data);
+      setEditRequestId(null);
+    }
+  }, [editRequestId, editQuery.data]);
 
   function submitCreate(input: RepairRequestInput) {
     create.mutate(input, {
@@ -243,6 +301,50 @@ export function DashboardOverviewScreen() {
       },
       onError: (error) => toast.error("تعذر إنشاء الطلب", getApiErrorMessage(error)),
     });
+  }
+
+  function submitUpdate(input: RepairRequestInput) {
+    if (!editingRequest) return;
+    const patch = createRepairRequestUpdatePatch(input, editingRequest);
+    if (!hasRepairRequestPatch(patch)) {
+      setEditingRequest(null);
+      toast.success("لا توجد تغييرات", "لم يتم إرسال طلب تعديل للطلب.");
+      return;
+    }
+
+    update.mutate(
+      { id: editingRequest.id, input },
+      {
+        onSuccess: () => {
+          setEditingRequest(null);
+          void statsQuery.refetch();
+          toast.success("تم تحديث الطلب", `تم حفظ تعديلات ${editingRequest.requestNumber}.`);
+        },
+        onError: (error) => toast.error("تعذر تحديث الطلب", getApiErrorMessage(error)),
+      },
+    );
+  }
+
+  async function downloadPdf(request: RepairRequest) {
+    setPdfRequestId(request.id);
+    try {
+      const response = await requestService.downloadReceipt(request.id);
+      saveBlob(response, request);
+      toast.success("تم تنزيل PDF", `تم تجهيز إيصال الطلب ${request.requestNumber}.`);
+    } catch (error) {
+      toast.error("تعذر تنزيل PDF", getPdfDownloadErrorMessage(error));
+    } finally {
+      setPdfRequestId(null);
+    }
+  }
+
+  function openOrder(order: RecentOrder, mode: ModalMode) {
+    if (mode === "edit") {
+      update.reset();
+      setEditRequestId(order.id);
+      return;
+    }
+    setSelectedRequestId(order.id);
   }
 
   const statsLoading = statsQuery.isLoading || (statsQuery.isFetching && !statsQuery.data);
@@ -300,17 +402,42 @@ export function DashboardOverviewScreen() {
         </aside>
       </div>
 
-      <RecentOrdersTable
-        orders={orders}
-        onOpen={(order, mode) => setModal({ order, mode })}
-      />
+      <RecentOrdersTable orders={orders} onOpen={openOrder} />
 
-      {modal ? (
-        <DashboardOrderModal
-          order={modal.order}
-          mode={modal.mode}
-          onClose={() => setModal(null)}
-          onSave={handleSave}
+      {selectedRequestId ? (
+        <RequestDetailsModal
+          request={detailsRequest}
+          isLoading={detailsQuery.isLoading}
+          errorMessage={detailsQuery.error ? getApiErrorMessage(detailsQuery.error) : undefined}
+          statusHistory={visibleStatusHistory}
+          statusHistoryLoading={statusHistoryQuery.isLoading && embeddedStatusHistory.length === 0}
+          statusHistoryError={
+            statusHistoryQuery.error && embeddedStatusHistory.length === 0
+              ? getApiErrorMessage(statusHistoryQuery.error)
+              : undefined
+          }
+          technicianDisplayName={
+            detailsRequest ? technicianDisplayName(detailsRequest, usersById) : undefined
+          }
+          usersById={usersById}
+          downloadingPdf={pdfRequestId === selectedRequestId}
+          onClose={() => setSelectedRequestId(null)}
+          onEdit={(request) => {
+            update.reset();
+            setSelectedRequestId(null);
+            setEditingRequest(request);
+          }}
+          onDownloadPdf={downloadPdf}
+        />
+      ) : null}
+
+      {editingRequest ? (
+        <RequestFormModal
+          request={editingRequest}
+          submitting={update.isPending}
+          submitError={update.error ? getApiErrorMessage(update.error) : undefined}
+          onClose={() => setEditingRequest(null)}
+          onSubmit={submitUpdate}
         />
       ) : null}
     </div>
