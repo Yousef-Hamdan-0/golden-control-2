@@ -4,7 +4,7 @@
  */
 export const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_URL ??
-  "https://al-khbaraa-backend-production.up.railway.app"
+  "https://al-khbaraa-backend-productions.up.railway.app"
 ).replace(/\/+$/, "");
 
 export const API_ROUTES = {
