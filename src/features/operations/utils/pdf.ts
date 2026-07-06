@@ -1,6 +1,6 @@
 import type { Order, Invoice } from "../types";
 import { formatMoney } from "@/lib/format/currency";
-import { PAYMENT_LABELS } from "../constants";
+import { PAYMENT_LABELS, PAYMENT_METHOD_LABELS } from "../constants";
 import { typeLabel, invoicePartTotal, remaining } from "./invoice";
 
 export function escapePdfText(value: string): string {
@@ -154,6 +154,14 @@ export function downloadInvoicePdf(invoice: Invoice) {
   URL.revokeObjectURL(url);
 }
 
+function escapeHtml(value: unknown) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 export function printInvoice(invoice: Invoice) {
   const printWindow = window.open("", "_blank", "width=900,height=700");
   if (!printWindow) return;
@@ -162,10 +170,21 @@ export function printInvoice(invoice: Invoice) {
     .map(
       (part) => `
         <tr>
-          <td>${part.name}</td>
+          <td>${escapeHtml(part.name)}</td>
           <td>${part.quantity}</td>
           <td>${formatMoney(part.unitPrice, invoice.currency)}</td>
-          <td>${formatMoney(invoicePartTotal(part), invoice.currency)}</td>
+          <td><strong>${formatMoney(invoicePartTotal(part), invoice.currency)}</strong></td>
+        </tr>
+      `,
+    )
+    .join("");
+  const paymentsRows = invoice.payments
+    .map(
+      (payment) => `
+        <tr>
+          <td><strong>${formatMoney(payment.convertedAmount ?? payment.amount, invoice.currency)}</strong></td>
+          <td>${PAYMENT_METHOD_LABELS[payment.method] ?? payment.method}</td>
+          <td dir="ltr">${escapeHtml(payment.paidAt)}</td>
         </tr>
       `,
     )
@@ -174,30 +193,86 @@ export function printInvoice(invoice: Invoice) {
   printWindow.document.write(`
     <html dir="rtl" lang="ar">
       <head>
-        <title>${invoice.id}</title>
+        <title>${escapeHtml(invoice.invoiceNumber || invoice.id)}</title>
         <style>
-          body { font-family: Arial, sans-serif; padding: 32px; color: #1f1f1f; }
-          h1 { color: #8a6b00; }
-          table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-          th, td { border: 1px solid #ddd; padding: 10px; text-align: right; }
-          .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
-          .box { border: 1px solid #ddd; padding: 12px; border-radius: 6px; }
+          @page { size: A4; margin: 0; }
+          * { box-sizing: border-box; }
+          body { margin: 0; background: #eee; color: #202020; font-family: Arial, Tahoma, sans-serif; }
+          .page { width: 210mm; min-height: 297mm; margin: 0 auto; padding: 18mm 14mm; background: #fff; }
+          .header { text-align: center; border-bottom: 2px solid #b98b2f; padding-bottom: 16px; }
+          .logo { width: 78px; height: 78px; margin: 0 auto 10px; border-radius: 50%; background: #222326; border: 2px solid #8a6800; display: flex; align-items: center; justify-content: center; }
+          .logo img { width: 58px; height: 58px; object-fit: contain; }
+          h1 { margin: 0; color: #8a6800; font-size: 28px; }
+          .sub { margin-top: 6px; color: #70675b; font-size: 13px; }
+          .contact { display: flex; justify-content: space-between; gap: 12px; margin-top: 22px; color: #333; font-size: 12px; direction: ltr; }
+          .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 24px; }
+          .box { border: 1px solid #dfd3bf; background: #fbf8f2; border-radius: 8px; padding: 14px; min-height: 118px; }
+          .box h2 { margin: 0 0 12px; padding-bottom: 9px; border-bottom: 1px solid #dfd3bf; color: #8a6800; font-size: 17px; }
+          .row { display: flex; justify-content: space-between; gap: 12px; margin: 8px 0; font-size: 13px; }
+          .label { color: #70675b; }
+          .value { font-weight: 700; }
+          table { width: 100%; border-collapse: collapse; margin-top: 24px; overflow: hidden; border-radius: 8px; }
+          th { background: #8a6800; color: white; padding: 11px; font-size: 13px; }
+          td { border: 1px solid #eadfcd; padding: 10px; font-size: 12px; text-align: right; }
+          .summary { margin-top: 24px; display: grid; grid-template-columns: 0.82fr 1fr; gap: 20px; align-items: start; }
+          .totals { background: #202020; color: white; border-radius: 8px; padding: 18px; }
+          .totals .line { display: flex; justify-content: space-between; border-bottom: 1px solid #484848; padding: 11px 0; }
+          .remaining { margin-top: 13px; display: flex; justify-content: space-between; background: #8a6800; padding: 13px; border-radius: 6px; font-weight: 700; }
+          .payments { border: 1px solid #dfd3bf; border-radius: 8px; padding: 12px; }
+          .terms { margin-top: 26px; text-align: right; font-size: 12px; line-height: 1.9; color: #333; }
+          .footer { margin-top: 34px; padding-top: 18px; border-top: 1px solid #dfd3bf; text-align: center; color: #81786d; font-size: 11px; }
         </style>
       </head>
       <body>
-        <h1>فاتورة ${invoice.id}</h1>
+        <main class="page">
+        <section class="header">
+          <div class="logo"><img src="/brand/al-khubara-emblem-transparent.png" alt="AL-KHUBARA COMPANY" /></div>
+          <h1>AL-KHUBARA COMPANY</h1>
+          <div class="sub">Maintenance Center</div>
+          <div class="contact">
+            <span>support@golden-control.com</span>
+            <span>+966 50 123 4567</span>
+            <span>AL Riyadh - حي العليا، شارع التخصصي</span>
+          </div>
+        </section>
         <div class="grid">
-          <div class="box">العميل: ${invoice.client}</div>
-          <div class="box">الهاتف: ${invoice.clientPhone}</div>
-          <div class="box">الفني: ${invoice.technician}</div>
-          <div class="box">الحالة: ${PAYMENT_LABELS[invoice.status]}</div>
-          <div class="box">الإجمالي: ${formatMoney(invoice.total, invoice.currency)}</div>
-          <div class="box">المتبقي: ${formatMoney(remaining(invoice.total, invoice.paid), invoice.currency)}</div>
+          <section class="box">
+            <h2>بيانات العميل</h2>
+            <div class="row"><span class="label">الاسم:</span><span class="value">${escapeHtml(invoice.client)}</span></div>
+            <div class="row"><span class="label">الجوال الأساسي:</span><span class="value" dir="ltr">${escapeHtml(invoice.clientPhone)}</span></div>
+            <div class="row"><span class="label">العنوان:</span><span class="value">${escapeHtml(invoice.clientAddress)}</span></div>
+          </section>
+          <section class="box">
+            <h2>تفاصيل الفاتورة</h2>
+            <div class="row"><span class="label">رقم الفاتورة:</span><span class="value" dir="ltr">${escapeHtml(invoice.invoiceNumber || invoice.id)}</span></div>
+            <div class="row"><span class="label">رقم الطلب:</span><span class="value" dir="ltr">${escapeHtml(invoice.requestNumber || invoice.orderId)}</span></div>
+            <div class="row"><span class="label">تاريخ الإصدار:</span><span class="value" dir="ltr">${escapeHtml(invoice.issuedAt)}</span></div>
+          </section>
         </div>
         <table>
           <thead><tr><th>القطعة</th><th>الكمية</th><th>سعر القطعة</th><th>الإجمالي</th></tr></thead>
-          <tbody>${partsRows}</tbody>
+          <tbody>${partsRows || `<tr><td colspan="4">لا توجد قطع مسجلة.</td></tr>`}</tbody>
         </table>
+        <section class="summary">
+          <div class="totals">
+            <div class="line"><span>إجمالي الفاتورة</span><strong>${formatMoney(invoice.total, invoice.currency)}</strong></div>
+            <div class="line"><span>المبلغ المدفوع</span><strong>${formatMoney(invoice.paid, invoice.currency)}</strong></div>
+            <div class="remaining"><span>المتبقي للسداد</span><strong>${formatMoney(remaining(invoice.total, invoice.paid), invoice.currency)}</strong></div>
+          </div>
+          <div class="payments">
+            <strong>سجل الدفعات المستلمة</strong>
+            <table>
+              <thead><tr><th>المبلغ</th><th>الوسيلة</th><th>التاريخ</th></tr></thead>
+              <tbody>${paymentsRows || `<tr><td colspan="3">لا توجد دفعات.</td></tr>`}</tbody>
+            </table>
+          </div>
+        </section>
+        <section class="terms">
+          <strong>الشروط والأحكام</strong>
+          <p>الضمان يسري فقط على قطع الغيار المستبدلة والمذكورة في هذا البيان. لا يشمل الضمان الأعطال الناتجة عن سوء الاستخدام أو العبث بالجهاز.</p>
+        </section>
+        <footer class="footer">جميع الحقوق محفوظة © 2026</footer>
+        </main>
       </body>
     </html>
   `);

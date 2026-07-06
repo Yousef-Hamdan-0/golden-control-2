@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
-import Image from "next/image";
 import { Button } from "@/components/ui/Button";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { Field, Input } from "@/components/ui/Input";
@@ -31,9 +30,10 @@ export function SettingsCenterScreen() {
   const [draft, setDraft] = useState<SettingsInput | null>(null);
   const [errors, setErrors] = useState<SettingsErrors>({});
   const [logo, setLogo] = useState<File | null>(null);
+  const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null);
   const [logoInputKey, setLogoInputKey] = useState(0);
-  const [logoPreviewFailed, setLogoPreviewFailed] = useState(false);
   const logoUrl = settingsMediaUrl(settingsQuery.data?.logoPath);
+  const displayedLogoUrl = logoPreviewUrl || logoUrl || "/brand/al-khubara-logo-transparent.png";
 
   useEffect(() => {
     if (settingsQuery.data && !draft) setDraft(settingsToInput(settingsQuery.data));
@@ -46,8 +46,15 @@ export function SettingsCenterScreen() {
   }, [settingsQuery.error, settingsQuery.isError, toast]);
 
   useEffect(() => {
-    setLogoPreviewFailed(false);
-  }, [logoUrl]);
+    if (!logo) {
+      setLogoPreviewUrl(null);
+      return undefined;
+    }
+
+    const objectUrl = URL.createObjectURL(logo);
+    setLogoPreviewUrl(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [logo]);
 
   function patchDraft(field: SettingsField, value: string) {
     update.reset();
@@ -127,22 +134,15 @@ export function SettingsCenterScreen() {
         title="إدارة بيانات المركز"
         subtitle="تحديث بيانات المركز التي تظهر على الفواتير، الطلبات، والمستندات الرسمية."
         action={
-          <div className="flex min-w-40 items-center justify-center rounded-md border border-border bg-surface p-3 shadow-card">
-            {logoUrl && !logoPreviewFailed ? (
-              <Image
-                src={logoUrl}
-                alt={settingsQuery.data?.centerName || "شعار المركز"}
-                width={120}
-                height={64}
-                unoptimized
-                className="max-h-16 w-auto object-contain"
-                onError={() => setLogoPreviewFailed(true)}
-              />
-            ) : (
-              <span className="flex h-16 w-28 items-center justify-center rounded-sm bg-gold-soft text-gold">
-                <Icon name="file" size={28} />
-              </span>
-            )}
+          <div className="flex h-36 w-52 items-center justify-center rounded-md border border-border bg-surface p-3 shadow-card">
+            <div
+              aria-label={settingsQuery.data?.centerName || "شعار المركز"}
+              role="img"
+              className="h-full w-full bg-contain bg-center bg-no-repeat"
+              style={{
+                backgroundImage: `url("${displayedLogoUrl}")`,
+              }}
+            />
           </div>
         }
       />

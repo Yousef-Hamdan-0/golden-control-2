@@ -1,4 +1,5 @@
 import { API_ENDPOINTS } from "@/config/api-endpoints";
+import { ApiError } from "@/helpers/api.helper";
 import { requestAuthenticatedApi } from "@/helpers/authenticated-api.helper";
 import {
   UpdateSettingsRequestModel,
@@ -30,11 +31,23 @@ export const settingsRepository = {
   },
 
   async uploadLogo(logo: File): Promise<Settings> {
-    const body = new UploadSettingsLogoRequestModel(logo).toFormData();
-    const payload = await requestAuthenticatedApi(API_ENDPOINTS.settings.logo, {
-      method: "POST",
-      body,
-    });
-    return normalizeSettingsResponse(payload);
+    const requestModel = new UploadSettingsLogoRequestModel(logo);
+    const upload = (fieldName: string) =>
+      requestAuthenticatedApi(API_ENDPOINTS.settings.root, {
+        method: "PATCH",
+        body: requestModel.toFormData(fieldName),
+      });
+
+    try {
+      const payload = await upload("logoPath");
+      return normalizeSettingsResponse(payload);
+    } catch (error) {
+      if (!(error instanceof ApiError) || (error.status !== 400 && error.status !== 422)) {
+        throw error;
+      }
+
+      const payload = await upload("logo");
+      return normalizeSettingsResponse(payload);
+    }
   },
 };

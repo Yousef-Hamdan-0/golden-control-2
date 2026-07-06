@@ -175,12 +175,12 @@ export function hasSettingsPatch(input: SettingsPatchInput) {
 export class UploadSettingsLogoRequestModel {
   constructor(private readonly logo: File) {}
 
-  toFormData() {
+  toFormData(fieldName = "logoPath") {
     if (!this.logo.type.startsWith("image/")) {
       throw new ApiError("يجب اختيار ملف صورة صالح للشعار.");
     }
     const formData = new FormData();
-    formData.append("logoPath", this.logo);
+    formData.append(fieldName, this.logo);
     return formData;
   }
 }

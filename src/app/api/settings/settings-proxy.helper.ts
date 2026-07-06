@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 
-export async function proxySettingsRequest(request: Request, backendUrl: string) {
+export async function proxySettingsRequest(
+  request: Request,
+  backendUrl: string,
+  upstreamMethod = request.method,
+) {
   const authorization = request.headers.get("authorization");
   if (!authorization?.startsWith("Bearer ")) {
     return NextResponse.json(
@@ -17,9 +21,9 @@ export async function proxySettingsRequest(request: Request, backendUrl: string)
   if (contentType) headers.set("Content-Type", contentType);
 
   try {
-    const hasBody = request.method !== "GET" && request.method !== "HEAD";
+    const hasBody = upstreamMethod !== "GET" && upstreamMethod !== "HEAD";
     const upstreamResponse = await fetch(backendUrl, {
-      method: request.method,
+      method: upstreamMethod,
       headers,
       body: hasBody ? await request.arrayBuffer() : undefined,
       cache: "no-store",

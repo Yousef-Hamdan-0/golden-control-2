@@ -1,20 +1,8 @@
+import Image from "next/image";
 import type { ReactNode } from "react";
 
-const BRAND_NAME = "مركز الصيانة الذهبي";
-const BRAND_SUBTITLE = "نظام الإدارة المتكامل للمرافق";
-
-function ToolsIcon({ className = "" }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      className={className}
-      fill="currentColor"
-    >
-      <path d="M21.67 18.17l-5.3-5.3h-.99l-2.54 2.54v.99l5.3 5.3c.39.39 1.02.39 1.41 0l2.12-2.12c.39-.39.39-1.02 0-1.41zM17.34 10.19l1.41-1.41 2.12 2.12c1.17-1.17 1.17-3.07 0-4.24l-3.54-3.54-1.41 1.41V1.71l-.7-.71-3.54 3.54.71.71h2.83l-1.41 1.41 1.06 1.06-2.89 2.89-4.13-4.13V5.06L4.83 2.04 2 4.87 5.03 7.9h1.41l4.13 4.13-.85.85H7.6l-5.3 5.3c-.39.39-.39 1.02 0 1.41l2.12 2.12c.39.39 1.02.39 1.41 0l5.3-5.3v-2.12l5.15-5.15z" />
-    </svg>
-  );
-}
+const BRAND_NAME = "AL-KHUBARA COMPANY";
+const BRAND_SUBTITLE = "Maintenance Center";
 
 function GridIcon({ className = "" }: { className?: string }) {
   return (
@@ -84,8 +72,15 @@ export function AuthBrandPanel() {
       <div className="absolute inset-0 bg-[radial-gradient(75%_65%_at_20%_12%,var(--auth-brand-glow)_0%,transparent_58%),radial-gradient(70%_55%_at_90%_90%,var(--auth-gold-glow)_0%,transparent_62%)]" />
 
       <div className="relative flex w-full max-w-[460px] flex-col items-center text-center">
-        <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-md bg-[var(--gold-active)] text-white shadow-[0_12px_28px_rgba(138,107,47,0.22)]">
-          <ToolsIcon className="h-9 w-9" />
+        <div className="mb-5 flex h-24 w-24 items-center justify-center rounded-md bg-[var(--surface)] text-white shadow-[0_12px_28px_rgba(138,107,47,0.22)]">
+          <Image
+            src="/brand/al-khubara-emblem-transparent.png"
+            alt={BRAND_NAME}
+            width={82}
+            height={82}
+            className="object-contain"
+            priority
+          />
         </div>
 
         <h1 className="font-heading text-[30px] font-bold leading-relaxed text-[var(--gold-active)] sm:text-[34px]">
@@ -110,7 +105,7 @@ export function AuthBrandPanel() {
       </div>
 
       <p className="absolute bottom-8 font-heading text-[14px] font-bold text-[var(--gold-active)]">
-        نظام التحكم الذهبي
+        {BRAND_NAME}
       </p>
     </section>
   );
