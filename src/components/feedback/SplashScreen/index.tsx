@@ -1,4 +1,4 @@
-import Image from "next/image";
+import { BackendLogo } from "@/components/brand/BackendLogo";
 import type { SplashScreenProps } from "./SplashScreen.types";
 
 /**
@@ -50,13 +50,9 @@ export function SplashScreen({
       <div className="relative flex flex-col items-center gap-7 px-6 text-center">
         {/* brand mark */}
         <div className="flex h-24 w-24 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
-          <Image
-            src="/brand/al-khubara-emblem-transparent.png"
+          <BackendLogo
             alt={BRAND_TITLE}
-            width={82}
-            height={82}
-            className="object-contain"
-            priority
+            className="h-[82px] w-[82px] object-contain"
           />
         </div>
 

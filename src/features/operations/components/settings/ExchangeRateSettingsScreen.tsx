@@ -11,17 +11,6 @@ import { getApiErrorMessage } from "@/helpers/api.helper";
 import { Icon } from "@/lib/icons";
 import { SettingsInputSchema, settingsToInput } from "@/models/settings/settings.model";
 import { SectionTitle } from "../shared/SectionTitle";
-import { DetailItem } from "../shared/DetailItem";
-
-function formatUpdatedAt(value: string) {
-  if (!value) return "غير محدد";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("ar-u-nu-latn", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
-}
 
 export function ExchangeRateSettingsScreen() {
   const toast = useToast();
@@ -138,12 +127,11 @@ export function ExchangeRateSettingsScreen() {
             </div>
           ) : null}
         </form>
-        <div className="grid gap-3 border-t border-border bg-surface-2 p-4 md:grid-cols-2">
-          <DetailItem label="السعر الحالي" value={`${settingsQuery.data?.dollarExchangeRate || "0"} ل.س`} ltr />
-          <DetailItem
-            label="آخر تحديث"
-            value={formatUpdatedAt(settingsQuery.data?.updatedAt ?? "")}
-          />
+        <div className="border-t border-border bg-surface-2 p-4 text-right">
+          <p className="text-xs text-content-muted">السعر الحالي</p>
+          <p className="mt-1 font-heading text-xl font-bold text-content" dir="ltr">
+            {settingsQuery.data?.dollarExchangeRate || "0"} ل.س
+          </p>
         </div>
       </Card>
     </div>

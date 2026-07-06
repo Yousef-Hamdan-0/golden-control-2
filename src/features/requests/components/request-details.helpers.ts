@@ -1,4 +1,4 @@
-import { localDateKey } from "@/lib/format/date";
+import { localDateKey, localDisplayDateTime } from "@/lib/format/date";
 import { invoiceService } from "@/services/invoice.service";
 import type { Invoice } from "@/features/operations/types";
 import type {
@@ -34,12 +34,16 @@ export function formatDate(value: string) {
   return localDateKey(value, "غير محدد");
 }
 
+export function formatDateTime(value: string) {
+  return localDisplayDateTime(value, "غير محدد");
+}
+
 export function invoiceDisplayNumber(invoice: Invoice) {
   return invoice.invoiceNumber || invoice.id;
 }
 
 export function canCreateInvoiceForRequest(request: RepairRequest) {
-  return ["new", "underrepair", "incompleted"].includes(request.status);
+  return ["completed", "incompleted"].includes(request.status);
 }
 
 export function canAddPayment(invoice: Invoice) {

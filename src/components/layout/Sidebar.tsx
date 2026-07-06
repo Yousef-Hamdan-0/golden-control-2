@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { NAVIGATION, NAV_FOOTER, type NavItem } from "@/config/navigation";
@@ -15,6 +14,7 @@ import {
 import { authService } from "@/services/auth.service";
 import { CURRENT_USER } from "@/lib/auth/current-user";
 import { cn } from "@/lib/utils/cn";
+import { BackendLogo } from "@/components/brand/BackendLogo";
 
 function isActive(
   pathname: string,
@@ -156,12 +156,9 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                 : "hover:bg-gold-soft",
             )}
           >
-            <Image
-              src="/brand/al-khubara-emblem-transparent.png"
+            <BackendLogo
               alt="AL-KHUBARA COMPANY"
-              width={28}
-              height={28}
-              className="shrink-0 object-contain"
+              className="h-7 w-7 shrink-0 object-contain"
             />
             <div className="leading-tight">
               <div className="text-sm font-semibold text-gold">AL-KHUBARA COMPANY</div>

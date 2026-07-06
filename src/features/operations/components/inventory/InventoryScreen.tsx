@@ -12,7 +12,7 @@ import { useToast } from "@/components/ui/Toast";
 import { getApiErrorMessage } from "@/helpers/api.helper";
 import { Icon } from "@/lib/icons";
 import { formatMoney } from "@/lib/format/currency";
-import { localDateKey } from "@/lib/format/date";
+import { localDateKey, localDisplayDateTime } from "@/lib/format/date";
 import { PAGE_SIZE } from "@/config/constants";
 import type { DateFilter } from "../../types";
 import { INVENTORY_MOVEMENT_LABELS } from "../../constants";
@@ -311,7 +311,7 @@ export function InventoryScreen({ section = "parts" }: { section?: string }) {
               <table className="min-w-[920px] w-full text-right text-sm">
                 <thead>
                   <tr className="bg-surface-2 text-content-muted">
-                    {["رقم الحركة", "القطعة", "نوع الحركة", "الكمية", "المسؤول", "المرجع", "التاريخ"].map(
+                    {["رقم الحركة", "القطعة", "نوع الحركة", "الكمية", "المسؤول", "المرجع", "وقت الإنشاء"].map(
                       (header) => (
                         <th key={header} className="whitespace-nowrap px-4 py-3 font-medium">
                           {header}
@@ -343,7 +343,7 @@ export function InventoryScreen({ section = "parts" }: { section?: string }) {
                         <td className="whitespace-nowrap px-4 py-4 text-content-muted">{movement.owner}</td>
                         <td className="whitespace-nowrap px-4 py-4 text-content-muted">{movement.reference || "غير محدد"}</td>
                         <td className="whitespace-nowrap px-4 py-4 text-content-muted">
-                          {localDateKey(movement.createdAt, "غير محدد")}
+                          {localDisplayDateTime(movement.createdAt, "غير محدد")}
                         </td>
                       </tr>
                     ))

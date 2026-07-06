@@ -8,6 +8,7 @@ import { Modal } from "@/components/ui/Modal";
 import { TablePagination } from "@/components/ui/TablePagination";
 import { Icon } from "@/lib/icons";
 import { formatMoney } from "@/lib/format/currency";
+import { localDisplayDateTime } from "@/lib/format/date";
 import { PAGE_SIZE } from "@/config/constants";
 import type { Invoice, Order } from "../../types";
 import {
@@ -21,7 +22,6 @@ import {
   currencyLabel,
   invoicePartTotal,
   remaining,
-  getTechnicianPhone,
   convertPaymentToInvoiceCurrency,
 } from "../../utils/invoice";
 import { downloadInvoicePdf, printInvoice } from "../../utils/pdf";
@@ -86,14 +86,6 @@ export function InvoiceDetailsModal({
             <DetailItem label="رقم 1" value={invoice.clientPhone} ltr />
             <DetailItem label="رقم 2" value={invoice.clientPhone2?.trim() || "لا يوجد"} ltr={Boolean(invoice.clientPhone2?.trim() && invoice.clientPhone2 !== "لا يوجد")} />
             <DetailItem label="العنوان" value={invoice.clientAddress || order?.address || "غير محدد"} />
-          </div>
-        </Card>
-
-        <Card className="bg-surface-2 p-4 shadow-none">
-          <h3 className="font-heading text-base font-bold text-content">بيانات الفني</h3>
-          <div className="mt-3 grid gap-3 md:grid-cols-2">
-            <DetailItem label="اسم الفني" value={invoice.technician} />
-            <DetailItem label="رقم تلفونه" value={invoice.technicianPhone || getTechnicianPhone(invoice.technician)} ltr />
           </div>
         </Card>
 
@@ -171,7 +163,7 @@ export function InvoiceDetailsModal({
               <table className="min-w-[640px] w-full text-right text-sm">
                 <thead>
                   <tr className="bg-surface-2 text-content-muted">
-                    {["المبلغ المدفوع", "المبلغ بعد التحويل", "طريقة الدفع", "نوع العملة", "التاريخ"].map((header) => (
+                    {["المبلغ المدفوع", "المبلغ بعد التحويل", "طريقة الدفع", "نوع العملة", "وقت الإنشاء"].map((header) => (
                       <th key={header} className="px-4 py-3 font-medium">
                         {header}
                       </th>
@@ -196,7 +188,9 @@ export function InvoiceDetailsModal({
                       <td className="px-4 py-3 text-content-muted">
                         {payment.currency === "SYP" ? "ليرة" : "دولار"}
                       </td>
-                      <td className="px-4 py-3 text-content-muted">{payment.paidAt}</td>
+                      <td className="px-4 py-3 text-content-muted">
+                        {localDisplayDateTime(payment.paidAt, "غير محدد")}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

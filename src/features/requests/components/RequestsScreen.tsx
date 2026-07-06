@@ -137,6 +137,10 @@ export function RequestsScreen() {
   const detailsQuery = useRequestQuery(selectedRequestId);
   const detailsRequest = detailsQuery.data ?? selectedPreview;
   const statusHistoryQuery = useRequestStatusHistoryQuery(selectedRequestId);
+  const embeddedStatusHistory = detailsRequest?.statusHistory ?? [];
+  const visibleStatusHistory = statusHistoryQuery.data?.length
+    ? statusHistoryQuery.data
+    : embeddedStatusHistory;
   const totalRequests = data?.total ?? 0;
   const metricRequests = requests;
   const completedCount = metricRequests.filter((request) => request.status === "completed").length;
@@ -206,7 +210,7 @@ export function RequestsScreen() {
     }
 
     update.mutate(
-      { id: editingRequest.id, input: patch },
+      { id: editingRequest.id, input },
       {
         onSuccess: () => {
           setEditingRequest(null);
@@ -270,10 +274,12 @@ export function RequestsScreen() {
           request={detailsRequest}
           isLoading={detailsQuery.isLoading}
           errorMessage={detailsQuery.error ? getApiErrorMessage(detailsQuery.error) : undefined}
-          statusHistory={statusHistoryQuery.data ?? []}
-          statusHistoryLoading={statusHistoryQuery.isLoading}
+          statusHistory={visibleStatusHistory}
+          statusHistoryLoading={statusHistoryQuery.isLoading && embeddedStatusHistory.length === 0}
           statusHistoryError={
-            statusHistoryQuery.error ? getApiErrorMessage(statusHistoryQuery.error) : undefined
+            statusHistoryQuery.error && embeddedStatusHistory.length === 0
+              ? getApiErrorMessage(statusHistoryQuery.error)
+              : undefined
           }
           technicianDisplayName={
             detailsRequest ? technicianDisplayName(detailsRequest, usersById) : undefined

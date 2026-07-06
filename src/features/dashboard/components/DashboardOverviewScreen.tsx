@@ -7,16 +7,18 @@ import { useToast } from "@/components/ui/Toast";
 import { getApiErrorMessage } from "@/helpers/api.helper";
 import { Icon } from "@/lib/icons";
 import { formatMoney } from "@/lib/format/currency";
-import { MaintenanceOrderModal } from "@/features/operations/components/OperationsScreens";
 import { useDashboardStatsQuery } from "@/features/dashboard/hooks/use-dashboard";
 import { DashboardOrderModal } from "@/features/dashboard/components/DashboardOrderModal";
 import { RecentOrdersTable } from "@/features/dashboard/components/RecentOrdersTable";
+import { RequestFormModal } from "@/features/requests/components/RequestFormModal";
+import { useRequestMutations } from "@/features/requests/hooks/use-requests";
 import {
   type ModalMode,
   type RecentOrder,
   recentOrderFromDashboard,
 } from "@/features/dashboard/components/dashboard-overview.helpers";
 import type { DashboardStats } from "@/models/dashboard/dashboard.model";
+import type { RepairRequestInput } from "@/models/requests/request.model";
 
 const chartBars = ["h-16", "h-14", "h-10", "h-12", "h-7", "h-9", "h-5"];
 
@@ -121,6 +123,7 @@ function OrderSummaryCard({
     { label: "طلبات خارجية", value: stats?.externalRequestsCount, tone: "gold" },
     { label: "مكتملة", value: stats?.completedCount, tone: "success" },
     { label: "غير مكتملة", value: stats?.incompletedCount, tone: "gold" },
+    { label: "غير الناجحة", value: stats?.notrepairableCount, tone: "danger" },
     { label: "مسحوبة إلى المركز", value: stats?.pulltocenterCount, tone: "gold" },
     { label: "معاد صيانتها", value: stats?.repeatedCount, tone: "gold" },
     { label: "مؤجلة إلى المركز", value: stats?.postponedCount, tone: "gold" },
@@ -216,6 +219,7 @@ export function DashboardOverviewScreen() {
   const [orders, setOrders] = useState<RecentOrder[]>([]);
   const [modal, setModal] = useState<{ order: RecentOrder; mode: ModalMode } | null>(null);
   const [showOrderModal, setShowOrderModal] = useState(false);
+  const { create } = useRequestMutations();
 
   useEffect(() => {
     if (!statsQuery.data) return;
@@ -228,6 +232,17 @@ export function DashboardOverviewScreen() {
     );
     setModal(null);
     toast.success("تم تحديث الطلب", `تم حفظ تعديلات الطلب ${updatedOrder.id} بنجاح.`);
+  }
+
+  function submitCreate(input: RepairRequestInput) {
+    create.mutate(input, {
+      onSuccess: () => {
+        setShowOrderModal(false);
+        void statsQuery.refetch();
+        toast.success("تم إنشاء الطلب", "تمت إضافة طلب الصيانة بنجاح.");
+      },
+      onError: (error) => toast.error("تعذر إنشاء الطلب", getApiErrorMessage(error)),
+    });
   }
 
   const statsLoading = statsQuery.isLoading || (statsQuery.isFetching && !statsQuery.data);
@@ -247,7 +262,12 @@ export function DashboardOverviewScreen() {
       </div>
 
       {showOrderModal ? (
-        <MaintenanceOrderModal onClose={() => setShowOrderModal(false)} />
+        <RequestFormModal
+          submitting={create.isPending}
+          submitError={create.error ? getApiErrorMessage(create.error) : undefined}
+          onClose={() => setShowOrderModal(false)}
+          onSubmit={submitCreate}
+        />
       ) : null}
 
       {statsQuery.isError ? (

@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/Card";
 import { Modal } from "@/components/ui/Modal";
 import { Icon } from "@/lib/icons";
 import { formatMoney } from "@/lib/format/currency";
-import { localDateTimeKey } from "@/lib/format/date";
+import { localDateTimeKey, localDisplayDateTime } from "@/lib/format/date";
 import { CURRENT_USER } from "@/lib/auth/current-user";
 import type { Order, Invoice } from "../../types";
 import { INVOICES } from "../../data/seed";
@@ -190,7 +190,7 @@ export function OrderDetailsModal({
                 <div key={record.id} className="grid gap-3 p-4 md:grid-cols-[1.2fr_0.6fr_0.8fr_1.4fr] md:items-center">
                   <DetailItem label="الاسم" value={record.name} />
                   <DetailItem label="المدة" value={record.duration} ltr />
-                  <DetailItem label="التاريخ" value={record.date} />
+                  <DetailItem label="وقت الإنشاء" value={localDisplayDateTime(record.date, record.date)} />
                   <div>
                     <div className="mb-1.5 text-xs text-content-muted">تشغيل التسجيل</div>
                     <audio controls preload="none" src={record.url} className="h-10 w-full" />
@@ -208,7 +208,7 @@ export function OrderDetailsModal({
               <table className="min-w-[760px] w-full text-right text-sm">
                 <thead>
                   <tr className="bg-surface-2 text-content-muted">
-                    {["الحالة", "الملاحظة", "المسؤول", "التاريخ"].map((header) => (
+                    {["الحالة", "الملاحظة", "المسؤول", "وقت التعديل"].map((header) => (
                       <th key={header} className="px-4 py-3 font-medium">
                         {header}
                       </th>
@@ -225,7 +225,9 @@ export function OrderDetailsModal({
                       </td>
                       <td className="px-4 py-3 text-content-muted">{item.note}</td>
                       <td className="px-4 py-3 text-content">{item.owner}</td>
-                      <td className="px-4 py-3 text-content-muted">{item.date}</td>
+                      <td className="px-4 py-3 text-content-muted">
+                        {localDisplayDateTime(item.date, item.date)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

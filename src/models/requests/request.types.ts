@@ -54,6 +54,8 @@ export interface RepairRequest {
   updatedAt: string;
   records: RepairRequestRecord[];
   invoices: Invoice[];
+  statusHistory: RepairRequestStatusHistoryItem[];
+  hasInvoice: boolean;
 }
 
 export interface NormalizedRepairRequestList {

@@ -1,5 +1,5 @@
-import Image from "next/image";
 import type { ReactNode } from "react";
+import { BackendLogo } from "@/components/brand/BackendLogo";
 
 const BRAND_NAME = "AL-KHUBARA COMPANY";
 const BRAND_SUBTITLE = "Maintenance Center";
@@ -73,13 +73,9 @@ export function AuthBrandPanel() {
 
       <div className="relative flex w-full max-w-[460px] flex-col items-center text-center">
         <div className="mb-5 flex h-24 w-24 items-center justify-center rounded-md bg-[var(--surface)] text-white shadow-[0_12px_28px_rgba(138,107,47,0.22)]">
-          <Image
-            src="/brand/al-khubara-emblem-transparent.png"
+          <BackendLogo
             alt={BRAND_NAME}
-            width={82}
-            height={82}
-            className="object-contain"
-            priority
+            className="h-[82px] w-[82px] object-contain"
           />
         </div>
 

@@ -1,4 +1,5 @@
 import { ApiError } from "@/helpers/api.helper";
+import { API_BASE_URL } from "@/config/api-endpoints";
 import { localDateKey } from "@/lib/format/date";
 import { normalizeInvoice } from "@/models/invoices/invoice.model";
 import {
@@ -45,6 +46,16 @@ function numberValue(...values: unknown[]): number | undefined {
   return undefined;
 }
 
+function booleanValue(value: unknown) {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value !== 0;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    return normalized === "true" || normalized === "1" || normalized === "yes";
+  }
+  return false;
+}
+
 function stringValue(...values: unknown[]): string {
   for (const value of values) {
     if (typeof value === "string") return value;
@@ -56,6 +67,17 @@ function stringValue(...values: unknown[]): string {
 function dateValue(...values: unknown[]): string {
   const value = stringValue(...values);
   return localDateKey(value);
+}
+
+function dateTimeValue(...values: unknown[]): string {
+  return stringValue(...values);
+}
+
+function mediaUrl(value?: string | null) {
+  const path = String(value ?? "").trim();
+  if (!path) return "";
+  if (/^(?:https?:|data:|blob:)/i.test(path)) return path;
+  return `${API_BASE_URL}/${path.replace(/^\/+/, "")}`;
 }
 
 function nestedName(value: unknown): string {
@@ -135,8 +157,25 @@ function firstRecord(...values: unknown[]): JsonRecord {
   return {};
 }
 
+function firstActiveRecord(...values: unknown[]): JsonRecord {
+  for (const value of values) {
+    if (isRecord(value)) return value;
+    if (Array.isArray(value)) {
+      const activeRecord = value.find(
+        (item): item is JsonRecord =>
+          isRecord(item) && (item.isActive === undefined || item.isActive === true),
+      );
+      if (activeRecord) return activeRecord;
+      const record = value.find(isRecord);
+      if (record) return record;
+    }
+  }
+
+  return {};
+}
+
 function technicianAssignment(payload: JsonRecord) {
-  return firstRecord(
+  return firstActiveRecord(
     payload.technicianAssignment,
     payload.technician_assignment,
     payload.latestTechnicianAssignment,
@@ -337,12 +376,40 @@ function normalizeRequestRecord(payload: unknown, index: number): RepairRequestR
 
   const raw = isRecord(payload) ? payload : {};
   const id = stringValue(raw.id, raw._id, `record-${index + 1}`);
+  const file = firstRecord(raw.file, raw.audio, raw.voice, raw.recording, raw.media);
+  const url = stringValue(
+    raw.url,
+    raw.path,
+    raw.record,
+    raw.src,
+    raw.fileUrl,
+    raw.file_url,
+    raw.audioUrl,
+    raw.audio_url,
+    raw.voiceUrl,
+    raw.voice_url,
+    raw.recordingUrl,
+    raw.recording_url,
+    raw.recordUrl,
+    raw.record_url,
+    raw.mediaUrl,
+    raw.media_url,
+    raw.filePath,
+    raw.file_path,
+    raw.audioPath,
+    raw.audio_path,
+    raw.voicePath,
+    raw.voice_path,
+    file.url,
+    file.path,
+    file.src,
+  );
 
   return {
     id,
-    name: stringValue(raw.name, raw.fileName, raw.file_name, `تسجيل ${index + 1}`),
-    url: stringValue(raw.url, raw.path, raw.record, raw.src),
-    createdAt: dateValue(raw.createdAt, raw.created_at, raw.date),
+    name: stringValue(raw.name, raw.fileName, raw.file_name, file.name, `تسجيل ${index + 1}`),
+    url: mediaUrl(url),
+    createdAt: dateTimeValue(raw.createdAt, raw.created_at, raw.date, raw.uploadedAt, raw.uploaded_at),
   };
 }
 
@@ -407,10 +474,16 @@ export function normalizeRepairRequest(payload: unknown, fallbackId?: string): R
     (Array.isArray(payload.audioRecords) && payload.audioRecords) ||
     (Array.isArray(payload.voiceRecords) && payload.voiceRecords) ||
     [];
+  const rawStatusHistory =
+    (Array.isArray(payload.statusHistory) && payload.statusHistory) ||
+    (Array.isArray(payload.status_history) && payload.status_history) ||
+    (Array.isArray(payload.history) && payload.history) ||
+    [];
   const assignment = technicianAssignment(payload);
   const assignmentTechnician = firstRecord(assignment.technician, assignment.user);
 
   const requestNumber = stringValue(payload.requestNumber, payload.request_number, id);
+  const invoices = normalizeRequestInvoices(payload, id, requestNumber);
 
   return {
     id,
@@ -462,8 +535,8 @@ export function normalizeRepairRequest(payload: unknown, fallbackId?: string): R
       nestedObjectName(assignmentTechnician),
       nestedObjectName(assignment),
     ),
-    createdAt: dateValue(payload.createdAt, payload.created_at),
-    updatedAt: dateValue(
+    createdAt: dateTimeValue(payload.createdAt, payload.created_at),
+    updatedAt: dateTimeValue(
       payload.updatedAt,
       payload.updated_at,
       payload.modifiedAt,
@@ -476,7 +549,9 @@ export function normalizeRepairRequest(payload: unknown, fallbackId?: string): R
       payload.created_at,
     ),
     records: rawRecords.map(normalizeRequestRecord),
-    invoices: normalizeRequestInvoices(payload, id, requestNumber),
+    invoices,
+    statusHistory: rawStatusHistory.map(normalizeStatusHistoryItem),
+    hasInvoice: booleanValue(payload.hasInvoice ?? payload.has_invoice) || invoices.length > 0,
   };
 }
 
@@ -678,7 +753,7 @@ function normalizeStatusHistoryItem(
       nestedId(raw.responsibleUser),
       nestedId(raw.responsible_user),
     ),
-    date: dateValue(
+    date: dateTimeValue(
       raw.date,
       raw.changedAt,
       raw.changed_at,

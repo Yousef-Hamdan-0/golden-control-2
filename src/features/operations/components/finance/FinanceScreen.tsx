@@ -9,6 +9,7 @@ import { useToast } from "@/components/ui/Toast";
 import { getApiErrorMessage } from "@/helpers/api.helper";
 import { useFinanceSummaryQuery } from "@/features/expenses/hooks/use-expenses";
 import { formatMoney } from "@/lib/format/currency";
+import { localDisplayDateTime } from "@/lib/format/date";
 import { PAGE_SIZE } from "@/config/constants";
 import { SectionTitle } from "../shared/SectionTitle";
 import { KpiCards } from "../shared/KpiCards";
@@ -47,7 +48,7 @@ export function FinanceScreen({ section }: { section?: string[] }) {
       category: "sales",
       owner: "API المالية",
       date: summary?.periodStart && summary?.periodEnd
-        ? `${summary.periodStart.slice(0, 10)} - ${summary.periodEnd.slice(0, 10)}`
+        ? `${localDisplayDateTime(summary.periodStart)} - ${localDisplayDateTime(summary.periodEnd)}`
         : "غير محدد",
       amount: salesTotal,
     },
@@ -56,7 +57,7 @@ export function FinanceScreen({ section }: { section?: string[] }) {
       title: "المصروفات الثابتة",
       category: "fixed",
       owner: "API المالية",
-      date: summary?.periodStart?.slice(0, 10) ?? "غير محدد",
+      date: localDisplayDateTime(summary?.periodStart, "غير محدد"),
       amount: summary?.fixedCosts ?? 0,
     },
     {
@@ -64,7 +65,7 @@ export function FinanceScreen({ section }: { section?: string[] }) {
       title: "المصروفات المتغيرة",
       category: "variable",
       owner: "API المالية",
-      date: summary?.periodStart?.slice(0, 10) ?? "غير محدد",
+      date: localDisplayDateTime(summary?.periodStart, "غير محدد"),
       amount: summary?.variableCosts ?? 0,
     },
     {
@@ -72,7 +73,7 @@ export function FinanceScreen({ section }: { section?: string[] }) {
       title: "تكلفة القطع",
       category: "variable",
       owner: "API المالية",
-      date: summary?.periodStart?.slice(0, 10) ?? "غير محدد",
+      date: localDisplayDateTime(summary?.periodStart, "غير محدد"),
       amount: summary?.partsCosts ?? 0,
     },
   ].filter((record) =>
@@ -138,7 +139,7 @@ export function FinanceScreen({ section }: { section?: string[] }) {
             <table className="min-w-[760px] w-full text-right text-sm">
               <thead>
                 <tr className="bg-surface-2 text-content-muted">
-                  {["الرقم", "البند", "التصنيف", "المسؤول", "التاريخ", "المبلغ"].map((header) => (
+                  {["الرقم", "البند", "التصنيف", "المسؤول", "وقت الإنشاء", "المبلغ"].map((header) => (
                     <th key={header} className="px-4 py-3 font-medium">
                       {header}
                     </th>

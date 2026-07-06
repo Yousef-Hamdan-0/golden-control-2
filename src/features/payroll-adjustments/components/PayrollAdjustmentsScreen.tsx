@@ -26,6 +26,7 @@ import {
 import { useUsersQuery } from "@/features/users/hooks/use-users-query";
 import { getApiErrorMessage } from "@/helpers/api.helper";
 import { formatMoney } from "@/lib/format/currency";
+import { localDisplayDateTime } from "@/lib/format/date";
 import { Icon, type IconName } from "@/lib/icons";
 import { ROLE_LABELS_AR, type User } from "@/models/auth/user.model";
 
@@ -300,7 +301,7 @@ export function PayrollAdjustmentsScreen() {
                   "الحالة",
                   "المبلغ بالليرة",
                   "الملاحظة",
-                  "التاريخ",
+                  "وقت الإنشاء",
                   "الإجراءات",
                 ].map((header) => (
                   <th key={header} scope="col" className="px-4 py-3 font-medium">
@@ -340,7 +341,10 @@ export function PayrollAdjustmentsScreen() {
                         {adjustment.note || "لا توجد"}
                       </td>
                       <td className="px-4 py-4 text-content-muted">
-                        {formatPayrollDate(adjustment.date)}
+                        {localDisplayDateTime(
+                          adjustment.createdAt || `${adjustment.date}T00:00:00`,
+                          formatPayrollDate(adjustment.date),
+                        )}
                       </td>
                       <td className="px-4 py-4">
                         <button

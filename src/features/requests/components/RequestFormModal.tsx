@@ -120,7 +120,6 @@ export function RequestFormModal({
   onSubmit: (input: RepairRequestInput) => void;
 }) {
   const isEdit = Boolean(request);
-  const isTypeLocked = !isEdit && Boolean(defaultType);
   const [draft, setDraft] = useState<RequestFormDraft>(() => initialDraft(request, defaultType));
   const [errors, setErrors] = useState<FieldErrors>({});
   const { data: technicians = [] } = useUsersAllQuery({
@@ -325,7 +324,7 @@ export function RequestFormModal({
                     type: event.target.value as RepairRequestType,
                   }))
                 }
-                disabled={submitting || isTypeLocked}
+                disabled={submitting}
               >
                 {REQUEST_TYPE_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>

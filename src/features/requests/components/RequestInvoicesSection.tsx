@@ -12,7 +12,7 @@ import { formatMoney } from "@/lib/format/currency";
 import { Icon } from "@/lib/icons";
 import {
   canAddPayment,
-  formatDate,
+  formatDateTime,
   invoiceDisplayNumber,
 } from "@/features/requests/components/request-details.helpers";
 
@@ -59,7 +59,7 @@ export function RequestInvoicesSection({
         <table className="min-w-[820px] w-full text-right text-sm">
           <thead>
             <tr className="bg-surface-2 text-content-muted">
-              {["رقم الفاتورة", "الحالة", "الإجمالي", "المدفوع", "المتبقي", "التاريخ", "إجراءات"].map((header) => (
+              {["رقم الفاتورة", "الحالة", "الإجمالي", "المدفوع", "المتبقي", "وقت الإنشاء", "إجراءات"].map((header) => (
                 <th key={header} className="px-4 py-3 font-medium">
                   {header}
                 </th>
@@ -87,7 +87,7 @@ export function RequestInvoicesSection({
                   <td className="px-4 py-3 text-content-muted">
                     {formatMoney(remaining(invoice.total, invoice.paid), invoice.currency)}
                   </td>
-                  <td className="px-4 py-3 text-content-muted">{formatDate(invoice.issuedAt)}</td>
+                  <td className="px-4 py-3 text-content-muted">{formatDateTime(invoice.issuedAt)}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-start gap-2" dir="rtl">
                       <button

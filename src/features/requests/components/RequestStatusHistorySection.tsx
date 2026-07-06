@@ -5,8 +5,8 @@ import {
   type RepairRequestStatusHistoryItem,
 } from "@/models/requests/request.model";
 import {
+  formatDateTime,
   fallback,
-  formatDate,
   statusHistoryOwner,
 } from "@/features/requests/components/request-details.helpers";
 
@@ -35,7 +35,7 @@ export function RequestStatusHistorySection({
         <table className="min-w-[760px] w-full text-right text-sm">
           <thead>
             <tr className="bg-surface-2 text-content-muted">
-              {["الحالة", "الملاحظة", "المسؤول", "التاريخ"].map((header) => (
+              {["الحالة", "الملاحظة", "المسؤول", "وقت التعديل"].map((header) => (
                 <th key={header} className="px-4 py-3 font-medium">
                   {header}
                 </th>
@@ -63,7 +63,7 @@ export function RequestStatusHistorySection({
                   <td className="px-4 py-3 text-content">
                     {statusHistoryOwner(item, usersById)}
                   </td>
-                  <td className="px-4 py-3 text-content-muted">{formatDate(item.date)}</td>
+                  <td className="px-4 py-3 text-content-muted">{formatDateTime(item.date)}</td>
                 </tr>
               ))
             ) : (

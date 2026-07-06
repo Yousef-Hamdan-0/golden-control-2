@@ -2,7 +2,7 @@
 
 import { DetailItem } from "@/features/operations/components/shared/DetailItem";
 import type { RepairRequestRecord } from "@/models/requests/request.model";
-import { fallback, formatDate } from "@/features/requests/components/request-details.helpers";
+import { fallback, formatDateTime } from "@/features/requests/components/request-details.helpers";
 
 export function RequestRecordsSection({
   records,
@@ -17,7 +17,7 @@ export function RequestRecordsSection({
           records.map((record) => (
             <div key={record.id} className="grid gap-3 p-4 md:grid-cols-[1fr_1fr_2fr] md:items-center">
               <DetailItem label="الاسم" value={fallback(record.name)} />
-              <DetailItem label="التاريخ" value={formatDate(record.createdAt)} />
+              <DetailItem label="وقت الإنشاء" value={formatDateTime(record.createdAt)} />
               {record.url ? (
                 <audio controls preload="none" src={record.url} className="h-10 w-full" />
               ) : (

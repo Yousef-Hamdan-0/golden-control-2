@@ -315,9 +315,6 @@ export function CustomersScreen() {
             </span>
             <div>
               <div className="text-sm text-content-muted">إجمالي العملاء</div>
-              <div className="mt-1 text-xs text-content-muted">
-                العدد القادم من pagination في استجابة الخادم
-              </div>
             </div>
           </div>
           <div className="font-heading text-3xl font-bold text-content">{totalCustomers}</div>

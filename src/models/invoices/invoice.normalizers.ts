@@ -11,7 +11,6 @@ import type {
 } from "@/features/operations/types";
 import { USD_TO_SYP_RATE } from "@/features/operations/constants";
 import type { Currency } from "@/lib/format/currency";
-import { localDateKey } from "@/lib/format/date";
 
 type JsonRecord = Record<string, unknown>;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -86,11 +85,6 @@ function maybeNumberValue(...values: unknown[]): number | undefined {
   }
 
   return undefined;
-}
-
-function dateValue(...values: unknown[]) {
-  const value = stringValue(...values);
-  return localDateKey(value);
 }
 
 function dataRecord(payload: unknown) {
@@ -381,7 +375,7 @@ export function normalizeInvoicePayment(payload: unknown, index = 0): InvoicePay
       raw.convertedAmountValue,
       raw.converted_amount_value,
     ),
-    paidAt: dateValue(
+    paidAt: stringValue(
       raw.paidAt,
       raw.paid_at,
       raw.paymentDate,
@@ -715,7 +709,7 @@ export function normalizeInvoice(payload: unknown): Invoice {
     paymentMethod: toUiPaymentMethod(invoice.paymentMethod ?? invoice.payment_method ?? firstPayment?.method),
     total,
     paid: Math.min(total, Math.max(0, paid)),
-    issuedAt: dateValue(invoice.issuedAt, invoice.issued_at, invoice.createdAt, invoice.created_at),
+    issuedAt: stringValue(invoice.issuedAt, invoice.issued_at, invoice.createdAt, invoice.created_at),
     warrantyDuration: stringValue(
       invoice.warrantyDuration,
       invoice.warranty_duration,

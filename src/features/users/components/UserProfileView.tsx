@@ -68,7 +68,7 @@ export function UserProfileView({
           <div>
             <h2 className="font-heading text-xl font-bold text-content">{u.fullName}</h2>
             <p className="mt-1 text-sm text-content-muted">{u.jobTitle}</p>
-            <p className="mt-1 text-xs text-gold">{u.id}</p>
+            <p className="mt-1 text-xs text-gold">{u.userNumber ?? "رقم مستخدم غير متاح"}</p>
           </div>
         </div>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

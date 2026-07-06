@@ -26,6 +26,7 @@ import {
 } from "@/features/expenses/models/expense.model";
 import { getApiErrorMessage } from "@/helpers/api.helper";
 import { formatMoney } from "@/lib/format/currency";
+import { localDisplayDateTime } from "@/lib/format/date";
 import { Icon } from "@/lib/icons";
 
 interface ExpensesScreenProps {
@@ -210,7 +211,7 @@ export function ExpensesScreen({ initialCategory = "all" }: ExpensesScreenProps)
           <table className="w-full min-w-[720px] text-right text-sm">
             <thead>
               <tr className="bg-surface-2 text-content-muted">
-                {['البند', 'التصنيف', 'التاريخ', 'المبلغ', 'الإجراءات'].map((header) => (
+                {['البند', 'التصنيف', 'وقت الإنشاء', 'المبلغ', 'الإجراءات'].map((header) => (
                   <th key={header} scope="col" className="px-4 py-3 font-medium">
                     {header}
                   </th>
@@ -234,7 +235,10 @@ export function ExpensesScreen({ initialCategory = "all" }: ExpensesScreenProps)
                       </Badge>
                     </td>
                     <td className="px-4 py-4 text-content-muted">
-                      {formatExpenseMonth(expense.month)}
+                      {localDisplayDateTime(
+                        expense.createdAt || `${expense.month}-01T00:00:00`,
+                        formatExpenseMonth(expense.month),
+                      )}
                     </td>
                     <td className="px-4 py-4 font-medium text-content" dir="ltr">
                       {formatMoney(expense.amount, "SYP")}

@@ -9,7 +9,11 @@ import {
   REQUEST_TYPE_LABELS,
   type RepairRequest,
 } from "@/models/requests/request.model";
-import { fallback, formatDate } from "@/features/requests/components/request-details.helpers";
+import {
+  fallback,
+  formatDate,
+  formatDateTime,
+} from "@/features/requests/components/request-details.helpers";
 
 export function RequestSummarySection({
   request,
@@ -42,8 +46,8 @@ export function RequestSummarySection({
         />
         <DetailItem label="تاريخ الصيانة" value={formatDate(request.scheduledDate)} />
         <DetailItem label="الفني" value={fallback(technicianDisplayName ?? request.technicianName)} />
-        <DetailItem label="تاريخ الإنشاء" value={formatDate(request.createdAt)} />
-        <DetailItem label="آخر تعديل" value={formatDate(request.updatedAt || request.createdAt)} />
+        <DetailItem label="وقت الإنشاء" value={formatDateTime(request.createdAt)} />
+        <DetailItem label="وقت التعديل" value={formatDateTime(request.updatedAt || request.createdAt)} />
       </div>
     </section>
   );

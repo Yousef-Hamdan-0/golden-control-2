@@ -1,5 +1,7 @@
 import type { Order, Invoice } from "../types";
+import { API_BASE_URL } from "@/config/api-endpoints";
 import { formatMoney } from "@/lib/format/currency";
+import { localDisplayDateTime } from "@/lib/format/date";
 import { PAYMENT_LABELS, PAYMENT_METHOD_LABELS } from "../constants";
 import { typeLabel, invoicePartTotal, remaining } from "./invoice";
 
@@ -162,9 +164,67 @@ function escapeHtml(value: unknown) {
     .replace(/"/g, "&quot;");
 }
 
-export function printInvoice(invoice: Invoice) {
+type PrintBrand = {
+  logoUrl: string;
+  centerName: string;
+  secondaryName: string;
+  email: string;
+  phone: string;
+  address: string;
+};
+
+function mediaUrl(value?: string | null) {
+  if (!value) return undefined;
+  if (/^(?:https?:|data:|blob:)/i.test(value)) return value;
+  return `${API_BASE_URL}/${value.replace(/^\/+/, "")}`;
+}
+
+function contactIcon(name: "mail" | "phone" | "location") {
+  const paths = {
+    mail: '<path d="M4 6h16v12H4z"/><path d="m4 7 8 6 8-6"/>',
+    phone: '<path d="M7 4h10v16H7z"/><path d="M11 17h2"/>',
+    location: '<path d="M12 21s7-5.1 7-11a7 7 0 0 0-14 0c0 5.9 7 11 7 11z"/><circle cx="12" cy="10" r="2.2"/>',
+  };
+
+  return `<svg class="contact-icon" viewBox="0 0 24 24" aria-hidden="true">${paths[name]}</svg>`;
+}
+
+async function getPrintBrand(): Promise<PrintBrand> {
+  const fallback: PrintBrand = {
+    logoUrl: "/brand/al-khubara-logo-transparent.png",
+    centerName: "AL-KHUBARA COMPANY",
+    secondaryName: "Maintenance Center",
+    email: "support@golden-control.com",
+    phone: "+966 50 123 4567",
+    address: "دمشق",
+  };
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/settings`, {
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+    });
+    if (!response.ok) return fallback;
+    const payload = await response.json();
+    const data =
+      typeof payload?.data === "object" && payload.data !== null ? payload.data : payload;
+    return {
+      logoUrl: mediaUrl(data.logoPath) ?? fallback.logoUrl,
+      centerName: data.centerName || fallback.centerName,
+      secondaryName: data.secondaryName || fallback.secondaryName,
+      email: data.email || fallback.email,
+      phone: [data.phone1, data.phone2].filter(Boolean).join("   ") || fallback.phone,
+      address: data.address || fallback.address,
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+export async function printInvoice(invoice: Invoice) {
   const printWindow = window.open("", "_blank", "width=900,height=700");
   if (!printWindow) return;
+  const brand = await getPrintBrand();
 
   const partsRows = invoice.parts
     .map(
@@ -184,7 +244,7 @@ export function printInvoice(invoice: Invoice) {
         <tr>
           <td><strong>${formatMoney(payment.convertedAmount ?? payment.amount, invoice.currency)}</strong></td>
           <td>${PAYMENT_METHOD_LABELS[payment.method] ?? payment.method}</td>
-          <td dir="ltr">${escapeHtml(payment.paidAt)}</td>
+          <td dir="ltr">${escapeHtml(localDisplayDateTime(payment.paidAt, "غير محدد"))}</td>
         </tr>
       `,
     )
@@ -200,11 +260,13 @@ export function printInvoice(invoice: Invoice) {
           body { margin: 0; background: #eee; color: #202020; font-family: Arial, Tahoma, sans-serif; }
           .page { width: 210mm; min-height: 297mm; margin: 0 auto; padding: 18mm 14mm; background: #fff; }
           .header { text-align: center; border-bottom: 2px solid #b98b2f; padding-bottom: 16px; }
-          .logo { width: 78px; height: 78px; margin: 0 auto 10px; border-radius: 50%; background: #222326; border: 2px solid #8a6800; display: flex; align-items: center; justify-content: center; }
-          .logo img { width: 58px; height: 58px; object-fit: contain; }
+          .logo { width: 150px; max-height: 120px; margin: 0 auto 10px; display: block; object-fit: contain; }
           h1 { margin: 0; color: #8a6800; font-size: 28px; }
           .sub { margin-top: 6px; color: #70675b; font-size: 13px; }
           .contact { display: flex; justify-content: space-between; gap: 12px; margin-top: 22px; color: #333; font-size: 12px; direction: ltr; }
+          .contact-item { display: inline-flex; align-items: center; justify-content: center; gap: 6px; direction: rtl; white-space: nowrap; }
+          .contact-icon { width: 13px; height: 13px; fill: none; stroke: #8a6800; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: 0 0 auto; }
+          .phone-number { direction: ltr; unicode-bidi: isolate; text-align: right; }
           .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 24px; }
           .box { border: 1px solid #dfd3bf; background: #fbf8f2; border-radius: 8px; padding: 14px; min-height: 118px; }
           .box h2 { margin: 0 0 12px; padding-bottom: 9px; border-bottom: 1px solid #dfd3bf; color: #8a6800; font-size: 17px; }
@@ -226,27 +288,27 @@ export function printInvoice(invoice: Invoice) {
       <body>
         <main class="page">
         <section class="header">
-          <div class="logo"><img src="/brand/al-khubara-emblem-transparent.png" alt="AL-KHUBARA COMPANY" /></div>
-          <h1>AL-KHUBARA COMPANY</h1>
-          <div class="sub">Maintenance Center</div>
+          <img class="logo" src="${escapeHtml(brand.logoUrl)}" alt="${escapeHtml(brand.centerName)}" />
+          <h1>${escapeHtml(brand.centerName)}</h1>
+          <div class="sub">${escapeHtml(brand.secondaryName)}</div>
           <div class="contact">
-            <span>support@golden-control.com</span>
-            <span>+966 50 123 4567</span>
-            <span>AL Riyadh - حي العليا، شارع التخصصي</span>
+            <span class="contact-item">${contactIcon("mail")}<span>${escapeHtml(brand.email)}</span></span>
+            <span class="contact-item">${contactIcon("phone")}<span class="phone-number">${escapeHtml(brand.phone)}</span></span>
+            <span class="contact-item">${contactIcon("location")}<span>${escapeHtml(brand.address)}</span></span>
           </div>
         </section>
         <div class="grid">
           <section class="box">
             <h2>بيانات العميل</h2>
             <div class="row"><span class="label">الاسم:</span><span class="value">${escapeHtml(invoice.client)}</span></div>
-            <div class="row"><span class="label">الجوال الأساسي:</span><span class="value" dir="ltr">${escapeHtml(invoice.clientPhone)}</span></div>
+            <div class="row"><span class="label">الجوال الأساسي:</span><span class="value phone-number">${escapeHtml(invoice.clientPhone)}</span></div>
             <div class="row"><span class="label">العنوان:</span><span class="value">${escapeHtml(invoice.clientAddress)}</span></div>
           </section>
           <section class="box">
             <h2>تفاصيل الفاتورة</h2>
             <div class="row"><span class="label">رقم الفاتورة:</span><span class="value" dir="ltr">${escapeHtml(invoice.invoiceNumber || invoice.id)}</span></div>
             <div class="row"><span class="label">رقم الطلب:</span><span class="value" dir="ltr">${escapeHtml(invoice.requestNumber || invoice.orderId)}</span></div>
-            <div class="row"><span class="label">تاريخ الإصدار:</span><span class="value" dir="ltr">${escapeHtml(invoice.issuedAt)}</span></div>
+            <div class="row"><span class="label">وقت الإنشاء:</span><span class="value" dir="ltr">${escapeHtml(localDisplayDateTime(invoice.issuedAt, "غير محدد"))}</span></div>
           </section>
         </div>
         <table>
@@ -262,7 +324,7 @@ export function printInvoice(invoice: Invoice) {
           <div class="payments">
             <strong>سجل الدفعات المستلمة</strong>
             <table>
-              <thead><tr><th>المبلغ</th><th>الوسيلة</th><th>التاريخ</th></tr></thead>
+              <thead><tr><th>المبلغ</th><th>الوسيلة</th><th>وقت الإنشاء</th></tr></thead>
               <tbody>${paymentsRows || `<tr><td colspan="3">لا توجد دفعات.</td></tr>`}</tbody>
             </table>
           </div>

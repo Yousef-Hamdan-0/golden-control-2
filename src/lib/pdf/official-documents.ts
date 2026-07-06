@@ -1,10 +1,12 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import sharp from "sharp";
-import { formatMoney } from "@/lib/format/currency";
+import puppeteer from "puppeteer";
+import { API_BASE_URL } from "@/config/api-endpoints";
 import { PAYMENT_METHOD_LABELS } from "@/features/operations/constants";
 import type { Invoice } from "@/features/operations/types";
 import { invoicePartTotal, remaining } from "@/features/operations/utils/invoice";
+import { formatMoney } from "@/lib/format/currency";
+import { localDisplayDateTime } from "@/lib/format/date";
 import type { RepairRequest } from "@/models/requests/request.model";
 import {
   REQUEST_STATUS_LABELS,
@@ -12,35 +14,25 @@ import {
 } from "@/models/requests/request.model";
 import type { Settings } from "@/models/settings/settings.model";
 
-const DESIGN_WIDTH = 1240;
-const DESIGN_HEIGHT = 1754;
-const RENDER_SCALE = 2;
-const PAGE_WIDTH = DESIGN_WIDTH * RENDER_SCALE;
-const PAGE_HEIGHT = DESIGN_HEIGHT * RENDER_SCALE;
-const PDF_WIDTH = 595.28;
-const PDF_HEIGHT = 841.89;
-const GOLD = "#8a6800";
-const GOLD_LIGHT = "#b98b2f";
-const DARK = "#1f1f1f";
-const MUTED = "#7b7469";
-const BORDER = "#dfd3bf";
-const SOFT = "#f8f3ea";
-const PANEL = "#fbf8f2";
-const WHITE = "#ffffff";
 const BRAND_NAME = "AL-KHUBARA COMPANY";
 const BRAND_SUBTITLE = "Maintenance Center";
 const FALLBACK_EMAIL = "support@golden-control.com";
 const FALLBACK_PHONE = "+966 50 123 4567";
-const FALLBACK_ADDRESS = "AL Riyadh - حي العليا، شارع التخصصي";
+const FALLBACK_ADDRESS = "دمشق";
+const GOLD = "#8a6800";
+const GOLD_LIGHT = "#b98b2f";
+const DARK = "#1f1f1f";
+const MUTED = "#70685f";
+const BORDER = "#dfd3bf";
+const SOFT = "#f8f3ea";
 
 type DocumentBrand = {
-  centerName: string;
-  secondaryName: string;
   address: string;
   phone1: string;
   phone2: string;
   email: string;
   terms: string[];
+  logoDataUri: string;
 };
 
 function text(value: unknown, fallback = "غير محدد") {
@@ -48,28 +40,76 @@ function text(value: unknown, fallback = "غير محدد") {
   return next || fallback;
 }
 
-function escapeXml(value: unknown) {
+function escapeHtml(value: unknown) {
   return text(value, "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
-function shortText(value: unknown, max = 46) {
+function shortText(value: unknown, max = 90) {
   const next = text(value, "");
   return next.length > max ? `${next.slice(0, max - 1)}…` : next;
 }
 
-function isoDate(value: string) {
-  if (!value) return "غير محدد";
-  return value.slice(0, 10);
+function displayDateTime(value: string) {
+  return localDisplayDateTime(value, "غير محدد");
 }
 
-function documentBrand(settings?: Settings | null): DocumentBrand {
+function topIcon(name: "mail" | "phone" | "location") {
+  const paths = {
+    mail: '<path d="M4 6h16v12H4z"/><path d="m4 7 8 6 8-6"/>',
+    phone: '<path d="M7 4h10v16H7z"/><path d="M11 17h2"/>',
+    location: '<path d="M12 21s7-5.1 7-11a7 7 0 0 0-14 0c0 5.9 7 11 7 11z"/><circle cx="12" cy="10" r="2.2"/>',
+  };
+
+  return `<svg class="contact-icon" viewBox="0 0 24 24" aria-hidden="true">${paths[name]}</svg>`;
+}
+
+function mediaUrl(value?: string | null) {
+  if (!value) return undefined;
+  if (/^(?:https?:|data:|blob:)/i.test(value)) return value;
+  return `${API_BASE_URL}/${value.replace(/^\/+/, "")}`;
+}
+
+function mimeFromPath(value?: string | null) {
+  const normalized = String(value ?? "").toLowerCase();
+  if (normalized.endsWith(".jpg") || normalized.endsWith(".jpeg")) return "image/jpeg";
+  if (normalized.endsWith(".webp")) return "image/webp";
+  if (normalized.endsWith(".svg")) return "image/svg+xml";
+  return "image/png";
+}
+
+async function localAssetDataUri(fileName: string) {
+  const filePath = path.join(process.cwd(), "public", "brand", fileName);
+  const buffer = await readFile(filePath);
+  return `data:${mimeFromPath(fileName)};base64,${buffer.toString("base64")}`;
+}
+
+async function remoteAssetDataUri(url: string) {
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) throw new Error("Logo fetch failed");
+  const mime = response.headers.get("content-type") ?? mimeFromPath(url);
+  const buffer = Buffer.from(await response.arrayBuffer());
+  return `data:${mime};base64,${buffer.toString("base64")}`;
+}
+
+async function logoDataUri(settings?: Settings | null) {
+  const settingsLogoUrl = mediaUrl(settings?.logoPath);
+  if (settingsLogoUrl) {
+    try {
+      return await remoteAssetDataUri(settingsLogoUrl);
+    } catch {
+      // Keep documents printable even if the uploaded logo is temporarily unavailable.
+    }
+  }
+  return localAssetDataUri("al-khubara-logo-transparent.png");
+}
+
+async function documentBrand(settings?: Settings | null): Promise<DocumentBrand> {
   return {
-    centerName: BRAND_NAME,
-    secondaryName: text(settings?.secondaryName, BRAND_SUBTITLE),
     address: text(settings?.address, FALLBACK_ADDRESS),
     phone1: text(settings?.phone1, FALLBACK_PHONE),
     phone2: text(settings?.phone2, ""),
@@ -80,256 +120,363 @@ function documentBrand(settings?: Settings | null): DocumentBrand {
       text(settings?.term3, "لا يشمل الضمان الأعطال الناتجة عن سوء الاستخدام أو العبث بالجهاز."),
       text(settings?.term4, "جميع المبالغ والتواريخ معتمدة حسب البيانات المسجلة في النظام."),
     ],
+    logoDataUri: await logoDataUri(settings),
   };
 }
 
-async function assetDataUri(fileName: string) {
-  const filePath = path.join(process.cwd(), "public", "brand", fileName);
-  const buffer = await readFile(filePath);
-  return `data:image/png;base64,${buffer.toString("base64")}`;
-}
-
-function svgText({
-  x,
-  y,
-  value,
-  size = 20,
-  weight = 400,
-  fill = DARK,
-  anchor = "end",
-  ltr = false,
-}: {
-  x: number;
-  y: number;
-  value: unknown;
-  size?: number;
-  weight?: number;
-  fill?: string;
-  anchor?: "start" | "middle" | "end";
-  ltr?: boolean;
-}) {
-  const direction = ltr ? "ltr" : "rtl";
-  const visualAnchor = !ltr && anchor === "end"
-    ? "start"
-    : !ltr && anchor === "start"
-      ? "end"
-      : anchor;
-  return `<text x="${x}" y="${y}" text-anchor="${visualAnchor}" direction="${direction}" style="unicode-bidi: isolate;" xml:space="preserve" font-size="${size}" font-weight="${weight}" fill="${fill}">${escapeXml(value)}</text>`;
-}
-
-function line(x1: number, y1: number, x2: number, y2: number, color = BORDER, width = 1) {
-  return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="${width}"/>`;
-}
-
-function rect(x: number, y: number, width: number, height: number, options: { fill?: string; stroke?: string; radius?: number; strokeWidth?: number } = {}) {
-  return `<rect x="${x}" y="${y}" width="${width}" height="${height}" rx="${options.radius ?? 10}" fill="${options.fill ?? WHITE}" stroke="${options.stroke ?? BORDER}" stroke-width="${options.strokeWidth ?? 1}"/>`;
-}
-
-function header(brand: DocumentBrand, logoUri: string) {
+function htmlShell(title: string, brand: DocumentBrand, body: string) {
   const phone = [brand.phone1, brand.phone2].filter(Boolean).join("   ");
-  return `
-    <g>
-      <image href="${logoUri}" x="480" y="58" width="280" height="244" preserveAspectRatio="xMidYMid meet"/>
-      ${svgText({ x: 300, y: 372, value: brand.email, anchor: "middle", size: 15, fill: DARK, ltr: true })}
-      ${svgText({ x: 620, y: 372, value: phone || FALLBACK_PHONE, anchor: "middle", size: 15, fill: DARK, ltr: true })}
-      ${svgText({ x: 950, y: 372, value: brand.address, anchor: "middle", size: 15, fill: DARK })}
-      ${line(130, 418, 1110, 418, GOLD_LIGHT, 3)}
-      ${line(130, 452, 1110, 452, BORDER, 1)}
-    </g>
-  `;
+  return `<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <title>${escapeHtml(title)}</title>
+  <style>
+    @page { size: A4; margin: 0; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: ${DARK};
+      background: #ffffff;
+      font-family: Arial, Tahoma, "DejaVu Sans", sans-serif;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .page {
+      width: 210mm;
+      min-height: 297mm;
+      margin: 0 auto;
+      padding: 9mm 16mm 10mm;
+      background: #ffffff;
+      direction: rtl;
+      position: relative;
+    }
+    .logo { display: block; width: 45mm; max-height: 42mm; object-fit: contain; margin: 0 auto 4mm; }
+    .contact {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 6mm;
+      align-items: center;
+      color: #3c3934;
+      font-size: 10px;
+      margin-top: 0;
+      direction: ltr;
+      text-align: center;
+    }
+    .contact-item {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1.5mm;
+      direction: rtl;
+      white-space: nowrap;
+    }
+    .contact-icon {
+      width: 12px;
+      height: 12px;
+      fill: none;
+      stroke: ${GOLD};
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      flex: 0 0 auto;
+    }
+    .contact .rtl { direction: rtl; }
+    .gold-line { height: 1.2px; background: ${GOLD_LIGHT}; margin: 5mm 0 3mm; }
+    .thin-line { height: 1px; background: ${BORDER}; margin-bottom: 7mm; }
+    .panel {
+      border: 1px solid ${BORDER};
+      border-radius: 6px;
+      background: #fffdfa;
+      overflow: hidden;
+    }
+    .panel-title {
+      color: ${GOLD};
+      font-weight: 800;
+      font-size: 15px;
+      padding-bottom: 3mm;
+      border-bottom: 1px solid ${BORDER};
+      margin-bottom: 3mm;
+    }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 9mm; }
+    .details { padding: 5mm; min-height: 35mm; }
+    .row {
+      display: grid;
+      grid-template-columns: 31mm 1fr;
+      gap: 3mm;
+      align-items: baseline;
+      min-height: 6.8mm;
+      font-size: 12px;
+    }
+    .label { color: ${MUTED}; white-space: nowrap; }
+    .value { font-weight: 700; overflow-wrap: anywhere; }
+    .ltr { direction: ltr; unicode-bidi: isolate; text-align: left; }
+    .phone-number { direction: ltr; unicode-bidi: isolate; text-align: right; }
+    .center { text-align: center; }
+    .table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      table-layout: fixed;
+      margin-top: 7mm;
+      border: 1px solid ${BORDER};
+      border-radius: 6px;
+      overflow: hidden;
+      font-size: 12px;
+    }
+    th {
+      background: ${GOLD};
+      color: #ffffff;
+      padding: 3mm 3mm;
+      font-weight: 800;
+      text-align: center;
+    }
+    td {
+      padding: 3mm 3mm;
+      border-top: 1px solid ${BORDER};
+      text-align: center;
+      vertical-align: middle;
+      overflow-wrap: anywhere;
+    }
+    tbody tr:nth-child(even) td { background: #fffdfa; }
+    .right { text-align: right; }
+    .summary-row { display: grid; grid-template-columns: 1fr 1fr; gap: 9mm; margin-top: 8mm; align-items: start; }
+    .totals {
+      background: #202020;
+      color: #ffffff;
+      border-radius: 7px;
+      padding: 5mm;
+      min-height: 38mm;
+    }
+    .totals-line {
+      display: flex;
+      justify-content: space-between;
+      gap: 4mm;
+      align-items: center;
+      border-bottom: 1px solid #4a4a4a;
+      padding: 0 0 3.5mm;
+      margin-bottom: 3.5mm;
+    }
+    .totals-label { color: #d9d2c2; font-size: 11px; }
+    .totals-amount { font-weight: 900; font-size: 22px; direction: rtl; white-space: nowrap; }
+    .remaining {
+      display: flex;
+      justify-content: space-between;
+      gap: 4mm;
+      align-items: center;
+      background: ${GOLD};
+      color: #ffffff;
+      border-radius: 4px;
+      padding: 3mm 5mm;
+      font-weight: 800;
+    }
+    .payments { min-height: 39mm; padding: 5mm; }
+    .mini-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 3mm; }
+    .mini-table td { padding: 3mm 2mm; border-top: 1px solid ${BORDER}; }
+    .warranty {
+      width: 100%;
+      border: 1.4px solid ${GOLD_LIGHT};
+      text-align: center;
+      padding: 4mm;
+      margin-top: 6mm;
+    }
+    .warranty small { display: block; color: ${GOLD}; margin-bottom: 2mm; }
+    .warranty strong { font-size: 20px; }
+    .terms { font-size: 10.5px; line-height: 1.65; margin-top: 5mm; }
+    .terms h3 { font-size: 13px; margin: 0 0 3mm; }
+    .top-strip {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      background: ${SOFT};
+      border: 1px solid ${BORDER};
+      border-radius: 4px;
+      margin-bottom: 8mm;
+      overflow: hidden;
+    }
+    .top-cell { padding: 5mm 7mm; text-align: center; border-inline-start: 1px solid ${BORDER}; }
+    .top-cell:last-child { border-inline-start: 0; }
+    .top-label { display: block; color: ${MUTED}; font-size: 14px; margin-bottom: 2mm; }
+    .top-value { color: ${GOLD}; font-weight: 800; font-size: 13px; }
+    .request-columns {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12mm;
+      margin-bottom: 7mm;
+    }
+    .request-col {
+      border-inline-end: 2px solid ${GOLD_LIGHT};
+      padding-inline-end: 6mm;
+      min-height: 48mm;
+    }
+    .request-col h2 {
+      font-size: 15px;
+      margin: 0 0 6mm;
+      color: ${DARK};
+    }
+    .notice {
+      border: 1px solid ${BORDER};
+      border-radius: 6px;
+      padding: 6mm;
+      margin-top: 8mm;
+      background: #fbf4ea;
+      min-height: 32mm;
+    }
+    .notice.white { background: #ffffff; border-style: dashed; }
+    .notice h3 { color: ${GOLD}; margin: 0 0 5mm; font-size: 14px; }
+    .footer-line { height: 1px; background: ${BORDER}; margin-top: 7mm; }
+    .footer {
+      position: absolute;
+      bottom: 7mm;
+      left: 16mm;
+      right: 16mm;
+      text-align: center;
+      color: ${MUTED};
+      font-size: 10px;
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <img class="logo" src="${brand.logoDataUri}" alt="${BRAND_NAME}" />
+    <div class="contact">
+      <div class="contact-item">${topIcon("mail")}<span>${escapeHtml(brand.email)}</span></div>
+      <div class="contact-item">${topIcon("phone")}<span class="phone-number">${escapeHtml(phone || FALLBACK_PHONE)}</span></div>
+      <div class="contact-item rtl">${topIcon("location")}<span>${escapeHtml(brand.address)}</span></div>
+    </div>
+    <div class="gold-line"></div>
+    <div class="thin-line"></div>
+    ${body}
+    <div class="footer">جميع الحقوق محفوظة © 2026</div>
+  </main>
+</body>
+</html>`;
 }
 
-function footer() {
-  return `
-    ${line(130, 1660, 1110, 1660, BORDER, 1)}
-    ${svgText({ x: 620, y: 1720, value: "جميع الحقوق محفوظة © 2026", anchor: "middle", size: 14, fill: MUTED })}
-  `;
-}
-
-function infoBox({
-  x,
-  y,
-  width,
-  title,
-  rows,
-}: {
-  x: number;
-  y: number;
-  width: number;
-  title: string;
-  rows: Array<[string, string, boolean?]>;
-}) {
-  const rowSvg = rows
-    .map(([label, value, ltr], index) => {
-      const rowY = y + 92 + index * 40;
-      return `
-        ${svgText({ x: x + width - 28, y: rowY, value: `${label}:`, size: 17, fill: MUTED })}
-        ${svgText({ x: x + 28, y: rowY, value, size: 17, weight: 700, anchor: "start", ltr: ltr ?? false })}
-      `;
-    })
-    .join("");
-  return `
-    ${rect(x, y, width, 212, { fill: PANEL, stroke: BORDER, radius: 12 })}
-    ${svgText({ x: x + width - 28, y: y + 48, value: title, size: 22, weight: 800, fill: GOLD })}
-    ${line(x + 28, y + 72, x + width - 28, y + 72, BORDER, 1)}
-    ${rowSvg}
-  `;
-}
-
-function tableHeader(x: number, y: number, width: number, columns: Array<{ label: string; x: number }>) {
-  return `
-    ${rect(x, y, width, 54, { fill: GOLD, stroke: GOLD, radius: 8 })}
-    ${columns.map((column) => svgText({ x: column.x, y: y + 36, value: column.label, size: 17, weight: 800, fill: WHITE })).join("")}
-  `;
-}
-
-function createPdfFromJpeg(jpeg: Buffer, width: number, height: number) {
-  const content = `q\n${PDF_WIDTH} 0 0 ${PDF_HEIGHT} 0 0 cm\n/Im1 Do\nQ`;
-  const objects = [
-    `<< /Type /Catalog /Pages 2 0 R >>`,
-    `<< /Type /Pages /Kids [3 0 R] /Count 1 >>`,
-    `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PDF_WIDTH} ${PDF_HEIGHT}] /Resources << /XObject << /Im1 5 0 R >> >> /Contents 4 0 R >>`,
-    `<< /Length ${Buffer.byteLength(content)} >>\nstream\n${content}\nendstream`,
-    `<< /Type /XObject /Subtype /Image /Width ${width} /Height ${height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpeg.length} >>\nstream\n${jpeg.toString("binary")}\nendstream`,
-  ];
-  let pdf = "%PDF-1.4\n";
-  const offsets = [0];
-  for (const [index, object] of objects.entries()) {
-    offsets.push(Buffer.byteLength(pdf, "binary"));
-    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
-  }
-  const xref = Buffer.byteLength(pdf, "binary");
-  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
-  offsets.slice(1).forEach((offset) => {
-    pdf += `${String(offset).padStart(10, "0")} 00000 n \n`;
+async function renderHtmlToPdf(html: string) {
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: ["--no-sandbox", "--disable-setuid-sandbox", "--font-render-hinting=medium"],
   });
-  pdf += `trailer << /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
-  return Buffer.from(pdf, "binary");
-}
 
-async function renderSvgToPdf(svg: string) {
-  const { data, info } = await sharp(Buffer.from(svg))
-    .flatten({ background: "#ffffff" })
-    .jpeg({ quality: 98, chromaSubsampling: "4:4:4" })
-    .toBuffer({ resolveWithObject: true });
-  return createPdfFromJpeg(data, info.width, info.height);
-}
-
-function baseSvg(body: string) {
-  return `
-    <svg xmlns="http://www.w3.org/2000/svg" width="${PAGE_WIDTH}" height="${PAGE_HEIGHT}" viewBox="0 0 ${DESIGN_WIDTH} ${DESIGN_HEIGHT}">
-      <rect width="${DESIGN_WIDTH}" height="${DESIGN_HEIGHT}" fill="#ffffff"/>
-      <style>
-        text { font-family: Arial, "DejaVu Sans", sans-serif; dominant-baseline: alphabetic; }
-      </style>
-      ${body}
-    </svg>
-  `;
+  try {
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: "load" });
+    await page.evaluate(() => document.fonts.ready);
+    await page.emulateMediaType("print");
+    const pdf = await page.pdf({
+      format: "A4",
+      printBackground: true,
+      preferCSSPageSize: true,
+      margin: { top: "0", right: "0", bottom: "0", left: "0" },
+    });
+    return Buffer.from(pdf);
+  } finally {
+    await browser.close();
+  }
 }
 
 export async function renderInvoicePdf(invoice: Invoice, settings?: Settings | null) {
-  const brand = documentBrand(settings);
-  const logoUri = await assetDataUri("al-khubara-logo-transparent.png");
-  const parts = invoice.parts.slice(0, 5);
-  const payments = invoice.payments.slice(0, 3);
+  const brand = await documentBrand(settings);
+  const parts = invoice.parts.slice(0, 6);
+  const payments = invoice.payments.slice(0, 4);
   const remainingAmount = remaining(invoice.total, invoice.paid);
-  const partRows = parts
-    .map((part, index) => {
-      const y = 826 + index * 62;
-      return `
-        ${rect(130, y - 42, 980, 62, { fill: index % 2 ? "#fffdfa" : WHITE, stroke: BORDER, radius: 0 })}
-        ${svgText({ x: 1048, y, value: shortText(part.name, 52), size: 17 })}
-        ${svgText({ x: 655, y, value: String(part.quantity), size: 17, anchor: "middle", ltr: true })}
-        ${svgText({ x: 505, y, value: formatMoney(part.unitPrice, invoice.currency), size: 16, anchor: "middle" })}
-        ${svgText({ x: 260, y, value: formatMoney(invoicePartTotal(part), invoice.currency), size: 17, weight: 800, anchor: "middle" })}
-      `;
-    })
+  const terms = brand.terms
+    .slice(0, 4)
+    .map((term) => `<div>${escapeHtml(term)}</div>`)
     .join("");
-  const paymentRows = payments
-    .map((payment, index) => {
-      const y = 1210 + index * 44;
-      return `
-        ${rect(580, y - 29, 530, 44, { fill: index % 2 ? "#fffdfa" : WHITE, stroke: BORDER, radius: 0 })}
-        ${svgText({ x: 1050, y, value: formatMoney(payment.convertedAmount ?? payment.amount, invoice.currency), size: 16, weight: 800 })}
-        ${svgText({ x: 840, y, value: PAYMENT_METHOD_LABELS[payment.method] ?? payment.method, size: 15, anchor: "middle" })}
-        ${svgText({ x: 650, y, value: isoDate(payment.paidAt), size: 15, anchor: "middle", ltr: true })}
-      `;
-    })
-    .join("");
-  const terms = brand.terms.slice(0, 4).map((term, index) =>
-    svgText({ x: 1045, y: 1405 + index * 34, value: shortText(term, 92), size: 16, fill: DARK }),
-  ).join("");
 
-  return renderSvgToPdf(baseSvg(`
-    ${header(brand, logoUri)}
-    ${infoBox({
-      x: 130,
-      y: 500,
-      width: 470,
-      title: "بيانات العميل",
-      rows: [
-        ["الاسم", invoice.client],
-        ["الجوال الأساسي", invoice.clientPhone, true],
-        ["العنوان", shortText(invoice.clientAddress, 32)],
-      ],
-    })}
-    ${infoBox({
-      x: 640,
-      y: 500,
-      width: 470,
-      title: "تفاصيل الفاتورة",
-      rows: [
-        ["رقم الفاتورة", invoice.invoiceNumber || invoice.id, true],
-        ["رقم الطلب", invoice.requestNumber || invoice.orderId, true],
-        ["تاريخ الإصدار", isoDate(invoice.issuedAt), true],
-      ],
-    })}
-    ${tableHeader(130, 730, 980, [
-      { label: "اسم القطعة", x: 1048 },
-      { label: "الكمية", x: 655 },
-      { label: "سعر الوحدة", x: 505 },
-      { label: "الإجمالي", x: 260 },
-    ])}
-    ${partRows || svgText({ x: 620, y: 826, value: "لا توجد قطع مسجلة على هذه الفاتورة.", anchor: "middle", size: 18, fill: MUTED })}
-    ${rect(130, 1104, 390, 238, { fill: "#202020", stroke: "#202020", radius: 12 })}
-    ${svgText({ x: 470, y: 1160, value: "إجمالي الفاتورة", size: 16, fill: "#d9d2c2" })}
-    ${svgText({ x: 250, y: 1160, value: formatMoney(invoice.total, invoice.currency), size: 30, weight: 800, fill: WHITE, anchor: "middle" })}
-    ${line(160, 1192, 490, 1192, "#4a4a4a", 1)}
-    ${svgText({ x: 470, y: 1240, value: "المبلغ المدفوع", size: 16, fill: "#d9d2c2" })}
-    ${svgText({ x: 250, y: 1240, value: formatMoney(invoice.paid, invoice.currency), size: 20, weight: 800, fill: WHITE, anchor: "middle" })}
-    ${rect(160, 1272, 330, 58, { fill: GOLD, stroke: GOLD, radius: 6 })}
-    ${svgText({ x: 454, y: 1310, value: "المتبقي للسداد", size: 18, weight: 800, fill: WHITE })}
-    ${svgText({ x: 235, y: 1310, value: formatMoney(remainingAmount, invoice.currency), size: 19, weight: 800, fill: WHITE, anchor: "middle" })}
-    ${rect(580, 1104, 530, 238, { fill: WHITE, stroke: BORDER, radius: 10 })}
-    ${svgText({ x: 1050, y: 1142, value: "سجل الدفعات المستلمة", size: 18, weight: 800, fill: GOLD })}
-    ${line(600, 1162, 1090, 1162, BORDER, 1)}
-    ${paymentRows || svgText({ x: 845, y: 1230, value: "لا توجد دفعات مسجلة.", anchor: "middle", size: 17, fill: MUTED })}
-    ${rect(130, 1418, 305, 100, { fill: WHITE, stroke: GOLD_LIGHT, radius: 0, strokeWidth: 2 })}
-    ${svgText({ x: 282, y: 1462, value: "فترة الضمان المعتمدة", anchor: "middle", size: 15, fill: GOLD })}
-    ${svgText({ x: 282, y: 1508, value: text(invoice.warrantyDuration, "غير محددة"), anchor: "middle", size: 31, weight: 800 })}
-    ${svgText({ x: 1045, y: 1360, value: "الشروط والأحكام", size: 19, weight: 800, fill: DARK })}
-    ${terms}
-    ${footer()}
-  `));
+  const body = `
+    <section class="grid-2">
+      <div class="panel details">
+        <div class="panel-title">بيانات العميل</div>
+        <div class="row"><span class="label">الاسم:</span><span class="value">${escapeHtml(invoice.client)}</span></div>
+        <div class="row"><span class="label">الجوال الأساسي:</span><span class="value phone-number">${escapeHtml(invoice.clientPhone)}</span></div>
+        <div class="row"><span class="label">العنوان:</span><span class="value">${escapeHtml(invoice.clientAddress)}</span></div>
+      </div>
+      <div class="panel details">
+        <div class="panel-title">تفاصيل الفاتورة</div>
+        <div class="row"><span class="label">رقم الفاتورة:</span><span class="value ltr">${escapeHtml(invoice.invoiceNumber || invoice.id)}</span></div>
+        <div class="row"><span class="label">رقم الطلب:</span><span class="value ltr">${escapeHtml(invoice.requestNumber || invoice.orderId)}</span></div>
+        <div class="row"><span class="label">وقت الإنشاء:</span><span class="value ltr">${escapeHtml(displayDateTime(invoice.issuedAt))}</span></div>
+      </div>
+    </section>
+
+    <table class="table">
+      <thead>
+        <tr>
+          <th class="right" style="width: 48%">اسم القطعة</th>
+          <th style="width: 13%">الكمية</th>
+          <th style="width: 19%">سعر الوحدة</th>
+          <th style="width: 20%">الإجمالي</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${parts.length > 0
+          ? parts.map((part) => `
+            <tr>
+              <td class="right">${escapeHtml(shortText(part.name, 58))}</td>
+              <td class="ltr center">${escapeHtml(part.quantity)}</td>
+              <td>${escapeHtml(formatMoney(part.unitPrice, invoice.currency))}</td>
+              <td><strong>${escapeHtml(formatMoney(invoicePartTotal(part), invoice.currency))}</strong></td>
+            </tr>
+          `).join("")
+          : `<tr><td colspan="4">لا توجد قطع مسجلة على هذه الفاتورة.</td></tr>`}
+      </tbody>
+    </table>
+
+    <section class="summary-row">
+      <div>
+        <div class="totals">
+          <div class="totals-line">
+            <span class="totals-label">إجمالي الفاتورة</span>
+            <strong class="totals-amount">${escapeHtml(formatMoney(invoice.total, invoice.currency))}</strong>
+          </div>
+          <div class="totals-line">
+            <span class="totals-label">المبلغ المدفوع</span>
+            <strong>${escapeHtml(formatMoney(invoice.paid, invoice.currency))}</strong>
+          </div>
+          <div class="remaining">
+            <span>المتبقي للسداد</span>
+            <strong>${escapeHtml(formatMoney(remainingAmount, invoice.currency))}</strong>
+          </div>
+        </div>
+        <div class="warranty">
+          <small>فترة الضمان المعتمدة</small>
+          <strong>${escapeHtml(text(invoice.warrantyDuration, "غير محددة"))}</strong>
+        </div>
+      </div>
+      <div>
+        <div class="panel payments">
+          <div class="panel-title">سجل الدفعات المستلمة</div>
+          <table class="mini-table">
+            <tbody>
+              ${payments.length > 0
+                ? payments.map((payment) => `
+                  <tr>
+                    <td><strong>${escapeHtml(formatMoney(payment.convertedAmount ?? payment.amount, invoice.currency))}</strong></td>
+                    <td>${escapeHtml(PAYMENT_METHOD_LABELS[payment.method] ?? payment.method)}</td>
+                    <td class="ltr">${escapeHtml(displayDateTime(payment.paidAt))}</td>
+                  </tr>
+                `).join("")
+                : `<tr><td colspan="3">لا توجد دفعات مسجلة.</td></tr>`}
+            </tbody>
+          </table>
+        </div>
+        <div class="terms">
+          <h3>الشروط والأحكام</h3>
+          ${terms}
+        </div>
+      </div>
+    </section>
+    <div class="footer-line"></div>
+  `;
+
+  return renderHtmlToPdf(htmlShell(`invoice-${invoice.invoiceNumber || invoice.id}`, brand, body));
 }
 
 export async function renderRequestPdf(request: RepairRequest, settings?: Settings | null) {
-  const brand = documentBrand(settings);
-  const logoUri = await assetDataUri("al-khubara-logo-transparent.png");
-  const devices = request.devices.slice(0, 5);
-  const deviceRows = devices
-    .map((device, index) => {
-      const y = 975 + index * 52;
-      return `
-        ${rect(130, y - 36, 980, 52, { fill: index % 2 ? "#fffdfa" : WHITE, stroke: BORDER, radius: 0 })}
-        ${svgText({ x: 1060, y, value: String(index + 1), size: 16, anchor: "middle", ltr: true })}
-        ${svgText({ x: 945, y, value: shortText(device.deviceType, 20), size: 16, anchor: "middle", ltr: true })}
-        ${svgText({ x: 720, y, value: shortText(device.deviceName, 26), size: 16, anchor: "middle", ltr: true })}
-        ${svgText({ x: 485, y, value: shortText(device.brand, 20), size: 16, anchor: "middle", ltr: true })}
-        ${svgText({ x: 255, y, value: shortText(device.model, 22), size: 16, anchor: "middle", ltr: true })}
-      `;
-    })
-    .join("");
+  const brand = await documentBrand(settings);
+  const devices = request.devices.slice(0, 6);
   const printedAt = new Intl.DateTimeFormat("en-GB", {
     year: "numeric",
     month: "2-digit",
@@ -340,51 +487,72 @@ export async function renderRequestPdf(request: RepairRequest, settings?: Settin
     timeZone: "Asia/Amman",
   }).format(new Date());
 
-  return renderSvgToPdf(baseSvg(`
-    <rect x="1062" y="0" width="100" height="150" fill="${SOFT}" rx="18"/>
-    ${header(brand, logoUri)}
-    ${rect(130, 500, 980, 95, { fill: SOFT, stroke: BORDER, radius: 4 })}
-    ${line(620, 520, 620, 575, BORDER, 1)}
-    ${svgText({ x: 1030, y: 545, value: "رقم الطلب", size: 20, fill: MUTED })}
-    ${svgText({ x: 1030, y: 578, value: `#${request.requestNumber}`, size: 18, weight: 800, fill: GOLD, ltr: true })}
-    ${svgText({ x: 470, y: 545, value: "تاريخ الإنشاء", size: 21, fill: MUTED })}
-    ${svgText({ x: 470, y: 578, value: isoDate(request.createdAt), size: 18, weight: 700, ltr: true })}
-    ${line(620, 620, 620, 858, GOLD_LIGHT, 5)}
-    ${line(1110, 620, 1110, 858, GOLD_LIGHT, 5)}
-    ${svgText({ x: 1040, y: 646, value: "بيانات المسؤول", size: 22, weight: 700, fill: DARK })}
-    ${svgText({ x: 1030, y: 704, value: "الموظف المسؤول:", size: 19, fill: MUTED })}
-    ${svgText({ x: 750, y: 704, value: text(request.technicianName), size: 22, anchor: "start" })}
-    ${line(690, 728, 1070, 728, BORDER, 1)}
-    ${svgText({ x: 1030, y: 766, value: "نوع الطلب:", size: 19, fill: MUTED })}
-    ${svgText({ x: 750, y: 766, value: REQUEST_TYPE_LABELS[request.type], size: 20, fill: GOLD, anchor: "start" })}
-    ${line(690, 790, 1070, 790, BORDER, 1)}
-    ${svgText({ x: 520, y: 646, value: "بيانات العميل", size: 22, weight: 700, fill: DARK })}
-    ${svgText({ x: 510, y: 704, value: "اسم العميل:", size: 19, fill: MUTED })}
-    ${svgText({ x: 205, y: 704, value: request.customer.name, size: 22, anchor: "start" })}
-    ${line(160, 728, 540, 728, BORDER, 1)}
-    ${svgText({ x: 510, y: 766, value: "الجوال الأساسي:", size: 19, fill: MUTED })}
-    ${svgText({ x: 205, y: 766, value: request.customer.firstPhone, size: 20, anchor: "start", ltr: true })}
-    ${line(160, 790, 540, 790, BORDER, 1)}
-    ${svgText({ x: 510, y: 828, value: "العنوان:", size: 19, fill: MUTED })}
-    ${svgText({ x: 205, y: 828, value: shortText(request.customer.address, 30), size: 19, anchor: "start" })}
-    ${svgText({ x: 1070, y: 852, value: "الأجهزة المشمولة بالطلب", size: 20, weight: 700, fill: DARK })}
-    ${rect(130, 875, 980, 60, { fill: WHITE, stroke: BORDER, radius: 8 })}
-    ${svgText({ x: 1060, y: 912, value: "#", size: 17, weight: 800, anchor: "middle" })}
-    ${svgText({ x: 945, y: 912, value: "نوع الجهاز", size: 17, weight: 800 })}
-    ${svgText({ x: 720, y: 912, value: "اسم الجهاز", size: 17, weight: 800 })}
-    ${svgText({ x: 485, y: 912, value: "العلامة التجارية", size: 17, weight: 800, anchor: "middle" })}
-    ${svgText({ x: 255, y: 912, value: "الموديل", size: 17, weight: 800, anchor: "middle" })}
-    ${deviceRows}
-    ${rect(130, 1225, 980, 132, { fill: "#fbf4ea", stroke: BORDER, radius: 10 })}
-    ${svgText({ x: 1060, y: 1270, value: "وصف العطل", size: 20, weight: 800, fill: GOLD })}
-    ${svgText({ x: 1060, y: 1322, value: shortText(request.faultDescription, 98), size: 21, fill: DARK })}
-    ${rect(130, 1385, 980, 132, { fill: WHITE, stroke: BORDER, radius: 10, strokeWidth: 1 })}
-    ${svgText({ x: 1060, y: 1430, value: "ملاحظات إضافية", size: 20, fill: MUTED })}
-    ${svgText({ x: 1060, y: 1482, value: shortText(request.notes, 98), size: 19, fill: MUTED })}
-    ${rect(130, 1560, 980, 100, { fill: SOFT, stroke: "none", radius: 4 })}
-    ${svgText({ x: 1060, y: 1605, value: "الشروط والأحكام العامة:", size: 18, fill: DARK })}
-    ${svgText({ x: 1060, y: 1642, value: `حالة الطلب: ${REQUEST_STATUS_LABELS[request.status]} - هذا المستند تأكيد لاستلام بيانات الطلب وليس تأكيداً نهائياً للإصلاح.`, size: 16, fill: MUTED })}
-    ${svgText({ x: 130, y: 1700, value: `Printed at ${printedAt}`, size: 15, fill: MUTED, anchor: "start", ltr: true })}
-    ${footer()}
-  `));
+  const body = `
+    <section class="top-strip">
+      <div class="top-cell">
+        <span class="top-label">رقم الطلب</span>
+        <span class="top-value ltr">#${escapeHtml(request.requestNumber)}</span>
+      </div>
+      <div class="top-cell">
+        <span class="top-label">وقت الإنشاء</span>
+        <strong class="ltr">${escapeHtml(displayDateTime(request.createdAt))}</strong>
+      </div>
+    </section>
+
+    <section class="request-columns">
+      <div class="request-col">
+        <h2>بيانات المسؤول</h2>
+        <div class="row"><span class="label">الموظف المسؤول:</span><span class="value">${escapeHtml(text(request.technicianName))}</span></div>
+        <div class="row"><span class="label">نوع الطلب:</span><span class="value" style="color:${GOLD}">${escapeHtml(REQUEST_TYPE_LABELS[request.type])}</span></div>
+      </div>
+      <div class="request-col">
+        <h2>بيانات العميل</h2>
+        <div class="row"><span class="label">اسم العميل:</span><span class="value">${escapeHtml(request.customer.name)}</span></div>
+        <div class="row"><span class="label">الجوال الأساسي:</span><span class="value phone-number">${escapeHtml(request.customer.firstPhone)}</span></div>
+        <div class="row"><span class="label">العنوان:</span><span class="value">${escapeHtml(shortText(request.customer.address, 58))}</span></div>
+      </div>
+    </section>
+
+    <h2 style="font-size:14px; margin:0 0 3mm;">الأجهزة المشمولة بالطلب</h2>
+    <table class="table" style="margin-top:0">
+      <thead>
+        <tr>
+          <th style="width: 8%">#</th>
+          <th style="width: 21%">نوع الجهاز</th>
+          <th style="width: 28%">اسم الجهاز</th>
+          <th style="width: 22%">العلامة التجارية</th>
+          <th style="width: 21%">الموديل</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${devices.length > 0
+          ? devices.map((device, index) => `
+            <tr>
+              <td class="ltr">${index + 1}</td>
+              <td>${escapeHtml(shortText(device.deviceType, 24))}</td>
+              <td>${escapeHtml(shortText(device.deviceName, 34))}</td>
+              <td>${escapeHtml(shortText(device.brand, 24))}</td>
+              <td class="ltr">${escapeHtml(shortText(device.model, 26))}</td>
+            </tr>
+          `).join("")
+          : `<tr><td colspan="5">لا توجد أجهزة مسجلة على هذا الطلب.</td></tr>`}
+      </tbody>
+    </table>
+
+    <section class="notice">
+      <h3>وصف العطل</h3>
+      <div>${escapeHtml(shortText(request.faultDescription, 150))}</div>
+    </section>
+    <section class="notice white">
+      <h3>ملاحظات إضافية</h3>
+      <div>${escapeHtml(shortText(request.notes, 150))}</div>
+    </section>
+    <section class="notice" style="min-height:24mm; margin-top:8mm;">
+      <h3>الشروط والأحكام العامة:</h3>
+      <div>حالة الطلب: ${escapeHtml(REQUEST_STATUS_LABELS[request.status])} - هذا المستند تأكيد لاستلام بيانات الطلب وليس تأكيداً نهائياً للإصلاح.</div>
+    </section>
+    <div class="ltr" style="position:absolute; bottom:12mm; left:16mm; color:${MUTED}; font-size:10px;">Printed at ${escapeHtml(printedAt)}</div>
+  `;
+
+  return renderHtmlToPdf(htmlShell(`request-${request.requestNumber}`, brand, body));
 }

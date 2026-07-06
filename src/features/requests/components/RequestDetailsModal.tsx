@@ -78,9 +78,9 @@ export function RequestDetailsModal({
   const { create, recordPayment } = useInvoiceMutations();
   const dollarExchangeRate = useDollarExchangeRate();
   const invoices = request?.invoices ?? [];
-  const hasPaidInvoice = invoices.some((invoice) => invoice.status === "paid");
+  const hasInvoice = Boolean(request?.hasInvoice) || invoices.length > 0;
   const canCreateRequestInvoice = Boolean(
-    request && canCreateInvoiceForRequest(request) && !hasPaidInvoice,
+    request && canCreateInvoiceForRequest(request) && !hasInvoice,
   );
   const invoiceDraft = useMemo(
     () => (request ? createInvoiceDraftFromRequest(request) : null),
@@ -98,12 +98,12 @@ export function RequestDetailsModal({
     setInvoiceNotice(null);
 
     if (!canCreateInvoiceForRequest(request)) {
-      setInvoiceNotice("إنشاء الفاتورة متاح للطلب الجديد أو قيد الإصلاح أو غير مكتمل الدفع.");
+      setInvoiceNotice("إنشاء الفاتورة متاح فقط إذا كان الطلب مكتملًا أو غير مكتمل.");
       return;
     }
 
-    if (hasPaidInvoice) {
-      setInvoiceNotice("توجد فاتورة مدفوعة بالكامل لهذا الطلب، لذلك لا يمكن إنشاء فاتورة جديدة.");
+    if (hasInvoice) {
+      setInvoiceNotice("توجد فاتورة لهذا الطلب بالفعل، لذلك لا يمكن إنشاء فاتورة جديدة.");
       return;
     }
 

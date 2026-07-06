@@ -17,6 +17,7 @@ export interface PayrollAdjustment {
   amount: number;
   note: string;
   date: string;
+  createdAt?: string;
 }
 
 export interface PayrollAdjustmentInput {
@@ -146,6 +147,7 @@ export function normalizePayrollRecord(payload: unknown): PayrollAdjustment {
     amount: numberValue(raw.amount),
     note: stringValue(raw.note, raw.notes),
     date: recordMonth && recordYear ? fallbackDate : createdAt.slice(0, 10) || fallbackDate,
+    createdAt,
   };
 }
 

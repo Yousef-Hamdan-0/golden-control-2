@@ -6,11 +6,14 @@ import { Field, Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { Select } from "@/components/ui/Select";
 import { formatMoney } from "@/lib/format/currency";
-import { todayDateKey } from "@/lib/format/date";
 import type { Invoice, InvoicePayment, PaymentMethod, PaymentCurrency } from "../../types";
 import { USD_TO_SYP_RATE } from "../../constants";
 import { remaining, convertPaymentToInvoiceCurrency } from "../../utils/invoice";
 import { DetailItem } from "../shared/DetailItem";
+
+function invoiceDisplayNumber(invoice: Invoice) {
+  return invoice.invoiceNumber || invoice.id;
+}
 
 export function AddPaymentModal({
   invoice,
@@ -48,7 +51,7 @@ export function AddPaymentModal({
         convertedAmount,
         currency,
         method,
-        paidAt: todayDateKey(),
+        paidAt: new Date().toISOString(),
       },
       convertedAmount,
     );
@@ -68,7 +71,7 @@ export function AddPaymentModal({
           </div>
         ) : null}
         <div className="grid gap-3 md:grid-cols-2">
-          <DetailItem label="رقم الفاتورة" value={invoice.id} ltr />
+          <DetailItem label="رقم الفاتورة" value={invoiceDisplayNumber(invoice)} ltr />
           <DetailItem
             label="المبلغ المتبقي"
             value={formatMoney(remainingBefore, invoice.currency)}

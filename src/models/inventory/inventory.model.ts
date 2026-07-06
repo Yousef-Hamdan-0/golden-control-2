@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { ApiError } from "@/helpers/api.helper";
-import { localDateKey } from "@/lib/format/date";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -111,8 +110,7 @@ function booleanValue(value: unknown, fallback = true) {
 }
 
 function dateValue(...values: unknown[]) {
-  const value = stringValue(...values);
-  return localDateKey(value);
+  return stringValue(...values);
 }
 
 function dataRecord(payload: unknown) {
