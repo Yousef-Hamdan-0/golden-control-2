@@ -280,6 +280,40 @@ export class UpdateUserRequestModel {
     this.input = UserUpdatePatchSchema.parse(input);
   }
 
+  /** True only when an actual image file needs to be uploaded (multipart). */
+  hasFileUploads(): boolean {
+    return Boolean(
+      (this.input.imageUrl && dataUrlFile(this.input.imageUrl, "profileImage")) ||
+        (this.input.identityDocumentUrl &&
+          dataUrlFile(this.input.identityDocumentUrl, "documentImage")),
+    );
+  }
+
+  /**
+   * JSON payload used when there is no file upload. Sending JSON keeps numeric
+   * fields (salary) as real numbers instead of multipart strings, which the
+   * backend validator requires.
+   */
+  toJSON(): Record<string, unknown> {
+    const body: Record<string, unknown> = {};
+    if (hasOwn(this.input, "email")) body.email = this.input.email ?? "";
+    if (hasOwn(this.input, "fullName")) body.fullName = this.input.fullName ?? "";
+    if (hasOwn(this.input, "jobTitle")) body.jobTitle = this.input.jobTitle ?? "";
+    if (hasOwn(this.input, "salary")) body.salary = Number(this.input.salary);
+    if (hasOwn(this.input, "status")) body.isActive = this.input.status === "available";
+    if (hasOwn(this.input, "role")) body.role = this.input.role ?? "";
+    if (hasOwn(this.input, "password") && this.input.password) {
+      body.password = this.input.password;
+    }
+    if (hasOwn(this.input, "profileImagePath")) {
+      body.profileImagePath = this.input.profileImagePath ?? "";
+    }
+    if (hasOwn(this.input, "documentImagePath")) {
+      body.documentImagePath = this.input.documentImagePath ?? "";
+    }
+    return body;
+  }
+
   toFormData(): FormData {
     const formData = new FormData();
     if (hasOwn(this.input, "email")) formData.append("email", this.input.email ?? "");

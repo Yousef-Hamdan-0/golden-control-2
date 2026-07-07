@@ -7,7 +7,10 @@ export const UserUpdateSchema = z.object({
   fullName: z.string().trim().min(2, "الاسم مطلوب"),
   email: z.string().trim().email("بريد إلكتروني غير صالح"),
   jobTitle: z.string().trim().optional().or(z.literal("")),
-  salary: z.coerce.number().nonnegative("الراتب يجب أن يكون رقماً موجباً"),
+  salary: z.coerce
+    .number()
+    .nonnegative("الراتب يجب أن يكون رقماً موجباً")
+    .max(9_999_999_999.99, "الراتب يجب ألا يتجاوز 9999999999.99"),
   imageUrl: z.string().max(4_000_000, "حجم الصورة كبير جدًا").optional().or(z.literal("")),
   identityDocumentUrl: z
     .string()

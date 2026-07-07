@@ -3,7 +3,6 @@ import { PAGE_SIZE } from "@/config/constants";
 import { requestAuthenticatedApi } from "@/helpers/authenticated-api.helper";
 import type { Role, User, UserCounts, UserStatus } from "@/models/auth/user.model";
 import type { UserCreateInput } from "@/models/users/user-create.schema";
-import type { UserUpdateInput } from "@/models/users/user-update.schema";
 import {
   CreateUserRequestModel,
   UpdateUserRequestModel,
@@ -122,10 +121,23 @@ export const userRepository = {
   async update(id: string, input: UserUpdatePatchInput): Promise<void> {
     if (!hasUserUpdatePatch(input)) return;
 
-    const body = new UpdateUserRequestModel(input).toFormData();
+    const model = new UpdateUserRequestModel(input);
+
+    // Only fall back to multipart when an image file is actually being uploaded.
+    // Otherwise send JSON so numeric fields (salary) stay real numbers instead
+    // of multipart strings, which the backend validator rejects.
+    if (model.hasFileUploads()) {
+      await requestAuthenticatedApi(API_ENDPOINTS.users.byId(id), {
+        method: "PATCH",
+        body: model.toFormData(),
+      });
+      return;
+    }
+
     await requestAuthenticatedApi(API_ENDPOINTS.users.byId(id), {
       method: "PATCH",
-      body,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(model.toJSON()),
     });
   },
 };

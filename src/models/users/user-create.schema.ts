@@ -28,7 +28,10 @@ export const UserCreateSchema = z.object({
     .regex(/^[+0-9\s-]+$/, "رقم هاتف غير صالح"),
   role: RoleSchema,
   jobTitle: z.string().trim().optional().or(z.literal("")),
-  salary: z.coerce.number().nonnegative("الراتب يجب أن يكون رقماً موجباً"),
+  salary: z.coerce
+    .number()
+    .nonnegative("الراتب يجب أن يكون رقماً موجباً")
+    .max(9_999_999_999.99, "الراتب يجب ألا يتجاوز 9999999999.99"),
   imageUrl: z.string().max(4_000_000, "حجم الصورة كبير جدًا").optional().or(z.literal("")),
   identityDocumentUrl: z
     .string()
