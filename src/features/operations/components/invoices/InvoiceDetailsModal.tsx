@@ -77,6 +77,7 @@ export function InvoiceDetailsModal({
               </div>
             }
           />
+          <DetailItem label="اسم الفني" value={invoice.technician || "غير محدد"} />
         </div>
 
         <Card className="bg-surface-2 p-4 shadow-none">

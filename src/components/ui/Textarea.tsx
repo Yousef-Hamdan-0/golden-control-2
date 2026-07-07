@@ -1,10 +1,14 @@
 import { forwardRef, type TextareaHTMLAttributes } from "react";
 import { cn } from "@/lib/utils/cn";
+import {
+  applyArabicValidationMessage,
+  clearCustomValidity,
+} from "@/lib/forms/native-validation";
 
 export const Textarea = forwardRef<
   HTMLTextAreaElement,
   TextareaHTMLAttributes<HTMLTextAreaElement>
->(({ className, ...props }, ref) => (
+>(({ className, onInvalid, onInput, ...props }, ref) => (
   <textarea
     ref={ref}
     className={cn(
@@ -14,6 +18,14 @@ export const Textarea = forwardRef<
       "focus:border-primary focus:bg-surface focus:outline-none focus:ring-[3px] focus:ring-gold/15",
       className,
     )}
+    onInvalid={(event) => {
+      applyArabicValidationMessage(event.currentTarget);
+      onInvalid?.(event);
+    }}
+    onInput={(event) => {
+      clearCustomValidity(event.currentTarget);
+      onInput?.(event);
+    }}
     {...props}
   />
 ));

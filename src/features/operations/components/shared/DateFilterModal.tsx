@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
-import { Field, Input } from "@/components/ui/Input";
+import { DatePicker } from "@/components/ui/DatePicker";
+import { Field } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import type { DateFilter } from "../../types";
 
@@ -27,20 +28,18 @@ export function DateFilterModal({
       <div className="space-y-4 p-5">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="من تاريخ">
-            <Input
-              type="date"
+            <DatePicker
               value={draft.from}
-              onChange={(event) =>
-                setDraft((current) => ({ ...current, from: event.target.value }))
+              onChange={(value) =>
+                setDraft((current) => ({ ...current, from: value }))
               }
             />
           </Field>
           <Field label="إلى تاريخ">
-            <Input
-              type="date"
+            <DatePicker
               value={draft.to}
-              onChange={(event) =>
-                setDraft((current) => ({ ...current, to: event.target.value }))
+              onChange={(value) =>
+                setDraft((current) => ({ ...current, to: value }))
               }
             />
           </Field>

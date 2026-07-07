@@ -57,11 +57,23 @@ async function fetchAllParts(params: Omit<InventoryPartListParams, "page">) {
     firstPage.total > firstPage.items.length
       ? Math.max(1, Math.ceil(firstPage.total / firstPage.pageSize))
       : undefined;
-  let page = 2;
 
-  while (
-    knownPages ? page <= knownPages : firstPage.items.length >= pageSize && page <= 100
-  ) {
+  if (knownPages) {
+    // The total is known, so fetch the remaining pages in parallel.
+    const restPages = await Promise.all(
+      Array.from({ length: knownPages - 1 }, (_, index) =>
+        fetchPartsPage({ ...params, page: index + 2, pageSize }),
+      ),
+    );
+    restPages.forEach((result) =>
+      result.items.forEach((part) => byId.set(part.id, part)),
+    );
+    return Array.from(byId.values());
+  }
+
+  // The total is unknown, so walk pages sequentially until an empty/short page.
+  let page = 2;
+  while (firstPage.items.length >= pageSize && page <= 100) {
     const result = await fetchPartsPage({ ...params, page, pageSize });
     let addedNewPart = false;
     result.items.forEach((part) => {
@@ -69,7 +81,7 @@ async function fetchAllParts(params: Omit<InventoryPartListParams, "page">) {
       byId.set(part.id, part);
     });
 
-    if (!knownPages && (!addedNewPart || result.items.length < pageSize)) break;
+    if (!addedNewPart || result.items.length < pageSize) break;
     page += 1;
   }
 

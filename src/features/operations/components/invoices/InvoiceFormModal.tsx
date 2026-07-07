@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { ConfirmToast } from "@/components/ui/ConfirmToast";
+import { CounterInput } from "@/components/ui/CounterInput";
 import { Field, Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { Select } from "@/components/ui/Select";
@@ -152,17 +153,6 @@ export function InvoiceFormModal({
       ...current,
       parts: current.parts.filter((_, currentIndex) => currentIndex !== index),
     }));
-  }
-
-  function stepPartQuantity(index: number, step: number) {
-    const currentQuantity = Math.max(1, Number(draft.parts[index]?.quantity) || 1);
-    const selectedPart = availableSpareParts.find(
-      (sparePart) => sparePart.id === draft.parts[index]?.sparePartId,
-    );
-    const nextQuantity = Math.max(1, currentQuantity + step);
-    patchPart(index, {
-      quantity: selectedPart ? Math.min(selectedPart.quantity, nextQuantity) : nextQuantity,
-    });
   }
 
   function buildInvoice(): Invoice {
@@ -382,23 +372,16 @@ export function InvoiceFormModal({
                     </Field>
                     <div>
                       <div className="mb-1.5 text-sm text-content-muted">الكمية</div>
-                      <div className="grid h-10 grid-cols-[36px_1fr_36px] items-center overflow-hidden rounded-md border border-border bg-surface-2">
-                        <button
-                          type="button"
-                          className="h-full text-content-muted hover:bg-gold-soft hover:text-gold"
-                          onClick={() => stepPartQuantity(index, 1)}
-                        >
-                          +
-                        </button>
-                        <span className="text-center font-heading text-base font-bold text-content">{part.quantity}</span>
-                        <button
-                          type="button"
-                          className="h-full text-content-muted hover:bg-gold-soft hover:text-gold"
-                          onClick={() => stepPartQuantity(index, -1)}
-                        >
-                          -
-                        </button>
-                      </div>
+                      <CounterInput
+                        value={part.quantity}
+                        min={1}
+                        max={
+                          availableSpareParts.find(
+                            (sparePart) => sparePart.id === part.sparePartId,
+                          )?.quantity
+                        }
+                        onChange={(quantity) => patchPart(index, { quantity })}
+                      />
                     </div>
                     <div className="rounded-md border border-border bg-surface-2 px-3 py-2">
                       <div className="text-xs text-content-muted">الإجمالي</div>

@@ -6,6 +6,10 @@ import { API_BASE_URL } from "@/config/api-endpoints";
 
 const FALLBACK_LOGO = "/brand/al-khubara-logo-transparent.png";
 
+// Resolved once per session so the logo isn't re-fetched on every mount
+// (this component renders in the sidebar on every page).
+let cachedLogoUrl: string | null = null;
+
 function mediaUrl(value?: string | null) {
   if (!value) return undefined;
   if (/^(?:https?:|data:|blob:)/i.test(value)) return value;
@@ -32,19 +36,24 @@ export function BackendLogo({
   alt?: string;
   className?: string;
 }) {
-  const [src, setSrc] = useState(FALLBACK_LOGO);
+  const [src, setSrc] = useState(cachedLogoUrl ?? FALLBACK_LOGO);
 
   useEffect(() => {
+    // Already resolved earlier in this session — skip the network round-trip.
+    if (cachedLogoUrl) return;
+
     let active = true;
 
     fetch(`${API_BASE_URL}/api/settings`, {
       headers: { Accept: "application/json" },
-      cache: "no-store",
     })
       .then((response) => (response.ok ? response.json() : null))
       .then((payload) => {
         const logoUrl = settingsLogoUrl(payload);
-        if (active && logoUrl) setSrc(logoUrl);
+        if (logoUrl) {
+          cachedLogoUrl = logoUrl;
+          if (active) setSrc(logoUrl);
+        }
       })
       .catch(() => {
         if (active) setSrc(FALLBACK_LOGO);

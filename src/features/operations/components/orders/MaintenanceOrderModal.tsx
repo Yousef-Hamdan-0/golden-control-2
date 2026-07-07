@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { ConfirmToast } from "@/components/ui/ConfirmToast";
+import { DatePicker } from "@/components/ui/DatePicker";
 import { Field, Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { Select } from "@/components/ui/Select";
@@ -241,11 +242,10 @@ export function MaintenanceOrderModal({
             <h3 className="font-heading text-base font-bold text-gold">تاريخ التسليم / الزيارة</h3>
             <div className="grid gap-4 md:grid-cols-4">
               <Field label="التاريخ">
-                <Input
-                  type="date"
+                <DatePicker
                   value={draft.visitDate}
-                  onChange={(event) =>
-                    setDraft((current) => ({ ...current, visitDate: event.target.value }))
+                  onChange={(value) =>
+                    setDraft((current) => ({ ...current, visitDate: value }))
                   }
                 />
               </Field>

@@ -157,7 +157,7 @@ export function PayrollAdjustmentFormModal({
             >
               {Object.entries(PAYROLL_ADJUSTMENT_LABELS).map(([value, label]) => (
                 <option key={value} value={value}>
-                  {label}
+                  {value === "salary" ? "سلفة" : label}
                 </option>
               ))}
             </Select>

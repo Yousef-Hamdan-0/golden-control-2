@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { DatePicker } from "@/components/ui/DatePicker";
 import { Field, Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { Select } from "@/components/ui/Select";
@@ -352,11 +353,10 @@ export function RequestFormModal({
               </Select>
             </Field>
             <Field label="تاريخ الصيانة" error={errors.scheduledDate}>
-              <Input
-                type="date"
+              <DatePicker
                 value={draft.scheduledDate}
-                onChange={(event) =>
-                  setDraft((current) => ({ ...current, scheduledDate: event.target.value }))
+                onChange={(value) =>
+                  setDraft((current) => ({ ...current, scheduledDate: value }))
                 }
                 disabled={submitting}
               />

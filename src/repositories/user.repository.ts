@@ -69,15 +69,18 @@ export const userRepository = {
 
   async listAll(params: Omit<UserListParams, "page" | "pageSize"> = {}): Promise<User[]> {
     const firstPage = await this.list({ ...params, page: 1, pageSize: PAGE_SIZE });
-    const items = [...firstPage.items];
     const totalPages = Math.max(1, Math.ceil(firstPage.total / firstPage.pageSize));
 
-    for (let page = 2; page <= totalPages; page += 1) {
-      const result = await this.list({ ...params, page, pageSize: PAGE_SIZE });
-      items.push(...result.items);
-    }
+    if (totalPages <= 1) return [...firstPage.items];
 
-    return items;
+    // The total page count is known, so fetch the remaining pages in parallel.
+    const restPages = await Promise.all(
+      Array.from({ length: totalPages - 1 }, (_, index) =>
+        this.list({ ...params, page: index + 2, pageSize: PAGE_SIZE }),
+      ),
+    );
+
+    return [...firstPage.items, ...restPages.flatMap((result) => result.items)];
   },
 
   async counts(): Promise<UserCounts> {

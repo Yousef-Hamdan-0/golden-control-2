@@ -1,8 +1,12 @@
 import { forwardRef, type InputHTMLAttributes, type ReactNode } from "react";
 import { cn } from "@/lib/utils/cn";
+import {
+  applyArabicValidationMessage,
+  clearCustomValidity,
+} from "@/lib/forms/native-validation";
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
-  ({ className, ...props }, ref) => (
+  ({ className, onInvalid, onInput, ...props }, ref) => (
     <input
       ref={ref}
       className={cn(
@@ -13,6 +17,14 @@ export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputE
         "focus:ring-[3px] focus:ring-gold/15",
         className,
       )}
+      onInvalid={(event) => {
+        applyArabicValidationMessage(event.currentTarget);
+        onInvalid?.(event);
+      }}
+      onInput={(event) => {
+        clearCustomValidity(event.currentTarget);
+        onInput?.(event);
+      }}
       {...props}
     />
   ),

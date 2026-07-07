@@ -67,11 +67,23 @@ async function fetchAllInvoices(params: InvoiceListAllParams = {}) {
     firstPage.total > firstPage.items.length
       ? Math.max(1, Math.ceil(firstPage.total / firstPage.pageSize))
       : undefined;
-  let page = 2;
 
-  while (
-    knownPages ? page <= knownPages : firstPage.items.length >= pageSize && page <= 100
-  ) {
+  if (knownPages) {
+    // The total is known, so fetch the remaining pages in parallel.
+    const restPages = await Promise.all(
+      Array.from({ length: knownPages - 1 }, (_, index) =>
+        fetchInvoicePage({ ...params, page: index + 2, pageSize }),
+      ),
+    );
+    restPages.forEach((result) =>
+      result.items.forEach((invoice) => byId.set(invoice.id, invoice)),
+    );
+    return Array.from(byId.values());
+  }
+
+  // The total is unknown, so walk pages sequentially until an empty/short page.
+  let page = 2;
+  while (firstPage.items.length >= pageSize && page <= 100) {
     const result = await fetchInvoicePage({ ...params, page, pageSize });
     let addedNewInvoice = false;
     result.items.forEach((invoice) => {
@@ -79,7 +91,7 @@ async function fetchAllInvoices(params: InvoiceListAllParams = {}) {
       byId.set(invoice.id, invoice);
     });
 
-    if (!knownPages && (!addedNewInvoice || result.items.length < pageSize)) break;
+    if (!addedNewInvoice || result.items.length < pageSize) break;
     page += 1;
   }
 

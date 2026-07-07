@@ -1,6 +1,10 @@
 "use client";
 
 import type { InputHTMLAttributes, ReactNode } from "react";
+import {
+  applyArabicValidationMessage,
+  clearCustomValidity,
+} from "@/lib/forms/native-validation";
 
 type AuthInputProps = InputHTMLAttributes<HTMLInputElement> & {
   label: string;
@@ -14,6 +18,8 @@ export function AuthInput({
   leftSlot,
   rightSlot,
   className = "",
+  onInvalid,
+  onInput,
   ...props
 }: AuthInputProps) {
   return (
@@ -40,6 +46,14 @@ export function AuthInput({
             rightSlot ? "pr-11" : "pr-3",
             leftSlot ? "pl-11" : "pl-3",
           ].join(" ")}
+          onInvalid={(event) => {
+            applyArabicValidationMessage(event.currentTarget);
+            onInvalid?.(event);
+          }}
+          onInput={(event) => {
+            clearCustomValidity(event.currentTarget);
+            onInput?.(event);
+          }}
           {...props}
         />
 

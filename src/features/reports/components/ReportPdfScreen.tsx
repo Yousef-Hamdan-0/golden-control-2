@@ -3,11 +3,13 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { Field, Input } from "@/components/ui/Input";
+import { DatePicker } from "@/components/ui/DatePicker";
+import { Field } from "@/components/ui/Input";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Icon } from "@/lib/icons";
 import { cn } from "@/lib/utils/cn";
 import { financeService } from "@/services/finance.service";
+import { requestAuthenticatedBlob } from "@/helpers/authenticated-api.helper";
 
 export type ReportType =
   | "orders"
@@ -84,19 +86,10 @@ export function ReportPdfScreen({ type }: { type: ReportType }) {
         ? await financeService.downloadReportPdf({ startDate: from, endDate: to })
         : await (async () => {
             const search = new URLSearchParams({ from, to });
-            const response = await fetch(`${REPORTS_API_BASE}/${type}?${search.toString()}`, {
-              headers: { Accept: "application/pdf" },
+            return requestAuthenticatedBlob(`${REPORTS_API_BASE}/${type}?${search.toString()}`, {
+              method: "GET",
+              headers: { Accept: "application/pdf, application/json" },
             });
-
-            if (!response.ok) {
-              throw new Error("تعذر جلب التقرير من الخادم.");
-            }
-
-            return {
-              blob: await response.blob(),
-              contentType: response.headers.get("content-type") ?? "",
-              fileName: undefined,
-            };
           })();
 
       if (!reportResponse.contentType.includes("application/pdf")) {
@@ -172,25 +165,19 @@ export function ReportPdfScreen({ type }: { type: ReportType }) {
           {showDateFilter ? (
             <div className="grid gap-4 border-t border-border pt-5 sm:grid-cols-2">
               <Field label="من تاريخ" htmlFor={`${type}-report-from`}>
-                <Input
+                <DatePicker
                   id={`${type}-report-from`}
-                  type="date"
-                  dir="ltr"
                   value={from}
                   max={to || undefined}
-                  required
-                  onChange={(event) => setFrom(event.target.value)}
+                  onChange={(value) => setFrom(value)}
                 />
               </Field>
               <Field label="إلى تاريخ" htmlFor={`${type}-report-to`}>
-                <Input
+                <DatePicker
                   id={`${type}-report-to`}
-                  type="date"
-                  dir="ltr"
                   value={to}
                   min={from || undefined}
-                  required
-                  onChange={(event) => setTo(event.target.value)}
+                  onChange={(value) => setTo(value)}
                 />
               </Field>
             </div>

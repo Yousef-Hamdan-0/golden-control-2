@@ -46,9 +46,16 @@ export function useDailyInventoryAllQuery() {
       const dailyById = new Map(firstPage.items.map((item) => [item.id, item]));
       const pages = Math.max(1, Math.ceil(firstPage.total / firstPage.pageSize));
 
-      for (let page = 2; page <= pages; page += 1) {
-        const result = await inventoryService.listDaily({ page, pageSize: PAGE_SIZE });
-        result.items.forEach((item) => dailyById.set(item.id, item));
+      if (pages > 1) {
+        // The total page count is known, so fetch the rest in parallel.
+        const restPages = await Promise.all(
+          Array.from({ length: pages - 1 }, (_, index) =>
+            inventoryService.listDaily({ page: index + 2, pageSize: PAGE_SIZE }),
+          ),
+        );
+        restPages.forEach((result) =>
+          result.items.forEach((item) => dailyById.set(item.id, item)),
+        );
       }
 
       const result = Array.from(dailyById.values());

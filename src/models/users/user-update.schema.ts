@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { RoleSchema, UserStatusSchema } from "@/models/auth/user.model";
+import { UserPasswordSchema } from "@/models/users/user-create.schema";
 
 /** Form input mapped to PATCH /api/users/{id} multipart fields. */
 export const UserUpdateSchema = z.object({
@@ -17,7 +18,7 @@ export const UserUpdateSchema = z.object({
   documentImagePath: z.string().optional().or(z.literal("")),
   role: RoleSchema,
   status: UserStatusSchema,
-  password: z.string().trim().min(8, "كلمة المرور 8 أحرف على الأقل").optional().or(z.literal("")),
+  password: UserPasswordSchema.optional().or(z.literal("")),
 });
 
 export type UserUpdateInput = z.infer<typeof UserUpdateSchema>;

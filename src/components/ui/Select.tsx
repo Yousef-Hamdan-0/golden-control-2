@@ -1,9 +1,13 @@
 import { forwardRef, type SelectHTMLAttributes } from "react";
 import { cn } from "@/lib/utils/cn";
 import { Icon } from "@/lib/icons";
+import {
+  applyArabicValidationMessage,
+  clearCustomValidity,
+} from "@/lib/forms/native-validation";
 
 export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement>>(
-  ({ className, children, ...props }, ref) => (
+  ({ className, children, onInvalid, onInput, ...props }, ref) => (
     <div className="relative">
       <select
         ref={ref}
@@ -13,6 +17,14 @@ export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSel
           "focus:border-primary focus:bg-surface focus:outline-none focus:ring-[3px] focus:ring-gold/15",
           className,
         )}
+        onInvalid={(event) => {
+          applyArabicValidationMessage(event.currentTarget);
+          onInvalid?.(event);
+        }}
+        onInput={(event) => {
+          clearCustomValidity(event.currentTarget);
+          onInput?.(event);
+        }}
         {...props}
       >
         {children}
