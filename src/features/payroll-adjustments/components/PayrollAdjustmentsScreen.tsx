@@ -6,13 +6,13 @@ import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { ConfirmToast } from "@/components/ui/ConfirmToast";
-import { Field, Input } from "@/components/ui/Input";
+import { Field } from "@/components/ui/Input";
+import { MonthYearFilter } from "@/components/ui/MonthYearFilter";
 import { Select } from "@/components/ui/Select";
 import { TablePagination } from "@/components/ui/TablePagination";
 import { useToast } from "@/components/ui/Toast";
 import { PAGE_SIZE } from "@/config/constants";
 import { PayrollAdjustmentFormModal } from "@/features/payroll-adjustments/components/PayrollAdjustmentFormModal";
-import { DEFAULT_PAYROLL_MONTH } from "@/features/payroll-adjustments/data/payroll-adjustments.mock";
 import { usePayrollRecordMutations, usePayrollRecordsQuery } from "@/features/payroll-adjustments/hooks/use-payroll-records";
 import {
   PAYROLL_ADJUSTMENT_LABELS,
@@ -26,7 +26,7 @@ import {
 import { useUsersQuery } from "@/features/users/hooks/use-users-query";
 import { getApiErrorMessage } from "@/helpers/api.helper";
 import { formatMoney } from "@/lib/format/currency";
-import { localDisplayDateTime } from "@/lib/format/date";
+import { localDisplayDateTime, todayDateKey } from "@/lib/format/date";
 import { Icon, type IconName } from "@/lib/icons";
 import { ROLE_LABELS_AR, type User } from "@/models/auth/user.model";
 
@@ -64,13 +64,20 @@ function payrollFilterFromValue(value: string): PayrollAdjustmentFilter {
 
 export function PayrollAdjustmentsScreen() {
   const toast = useToast();
-  const [month, setMonth] = useState(DEFAULT_PAYROLL_MONTH);
+  // The payroll settlement date filter defaults to the current month/year but
+  // can be changed or cleared (cleared → the request drops month/year → all).
+  const currentMonth = todayDateKey().slice(0, 7);
+  const [filterYear, setFilterYear] = useState(() => currentMonth.split("-")[0]);
+  const [filterMonth, setFilterMonth] = useState(() => String(Number(currentMonth.split("-")[1])));
   const [typeFilter, setTypeFilter] = useState<PayrollAdjustmentFilter>("all");
   const [page, setPage] = useState(1);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [adjustmentToDelete, setAdjustmentToDelete] =
     useState<PayrollAdjustment | null>(null);
-  const [yearValue, monthValue] = month.split("-").map(Number);
+  const filterMonthKey =
+    filterYear && filterMonth ? `${filterYear}-${filterMonth.padStart(2, "0")}` : "";
+  const yearValue = filterYear ? Number(filterYear) : undefined;
+  const monthValue = filterMonth ? Number(filterMonth) : undefined;
   const listParams = useMemo(
     () => ({
       page,
@@ -154,7 +161,7 @@ export function PayrollAdjustmentsScreen() {
   function createAdjustment(input: PayrollAdjustmentInput) {
     const user = usersById.get(input.userId);
     create.mutate(
-      { input, month },
+      { input, month: filterMonthKey || currentMonth },
       {
         onSuccess: () => {
           setTypeFilter("all");
@@ -214,7 +221,7 @@ export function PayrollAdjustmentsScreen() {
       {showCreateModal ? (
         <PayrollAdjustmentFormModal
           users={users}
-          initialMonth={month}
+          initialMonth={filterMonthKey || currentMonth}
           submitting={create.isPending}
           submitError={create.error ? getApiErrorMessage(create.error) : ""}
           submitLabel={create.isPending ? "جاري الحفظ..." : "إنشاء التسوية"}
@@ -247,7 +254,7 @@ export function PayrollAdjustmentsScreen() {
                 {formatMoney(card.value, "SYP")}
               </p>
               <p className="mt-1 text-xs text-content-muted">
-                عن شهر {formatPayrollMonth(month)}
+                {filterMonthKey ? `عن ${formatPayrollMonth(filterMonthKey)}` : "لكل الفترات"}
               </p>
             </div>
             <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-md ${card.iconClassName}`}>
@@ -257,7 +264,7 @@ export function PayrollAdjustmentsScreen() {
         ))}
       </div>
 
-      <Card className="grid gap-4 p-4 sm:grid-cols-2">
+      <Card className="grid gap-4 p-4 sm:grid-cols-3">
         <Field label="نوع التسوية" htmlFor="payroll-filter-type">
           <Select
             id="payroll-filter-type"
@@ -276,18 +283,19 @@ export function PayrollAdjustmentsScreen() {
           </Select>
         </Field>
 
-        <Field label="الشهر والسنة" htmlFor="payroll-filter-month">
-          <Input
-            id="payroll-filter-month"
-            type="month"
-            dir="ltr"
-            value={month}
-            onChange={(event) => {
-              setMonth(event.target.value || DEFAULT_PAYROLL_MONTH);
-              setPage(1);
-            }}
-          />
-        </Field>
+        <MonthYearFilter
+          idPrefix="payroll-filter"
+          year={filterYear}
+          month={filterMonth}
+          onYearChange={(value) => {
+            setFilterYear(value);
+            setPage(1);
+          }}
+          onMonthChange={(value) => {
+            setFilterMonth(value);
+            setPage(1);
+          }}
+        />
       </Card>
 
       <Card className="overflow-hidden">

@@ -6,10 +6,13 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Modal } from "@/components/ui/Modal";
 import { TablePagination } from "@/components/ui/TablePagination";
+import { useToast } from "@/components/ui/Toast";
 import { Icon } from "@/lib/icons";
 import { formatMoney } from "@/lib/format/currency";
 import { localDisplayDateTime } from "@/lib/format/date";
 import { PAGE_SIZE } from "@/config/constants";
+import { getApiErrorMessage } from "@/helpers/api.helper";
+import { invoiceService } from "@/services/invoice.service";
 import type { Invoice, Order } from "../../types";
 import {
   PAYMENT_TONE,
@@ -24,7 +27,7 @@ import {
   remaining,
   convertPaymentToInvoiceCurrency,
 } from "../../utils/invoice";
-import { downloadInvoicePdf, printInvoice } from "../../utils/pdf";
+import { printInvoice } from "../../utils/pdf";
 import { DetailItem } from "../shared/DetailItem";
 import { EmptyState } from "../shared/EmptyState";
 
@@ -34,18 +37,16 @@ export function InvoiceDetailsModal({
   onClose,
   onAddPayment,
   onReturnInvoice,
-  onDownloadPdf,
-  downloadingPdf = false,
 }: {
   invoice: Invoice;
   order?: Order;
   onClose: () => void;
   onAddPayment?: () => void;
   onReturnInvoice?: (invoice: Invoice) => void;
-  onDownloadPdf?: (invoice: Invoice) => void;
-  downloadingPdf?: boolean;
 }) {
+  const toast = useToast();
   const [paymentsPage, setPaymentsPage] = useState(1);
+  const [downloading, setDownloading] = useState(false);
   const paymentPages = Math.max(1, Math.ceil(invoice.payments.length / PAGE_SIZE));
   const currentPaymentsPage = Math.min(paymentsPage, paymentPages);
   const visiblePayments = invoice.payments.slice(
@@ -53,6 +54,27 @@ export function InvoiceDetailsModal({
     currentPaymentsPage * PAGE_SIZE,
   );
   const canAddPayment = invoice.status !== "paid" && !invoice.returned;
+
+  // Download the invoice as a real PDF file directly (server-rendered, same
+  // layout as the printed copy including the warranty box and part names).
+  async function downloadPdf() {
+    setDownloading(true);
+    try {
+      const { blob, fileName } = await invoiceService.downloadPdf(invoice.id);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = fileName ?? `invoice-${invoice.invoiceNumber || invoice.id}.pdf`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      toast.error("تعذر تنزيل PDF", getApiErrorMessage(error));
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   return (
     <Modal
@@ -217,11 +239,11 @@ export function InvoiceDetailsModal({
           <Button
             type="button"
             variant="outline"
-            disabled={downloadingPdf}
-            onClick={() => (onDownloadPdf ? onDownloadPdf(invoice) : downloadInvoicePdf(invoice))}
+            disabled={downloading}
+            onClick={downloadPdf}
           >
             <Icon name="file" size={18} />
-            {downloadingPdf ? "جاري التحميل..." : "تحميل PDF"}
+            {downloading ? "جاري التحميل..." : "تحميل PDF"}
           </Button>
           {onReturnInvoice ? (
             <Button

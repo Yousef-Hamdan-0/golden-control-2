@@ -2,8 +2,14 @@ import type { Order, Invoice } from "../types";
 import { API_BASE_URL } from "@/config/api-endpoints";
 import { formatMoney } from "@/lib/format/currency";
 import { localDisplayDateTime } from "@/lib/format/date";
-import { PAYMENT_LABELS, PAYMENT_METHOD_LABELS } from "../constants";
-import { typeLabel, invoicePartTotal, remaining } from "./invoice";
+import { PAYMENT_METHOD_LABELS } from "../constants";
+import { invoicePartTotal, remaining } from "./invoice";
+import {
+  INVOICE_FOOTER_CSS,
+  invoiceTerms,
+  invoiceTermsHtml,
+  invoiceWarrantyHtml,
+} from "@/lib/pdf/invoice-footer";
 
 export function escapePdfText(value: string): string {
   return value
@@ -105,57 +111,6 @@ export function printOrderPdf(order: Order) {
   printWindow.print();
 }
 
-export function buildSimpleInvoicePdf(invoice: Invoice): Blob {
-  const lines = [
-    "Golden Control - Invoice",
-    `Invoice: ${invoice.id}`,
-    `Type: ${typeLabel(invoice.type)}`,
-    `Status: ${PAYMENT_LABELS[invoice.status]}`,
-    `Client: ${escapePdfText(invoice.client)}`,
-    `Phone: ${invoice.clientPhone}`,
-    `Technician: ${escapePdfText(invoice.technician)}`,
-    `Total: ${formatMoney(invoice.total, invoice.currency)}`,
-    `Paid: ${formatMoney(invoice.paid, invoice.currency)}`,
-    `Remaining: ${formatMoney(remaining(invoice.total, invoice.paid), invoice.currency)}`,
-    `Warranty: ${escapePdfText(invoice.warrantyDuration || "N/A")}`,
-  ];
-  const objects: string[] = [];
-  const content =
-    "BT /F1 14 Tf 50 780 Td " +
-    lines.map((line, index) => `${index === 0 ? "" : "0 -24 Td "}(${escapePdfText(line)}) Tj`).join(" ") +
-    " ET";
-
-  objects.push("<< /Type /Catalog /Pages 2 0 R >>");
-  objects.push("<< /Type /Pages /Kids [3 0 R] /Count 1 >>");
-  objects.push("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>");
-  objects.push(`<< /Length ${content.length} >>\nstream\n${content}\nendstream`);
-  objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
-
-  let pdf = "%PDF-1.4\n";
-  const offsets = [0];
-  objects.forEach((object, index) => {
-    offsets.push(pdf.length);
-    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
-  });
-  const xref = pdf.length;
-  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
-  offsets.slice(1).forEach((offset) => {
-    pdf += `${String(offset).padStart(10, "0")} 00000 n \n`;
-  });
-  pdf += `trailer << /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
-
-  return new Blob([pdf], { type: "application/pdf" });
-}
-
-export function downloadInvoicePdf(invoice: Invoice) {
-  const url = URL.createObjectURL(buildSimpleInvoicePdf(invoice));
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `${invoice.id}.pdf`;
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
 function escapeHtml(value: unknown) {
   return String(value ?? "")
     .replace(/&/g, "&amp;")
@@ -171,6 +126,7 @@ type PrintBrand = {
   email: string;
   phone: string;
   address: string;
+  terms: string[];
 };
 
 function mediaUrl(value?: string | null) {
@@ -197,6 +153,7 @@ async function getPrintBrand(): Promise<PrintBrand> {
     email: "support@golden-control.com",
     phone: "+966 50 123 4567",
     address: "دمشق",
+    terms: invoiceTerms(null),
   };
 
   try {
@@ -215,13 +172,17 @@ async function getPrintBrand(): Promise<PrintBrand> {
       email: data.email || fallback.email,
       phone: [data.phone1, data.phone2].filter(Boolean).join("   ") || fallback.phone,
       address: data.address || fallback.address,
+      terms: invoiceTerms(data),
     };
   } catch {
     return fallback;
   }
 }
 
-export async function printInvoice(invoice: Invoice) {
+// Single source of truth for the invoice document. Both "طباعة الفاتورة" and
+// "تحميل الفاتورة (PDF)" render this exact template so their output — including
+// the spare-part name — is identical.
+async function openInvoiceDocument(invoice: Invoice) {
   const printWindow = window.open("", "_blank", "width=900,height=700");
   if (!printWindow) return;
   const brand = await getPrintBrand();
@@ -281,7 +242,7 @@ export async function printInvoice(invoice: Invoice) {
           .totals .line { display: flex; justify-content: space-between; border-bottom: 1px solid #484848; padding: 11px 0; }
           .remaining { margin-top: 13px; display: flex; justify-content: space-between; background: #8a6800; padding: 13px; border-radius: 6px; font-weight: 700; }
           .payments { border: 1px solid #dfd3bf; border-radius: 8px; padding: 12px; }
-          .terms { margin-top: 26px; text-align: right; font-size: 12px; line-height: 1.9; color: #333; }
+          ${INVOICE_FOOTER_CSS}
           .footer { margin-top: 34px; padding-top: 18px; border-top: 1px solid #dfd3bf; text-align: center; color: #81786d; font-size: 11px; }
         </style>
       </head>
@@ -316,22 +277,24 @@ export async function printInvoice(invoice: Invoice) {
           <tbody>${partsRows || `<tr><td colspan="4">لا توجد قطع مسجلة.</td></tr>`}</tbody>
         </table>
         <section class="summary">
-          <div class="totals">
-            <div class="line"><span>إجمالي الفاتورة</span><strong>${formatMoney(invoice.total, invoice.currency)}</strong></div>
-            <div class="line"><span>المبلغ المدفوع</span><strong>${formatMoney(invoice.paid, invoice.currency)}</strong></div>
-            <div class="remaining"><span>المتبقي للسداد</span><strong>${formatMoney(remaining(invoice.total, invoice.paid), invoice.currency)}</strong></div>
+          <div>
+            <div class="totals">
+              <div class="line"><span>إجمالي الفاتورة</span><strong>${formatMoney(invoice.total, invoice.currency)}</strong></div>
+              <div class="line"><span>المبلغ المدفوع</span><strong>${formatMoney(invoice.paid, invoice.currency)}</strong></div>
+              <div class="remaining"><span>المتبقي للسداد</span><strong>${formatMoney(remaining(invoice.total, invoice.paid), invoice.currency)}</strong></div>
+            </div>
+            ${invoiceWarrantyHtml(invoice.warrantyDuration)}
           </div>
-          <div class="payments">
-            <strong>سجل الدفعات المستلمة</strong>
-            <table>
-              <thead><tr><th>المبلغ</th><th>الوسيلة</th><th>وقت الإنشاء</th></tr></thead>
-              <tbody>${paymentsRows || `<tr><td colspan="3">لا توجد دفعات.</td></tr>`}</tbody>
-            </table>
+          <div>
+            <div class="payments">
+              <strong>سجل الدفعات المستلمة</strong>
+              <table>
+                <thead><tr><th>المبلغ</th><th>الوسيلة</th><th>وقت الإنشاء</th></tr></thead>
+                <tbody>${paymentsRows || `<tr><td colspan="3">لا توجد دفعات.</td></tr>`}</tbody>
+              </table>
+            </div>
+            ${invoiceTermsHtml(brand.terms)}
           </div>
-        </section>
-        <section class="terms">
-          <strong>الشروط والأحكام</strong>
-          <p>الضمان يسري فقط على قطع الغيار المستبدلة والمذكورة في هذا البيان. لا يشمل الضمان الأعطال الناتجة عن سوء الاستخدام أو العبث بالجهاز.</p>
         </section>
         <footer class="footer">جميع الحقوق محفوظة © 2026</footer>
         </main>
@@ -341,4 +304,8 @@ export async function printInvoice(invoice: Invoice) {
   printWindow.document.close();
   printWindow.focus();
   printWindow.print();
+}
+
+export async function printInvoice(invoice: Invoice) {
+  return openInvoiceDocument(invoice);
 }

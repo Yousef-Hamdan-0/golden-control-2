@@ -394,6 +394,8 @@ function normalizeRequestRecord(payload: unknown, index: number): RepairRequestR
     raw.record_url,
     raw.mediaUrl,
     raw.media_url,
+    raw.fullFilePath,
+    raw.full_file_path,
     raw.filePath,
     raw.file_path,
     raw.audioPath,
@@ -404,12 +406,18 @@ function normalizeRequestRecord(payload: unknown, index: number): RepairRequestR
     file.path,
     file.src,
   );
+  const mimeType = stringValue(raw.mimeType, raw.mime_type, raw.contentType, raw.content_type, file.mimeType);
+  const durationValue = Number(
+    raw.duration ?? raw.durationSeconds ?? raw.duration_seconds ?? file.duration,
+  );
 
   return {
     id,
     name: stringValue(raw.name, raw.fileName, raw.file_name, file.name, `تسجيل ${index + 1}`),
     url: mediaUrl(url),
     createdAt: dateTimeValue(raw.createdAt, raw.created_at, raw.date, raw.uploadedAt, raw.uploaded_at),
+    mimeType: mimeType || undefined,
+    duration: Number.isFinite(durationValue) && durationValue > 0 ? durationValue : undefined,
   };
 }
 
@@ -911,9 +919,10 @@ export function createRepairRequestUpdatePatch(
     patch.devices = parsed.devices;
   }
   if (
-    normalizeOptionalText(parsed.technicianId) &&
     normalizeOptionalText(parsed.technicianId) !== normalizeOptionalText(current.technicianId)
   ) {
+    // Includes clearing the technician ("بدون تحديد"), so the change is detected
+    // and the save is not blocked as "no changes".
     patch.technicianId = normalizeOptionalText(parsed.technicianId);
   }
   if (parsed.status && parsed.status !== current.status) {

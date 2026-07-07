@@ -16,8 +16,8 @@ import {
 
 export interface ExpenseListParams {
   type?: ExpenseCategoryFilter;
-  month: number;
-  year: number;
+  month?: number;
+  year?: number;
 }
 
 export interface FinancialSummaryParams {
@@ -94,10 +94,11 @@ function dateRangeQuery(params: FinancialSummaryParams) {
 export const financeRepository = {
   async listExpenses(params: ExpenseListParams): Promise<ExpenseRecord[]> {
     const query = expenseListQuery(params);
-    const searchParams = new URLSearchParams({
-      month: String(query.month),
-      year: String(query.year),
-    });
+    const searchParams = new URLSearchParams();
+    // Only constrain by month/year when a date filter is actually set,
+    // otherwise the API returns all matching expenses.
+    if (query.month) searchParams.set("month", String(query.month));
+    if (query.year) searchParams.set("year", String(query.year));
     if (query.type !== "all") searchParams.set("type", query.type);
 
     const payload = await requestAuthenticatedApi(

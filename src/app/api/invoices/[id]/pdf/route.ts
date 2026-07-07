@@ -4,8 +4,10 @@ import {
   normalizeInvoiceResponse,
   normalizePaymentListResponse,
 } from "@/models/invoices/invoice.model";
+import { normalizeInventoryPartResponse } from "@/models/inventory/inventory.model";
 import { normalizeSettingsResponse, type Settings } from "@/models/settings/settings.model";
 import { renderInvoicePdf } from "@/lib/pdf/official-documents";
+import type { Invoice } from "@/features/operations/types";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -47,6 +49,40 @@ async function fetchInvoicePayments(invoiceId: string, authorization: string) {
   }
 }
 
+// The backend returns `sparePartName` as null, so resolve each invoice item's
+// real name from the spare-part inventory (same as the on-screen invoice).
+async function resolvePartNames(invoice: Invoice, authorization: string): Promise<Invoice> {
+  const ids = Array.from(
+    new Set(
+      invoice.parts
+        .map((part) => part.sparePartId)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  );
+  if (ids.length === 0) return invoice;
+
+  const nameById = new Map<string, string>();
+  await Promise.all(
+    ids.map(async (id) => {
+      try {
+        const payload = await fetchJson(BACKEND_API_ENDPOINTS.inventory.partById(id), authorization);
+        const part = normalizeInventoryPartResponse(payload);
+        if (part.name) nameById.set(id, part.name);
+      } catch {
+        // Ignore individual lookups; keep the invoice's own name as fallback.
+      }
+    }),
+  );
+
+  return {
+    ...invoice,
+    parts: invoice.parts.map((part) => ({
+      ...part,
+      name: (part.sparePartId ? nameById.get(part.sparePartId) : undefined) || part.name,
+    })),
+  };
+}
+
 export async function GET(request: Request, { params }: RouteContext) {
   const { id } = await params;
   const authorization = request.headers.get("authorization");
@@ -65,9 +101,10 @@ export async function GET(request: Request, { params }: RouteContext) {
     ]);
     const invoiceDetails = normalizeInvoiceResponse(invoicePayload);
     const payments = await fetchInvoicePayments(invoiceDetails.id, authorization);
-    const invoice = payments.length > 0
+    const invoiceWithPayments = payments.length > 0
       ? { ...invoiceDetails, payments }
       : invoiceDetails;
+    const invoice = await resolvePartNames(invoiceWithPayments, authorization);
     const pdf = await renderInvoicePdf(invoice, settings);
     const invoiceNumber = invoice.invoiceNumber || invoice.id;
 

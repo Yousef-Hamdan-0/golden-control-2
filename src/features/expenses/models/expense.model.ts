@@ -23,8 +23,8 @@ export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {
 
 export const ExpenseListQuerySchema = z.object({
   type: z.union([z.enum(["fixed", "variable"]), z.literal("all")]),
-  month: z.coerce.number().int().min(1).max(12),
-  year: z.coerce.number().int().min(2000).max(2100),
+  month: z.coerce.number().int().min(1).max(12).optional(),
+  year: z.coerce.number().int().min(2000).max(2100).optional(),
 });
 
 export const ExpensePayloadSchema = z.object({

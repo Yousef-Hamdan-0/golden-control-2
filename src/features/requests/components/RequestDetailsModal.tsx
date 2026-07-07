@@ -9,7 +9,6 @@ import { useToast } from "@/components/ui/Toast";
 import { getApiErrorMessage } from "@/helpers/api.helper";
 import { queryKeys } from "@/hooks/query-keys";
 import { Icon } from "@/lib/icons";
-import { invoiceService } from "@/services/invoice.service";
 import type { Invoice, InvoicePayment } from "@/features/operations/types";
 import { createInvoiceDraftFromRequest } from "@/features/operations/utils/invoice";
 import { InvoiceDetailsModal } from "@/features/operations/components/invoices/InvoiceDetailsModal";
@@ -38,7 +37,6 @@ import {
   fallback,
   formatDate,
   invoiceDisplayNumber,
-  saveInvoicePdf,
 } from "@/features/requests/components/request-details.helpers";
 
 export function RequestDetailsModal({
@@ -74,7 +72,6 @@ export function RequestDetailsModal({
   const [invoiceNotice, setInvoiceNotice] = useState<string | null>(null);
   const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null);
   const [paymentInvoice, setPaymentInvoice] = useState<Invoice | null>(null);
-  const [invoicePdfId, setInvoicePdfId] = useState<string | null>(null);
   const { create, recordPayment } = useInvoiceMutations();
   const dollarExchangeRate = useDollarExchangeRate();
   const invoices = request?.invoices ?? [];
@@ -152,19 +149,6 @@ export function RequestDetailsModal({
         onError: (error) => toast.error("تعذر حفظ الدفعة", getApiErrorMessage(error)),
       },
     );
-  }
-
-  async function downloadInvoicePdf(invoice: Invoice) {
-    setInvoicePdfId(invoice.id);
-    try {
-      const response = await invoiceService.downloadPdf(invoice.id);
-      saveInvoicePdf(response, invoice);
-      toast.success("تم تنزيل PDF", `تم تجهيز الفاتورة ${invoiceDisplayNumber(invoice)}.`);
-    } catch (error) {
-      toast.error("تعذر تنزيل PDF", getApiErrorMessage(error));
-    } finally {
-      setInvoicePdfId(null);
-    }
   }
 
   return (
@@ -260,8 +244,6 @@ export function RequestDetailsModal({
               ? () => setPaymentInvoice(activeViewingInvoiceWithPayments)
               : undefined
           }
-          onDownloadPdf={downloadInvoicePdf}
-          downloadingPdf={invoicePdfId === activeViewingInvoiceWithPayments.id}
         />
       ) : null}
       {paymentInvoice ? (

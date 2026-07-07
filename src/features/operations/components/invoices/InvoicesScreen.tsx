@@ -20,7 +20,6 @@ import {
 } from "../../constants";
 import { getApiErrorMessage } from "@/helpers/api.helper";
 import { isUuid } from "@/models/invoices/invoice.model";
-import { invoiceService } from "@/services/invoice.service";
 import {
   useInvoiceMutations,
   useInvoicePaymentsQuery,
@@ -28,6 +27,7 @@ import {
   useInvoicesQuery,
 } from "@/features/invoices/hooks/use-invoices";
 import { useDollarExchangeRate } from "@/features/settings/hooks/use-settings";
+import { useInventoryAllPartsQuery } from "@/features/inventory/hooks/use-inventory";
 import { typeLabel, currencyLabel, remaining } from "../../utils/invoice";
 import { SectionTitle } from "../shared/SectionTitle";
 import { KpiCards } from "../shared/KpiCards";
@@ -52,17 +52,6 @@ function invoiceDisplayNumber(invoice: Invoice) {
   return invoice.invoiceNumber || invoice.id;
 }
 
-function savePdf(response: Awaited<ReturnType<typeof invoiceService.downloadPdf>>, invoice: Invoice) {
-  const url = URL.createObjectURL(response.blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = response.fileName ?? `${invoiceDisplayNumber(invoice)}.pdf`;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  URL.revokeObjectURL(url);
-}
-
 export function InvoicesScreen() {
   const router = useRouter();
   const params = useSearchParams();
@@ -78,7 +67,6 @@ export function InvoicesScreen() {
   const [showDateFilter, setShowDateFilter] = useState(false);
   const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null);
   const [paymentInvoice, setPaymentInvoice] = useState<Invoice | null>(null);
-  const [pdfInvoiceId, setPdfInvoiceId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const { recordPayment } = useInvoiceMutations();
   const dollarExchangeRate = useDollarExchangeRate();
@@ -109,8 +97,24 @@ export function InvoicesScreen() {
   const detailQuery = useInvoiceQuery(viewingInvoice?.id ?? null);
   const paymentsQuery = useInvoicePaymentsQuery(viewingInvoice?.id ?? null);
   const activeViewingInvoice = detailQuery.data ?? viewingInvoice;
+  const partsQuery = useInventoryAllPartsQuery();
+  const partNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const part of partsQuery.data ?? []) map.set(part.id, part.name);
+    return map;
+  }, [partsQuery.data]);
   const activeViewingInvoiceWithPayments = activeViewingInvoice
-    ? { ...activeViewingInvoice, payments: paymentsQuery.data ?? activeViewingInvoice.payments }
+    ? {
+        ...activeViewingInvoice,
+        payments: paymentsQuery.data ?? activeViewingInvoice.payments,
+        // The backend returns `sparePartName` as null (the name is not sent on
+        // create), so resolve the real name from the spare-part inventory. This
+        // feeds the on-screen table, the printed invoice and the PDF alike.
+        parts: activeViewingInvoice.parts.map((part) => ({
+          ...part,
+          name: (part.sparePartId ? partNameById.get(part.sparePartId) : undefined) || part.name,
+        })),
+      }
     : null;
 
   useEffect(() => {
@@ -146,19 +150,6 @@ export function InvoicesScreen() {
         onError: (error) => toast.error("تعذر حفظ الدفعة", getApiErrorMessage(error)),
       },
     );
-  }
-
-  async function downloadPdf(invoice: Invoice) {
-    setPdfInvoiceId(invoice.id);
-    try {
-      const response = await invoiceService.downloadPdf(invoice.id);
-      savePdf(response, invoice);
-      toast.success("تم تنزيل PDF", `تم تجهيز الفاتورة ${invoiceDisplayNumber(invoice)}.`);
-    } catch (error) {
-      toast.error("تعذر تنزيل PDF", getApiErrorMessage(error));
-    } finally {
-      setPdfInvoiceId(null);
-    }
   }
 
   useEffect(() => {
@@ -225,8 +216,6 @@ export function InvoicesScreen() {
           invoice={activeViewingInvoiceWithPayments}
           onClose={() => setViewingInvoice(null)}
           onAddPayment={() => setPaymentInvoice(activeViewingInvoiceWithPayments)}
-          onDownloadPdf={downloadPdf}
-          downloadingPdf={pdfInvoiceId === activeViewingInvoiceWithPayments.id}
         />
       ) : null}
       {paymentInvoice ? (

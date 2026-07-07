@@ -7,6 +7,12 @@ import type { Invoice } from "@/features/operations/types";
 import { invoicePartTotal, remaining } from "@/features/operations/utils/invoice";
 import { formatMoney } from "@/lib/format/currency";
 import { localDisplayDateTime } from "@/lib/format/date";
+import {
+  INVOICE_FOOTER_CSS,
+  invoiceTerms,
+  invoiceTermsHtml,
+  invoiceWarrantyHtml,
+} from "@/lib/pdf/invoice-footer";
 import type { RepairRequest } from "@/models/requests/request.model";
 import {
   REQUEST_STATUS_LABELS,
@@ -114,12 +120,7 @@ async function documentBrand(settings?: Settings | null): Promise<DocumentBrand>
     phone1: text(settings?.phone1, FALLBACK_PHONE),
     phone2: text(settings?.phone2, ""),
     email: text(settings?.email, FALLBACK_EMAIL),
-    terms: [
-      text(settings?.term1, "يعد هذا المستند تأكيداً للبيانات والخدمات المسجلة في النظام."),
-      text(settings?.term2, "يجب الاحتفاظ بهذا المستند للرجوع إليه عند الحاجة."),
-      text(settings?.term3, "لا يشمل الضمان الأعطال الناتجة عن سوء الاستخدام أو العبث بالجهاز."),
-      text(settings?.term4, "جميع المبالغ والتواريخ معتمدة حسب البيانات المسجلة في النظام."),
-    ],
+    terms: invoiceTerms(settings),
     logoDataUri: await logoDataUri(settings),
   };
 }
@@ -273,17 +274,7 @@ function htmlShell(title: string, brand: DocumentBrand, body: string) {
     .payments { min-height: 39mm; padding: 5mm; }
     .mini-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 3mm; }
     .mini-table td { padding: 3mm 2mm; border-top: 1px solid ${BORDER}; }
-    .warranty {
-      width: 100%;
-      border: 1.4px solid ${GOLD_LIGHT};
-      text-align: center;
-      padding: 4mm;
-      margin-top: 6mm;
-    }
-    .warranty small { display: block; color: ${GOLD}; margin-bottom: 2mm; }
-    .warranty strong { font-size: 20px; }
-    .terms { font-size: 10.5px; line-height: 1.65; margin-top: 5mm; }
-    .terms h3 { font-size: 13px; margin: 0 0 3mm; }
+    ${INVOICE_FOOTER_CSS}
     .top-strip {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -380,10 +371,6 @@ export async function renderInvoicePdf(invoice: Invoice, settings?: Settings | n
   const parts = invoice.parts.slice(0, 6);
   const payments = invoice.payments.slice(0, 4);
   const remainingAmount = remaining(invoice.total, invoice.paid);
-  const terms = brand.terms
-    .slice(0, 4)
-    .map((term) => `<div>${escapeHtml(term)}</div>`)
-    .join("");
 
   const body = `
     <section class="grid-2">
@@ -440,10 +427,7 @@ export async function renderInvoicePdf(invoice: Invoice, settings?: Settings | n
             <strong>${escapeHtml(formatMoney(remainingAmount, invoice.currency))}</strong>
           </div>
         </div>
-        <div class="warranty">
-          <small>فترة الضمان المعتمدة</small>
-          <strong>${escapeHtml(text(invoice.warrantyDuration, "غير محددة"))}</strong>
-        </div>
+        ${invoiceWarrantyHtml(invoice.warrantyDuration)}
       </div>
       <div>
         <div class="panel payments">
@@ -462,10 +446,7 @@ export async function renderInvoicePdf(invoice: Invoice, settings?: Settings | n
             </tbody>
           </table>
         </div>
-        <div class="terms">
-          <h3>الشروط والأحكام</h3>
-          ${terms}
-        </div>
+        ${invoiceTermsHtml(brand.terms)}
       </div>
     </section>
     <div class="footer-line"></div>

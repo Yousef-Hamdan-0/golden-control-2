@@ -6,13 +6,13 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { ConfirmToast } from "@/components/ui/ConfirmToast";
-import { Field, Input } from "@/components/ui/Input";
+import { Field } from "@/components/ui/Input";
+import { MonthYearFilter } from "@/components/ui/MonthYearFilter";
 import { Select } from "@/components/ui/Select";
 import { TablePagination } from "@/components/ui/TablePagination";
 import { useToast } from "@/components/ui/Toast";
 import { PAGE_SIZE } from "@/config/constants";
 import { ExpenseFormModal } from "@/features/expenses/components/ExpenseFormModal";
-import { DEFAULT_EXPENSE_MONTH } from "@/features/expenses/data/expenses.mock";
 import {
   useExpenseMutations,
   useExpensesQuery,
@@ -26,7 +26,7 @@ import {
 } from "@/features/expenses/models/expense.model";
 import { getApiErrorMessage } from "@/helpers/api.helper";
 import { formatMoney } from "@/lib/format/currency";
-import { localDisplayDateTime } from "@/lib/format/date";
+import { localDisplayDateTime, todayDateKey } from "@/lib/format/date";
 import { Icon } from "@/lib/icons";
 
 interface ExpensesScreenProps {
@@ -42,12 +42,20 @@ export function ExpensesScreen({ initialCategory = "all" }: ExpensesScreenProps)
       ? initialCategory
       : "all",
   );
-  const [month, setMonth] = useState(DEFAULT_EXPENSE_MONTH);
+  // The expenses date filter takes no automatic value and is only relevant for
+  // the "variable" category.
+  const [filterYear, setFilterYear] = useState("");
+  const [filterMonth, setFilterMonth] = useState("");
   const [page, setPage] = useState(1);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingExpense, setEditingExpense] = useState<ExpenseRecord | null>(null);
   const [expenseToDelete, setExpenseToDelete] = useState<ExpenseRecord | null>(null);
-  const [yearValue, monthValue] = month.split("-").map(Number);
+  const currentMonth = todayDateKey().slice(0, 7);
+  const showDateFilter = category === "variable";
+  const filterMonthKey =
+    filterYear && filterMonth ? `${filterYear}-${filterMonth.padStart(2, "0")}` : "";
+  const yearValue = showDateFilter && filterYear ? Number(filterYear) : undefined;
+  const monthValue = showDateFilter && filterMonth ? Number(filterMonth) : undefined;
   const listParams = useMemo(
     () => ({
       type: category,
@@ -91,7 +99,8 @@ export function ExpensesScreen({ initialCategory = "all" }: ExpensesScreenProps)
   function saveExpense(input: ExpenseInput) {
     const isEdit = Boolean(editingExpense);
     const onSuccess = () => {
-      setMonth(input.month);
+      setFilterYear("");
+      setFilterMonth("");
       setCategory("all");
       setPage(1);
       setEditingExpense(null);
@@ -141,7 +150,7 @@ export function ExpensesScreen({ initialCategory = "all" }: ExpensesScreenProps)
 
       {showCreateModal ? (
         <ExpenseFormModal
-          initialMonth={month}
+          initialMonth={filterMonthKey || currentMonth}
           submitting={isSubmitting}
           submitError={submitError ? getApiErrorMessage(submitError) : undefined}
           onClose={() => setShowCreateModal(false)}
@@ -152,7 +161,7 @@ export function ExpensesScreen({ initialCategory = "all" }: ExpensesScreenProps)
       {editingExpense ? (
         <ExpenseFormModal
           expense={editingExpense}
-          initialMonth={month}
+          initialMonth={filterMonthKey || currentMonth}
           submitting={isSubmitting}
           submitError={submitError ? getApiErrorMessage(submitError) : undefined}
           onClose={() => setEditingExpense(null)}
@@ -171,18 +180,23 @@ export function ExpensesScreen({ initialCategory = "all" }: ExpensesScreenProps)
         />
       ) : null}
 
-      <Card className="grid gap-4 p-4 sm:grid-cols-2">
+      <Card className="grid gap-4 p-4 sm:grid-cols-3">
         <Field label="تصنيف المصروف" htmlFor="expense-filter-category">
           <Select
             id="expense-filter-category"
             value={category}
             onChange={(event) => {
-              const nextCategory = event.target.value;
-              setCategory(
-                nextCategory === "fixed" || nextCategory === "variable"
-                  ? nextCategory
-                  : "all",
-              );
+              const nextCategory =
+                event.target.value === "fixed" || event.target.value === "variable"
+                  ? event.target.value
+                  : "all";
+              setCategory(nextCategory);
+              // The date filter only applies to "variable"; clear it otherwise
+              // so it is dropped from the request and all results are shown.
+              if (nextCategory !== "variable") {
+                setFilterYear("");
+                setFilterMonth("");
+              }
               setPage(1);
             }}
           >
@@ -192,18 +206,21 @@ export function ExpensesScreen({ initialCategory = "all" }: ExpensesScreenProps)
           </Select>
         </Field>
 
-        <Field label="الشهر والسنة" htmlFor="expense-filter-month">
-          <Input
-            id="expense-filter-month"
-            type="month"
-            dir="ltr"
-            value={month}
-            onChange={(event) => {
-              setMonth(event.target.value || DEFAULT_EXPENSE_MONTH);
+        {showDateFilter ? (
+          <MonthYearFilter
+            idPrefix="expense-filter"
+            year={filterYear}
+            month={filterMonth}
+            onYearChange={(value) => {
+              setFilterYear(value);
+              setPage(1);
+            }}
+            onMonthChange={(value) => {
+              setFilterMonth(value);
               setPage(1);
             }}
           />
-        </Field>
+        ) : null}
       </Card>
 
       <Card className="overflow-hidden">
@@ -295,7 +312,9 @@ export function ExpensesScreen({ initialCategory = "all" }: ExpensesScreenProps)
             <p className="mt-2 font-heading text-2xl font-bold text-content">
               {formatMoney(monthlyFixedTotal, "SYP")}
             </p>
-            <p className="mt-1 text-xs text-content-muted">عن شهر {formatExpenseMonth(month)}</p>
+            <p className="mt-1 text-xs text-content-muted">
+              {filterMonthKey ? `عن ${formatExpenseMonth(filterMonthKey)}` : "لكل الفترات"}
+            </p>
           </div>
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-gold-soft text-gold">
             <Icon name="wallet" size={21} />

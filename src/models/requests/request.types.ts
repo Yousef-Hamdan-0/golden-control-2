@@ -26,6 +26,8 @@ export interface RepairRequestRecord {
   name: string;
   url: string;
   createdAt: string;
+  mimeType?: string;
+  duration?: number;
 }
 
 export interface RepairRequestStatusHistoryItem {

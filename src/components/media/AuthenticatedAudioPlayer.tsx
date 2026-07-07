@@ -1,80 +1,46 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { API_BASE_URL } from "@/config/api-endpoints";
-import { requestAuthenticatedBlob } from "@/helpers/authenticated-api.helper";
+import { useMemo, useState } from "react";
 
-function canUseDirectly(url: string) {
-  return /^(?:data:|blob:)/i.test(url);
+/**
+ * `.m4a` files are MPEG-4 audio and are sometimes served as `audio/x-m4a`,
+ * which several browsers refuse to play. For those we hint `audio/mp4`. For
+ * everything else (e.g. `.mp3`) we leave the `<source>` without a type so the
+ * browser detects it from the file's Content-Type instead of a possibly wrong
+ * hint from the API.
+ */
+function sourceType(mimeType: string | undefined, url: string): string | undefined {
+  const lowered = (mimeType ?? "").toLowerCase();
+  if (lowered.includes("m4a") || /\.m4a(?:$|\?)/i.test(url)) return "audio/mp4";
+  return undefined;
 }
 
-function shouldUseBackendProxy(url: string) {
-  if (!/^[a-z][a-z0-9+.-]*:/i.test(url) || url.startsWith("/")) return true;
+export function AuthenticatedAudioPlayer({
+  url,
+  mimeType,
+}: {
+  url: string;
+  mimeType?: string;
+}) {
+  const src = useMemo(() => url.trim(), [url]);
+  const type = useMemo(() => sourceType(mimeType, src), [mimeType, src]);
+  const [failed, setFailed] = useState(false);
 
-  try {
-    return new URL(url).origin === new URL(API_BASE_URL).origin;
-  } catch {
-    return false;
-  }
-}
-
-function proxiedAudioUrl(url: string) {
-  return `/api/request/records/media?${new URLSearchParams({ url })}`;
-}
-
-export function AuthenticatedAudioPlayer({ url }: { url: string }) {
-  const normalizedUrl = useMemo(() => url.trim(), [url]);
-  const [audioUrl, setAudioUrl] = useState("");
-  const [status, setStatus] = useState<"loading" | "ready" | "error">(
-    normalizedUrl ? "loading" : "error",
-  );
-
-  useEffect(() => {
-    if (!normalizedUrl) {
-      setAudioUrl("");
-      setStatus("error");
-      return;
-    }
-
-    if (canUseDirectly(normalizedUrl) || !shouldUseBackendProxy(normalizedUrl)) {
-      setAudioUrl(normalizedUrl);
-      setStatus("ready");
-      return;
-    }
-
-    let objectUrl = "";
-    let cancelled = false;
-
-    setStatus("loading");
-    setAudioUrl("");
-
-    requestAuthenticatedBlob(proxiedAudioUrl(normalizedUrl), {
-      method: "GET",
-      headers: { Accept: "audio/*" },
-    })
-      .then(({ blob }) => {
-        if (cancelled) return;
-        objectUrl = URL.createObjectURL(blob);
-        setAudioUrl(objectUrl);
-        setStatus("ready");
-      })
-      .catch(() => {
-        if (!cancelled) setStatus("error");
-      });
-
-    return () => {
-      cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [normalizedUrl]);
-
-  if (status === "loading") {
-    return <div className="text-sm text-content-muted">جاري تجهيز التسجيل الصوتي...</div>;
-  }
-
-  if (status === "error" || !audioUrl) {
+  if (!src || failed) {
     return <div className="text-sm text-danger">تعذر تشغيل التسجيل الصوتي.</div>;
   }
 
-  return <audio controls preload="none" src={audioUrl} className="h-10 w-full" />;
+  // Native controls give play/pause and a progress bar; `preload="metadata"`
+  // loads the duration. The file is served directly from the backend domain.
+  return (
+    <audio
+      key={src}
+      controls
+      preload="metadata"
+      className="h-10 w-full"
+      onError={() => setFailed(true)}
+    >
+      <source src={src} type={type} />
+    </audio>
+  );
 }
