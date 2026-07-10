@@ -32,6 +32,14 @@ export function useFinanceSummaryQuery(params: FinancialSummaryParams) {
   });
 }
 
+export function useFinanceDailySummaryQuery(date: string) {
+  return useQuery({
+    queryKey: queryKeys.finance.dailySummary(date),
+    queryFn: () => financeService.getDailySummary(date),
+    enabled: Boolean(date),
+  });
+}
+
 export function useExpenseMutations() {
   const qc = useQueryClient();
   const invalidateExpenses = () =>

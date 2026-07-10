@@ -188,6 +188,7 @@ function technicianAssignment(payload: JsonRecord) {
     payload.technician_assignments,
     payload.assignedTechnicians,
     payload.assigned_technicians,
+    payload.technicians,
   );
 }
 
@@ -522,6 +523,9 @@ export function normalizeRepairRequest(payload: unknown, fallbackId?: string): R
       assignmentTechnician.userNumber,
       assignmentTechnician.user_number,
       isRecord(payload.technician) ? payload.technician.id : undefined,
+      // New backend shape: technicians: [{ id, fullName, assignedAt }] — the
+      // record itself is the technician, so its id is the technician id.
+      Array.isArray(payload.technicians) ? assignment.id : undefined,
     ),
     technicianName: stringValue(
       payload.technicianName,

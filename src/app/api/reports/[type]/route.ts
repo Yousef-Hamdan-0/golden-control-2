@@ -3,45 +3,63 @@ import puppeteer from "puppeteer";
 import { BACKEND_API_ENDPOINTS } from "@/config/api-endpoints";
 import { localDateKey, localDisplayDateTime } from "@/lib/format/date";
 import {
-  normalizeDashboardTechnicianPerformanceResponse,
-} from "@/models/dashboard/dashboard.model";
-import {
-  normalizeInventoryMovementList,
-} from "@/models/inventory/inventory.model";
-import {
-  normalizeRepairRequestListResponse,
   REQUEST_PRIORITY_LABELS,
   REQUEST_STATUS_LABELS,
   REQUEST_TYPE_LABELS,
-  type RepairRequest,
 } from "@/models/requests/request.model";
 
 export const dynamic = "force-dynamic";
 
 type RouteContext = { params: Promise<{ type: string }> };
-type ReportType = "orders" | "technicians" | "inventory-movements";
+type ReportType = "orders" | "technicians" | "inventory-movements" | "financial";
 type ReportRow = string[];
+type SummaryItem = { label: string; value: string };
+
+interface ReportContent {
+  headers: string[];
+  rows: ReportRow[];
+  summary: SummaryItem[];
+  periodStart: string;
+  periodEnd: string;
+}
 
 const REPORT_TITLES: Record<ReportType, string> = {
   orders: "تقرير الطلبات",
   technicians: "تقارير الفنيين",
   "inventory-movements": "تقارير حركة المخزون",
+  financial: "التقرير المالي",
 };
 
 const REPORT_FILE_NAMES: Record<ReportType, string> = {
   orders: "orders-report.pdf",
   technicians: "technicians-report.pdf",
   "inventory-movements": "inventory-movements-report.pdf",
+  financial: "financial-report.pdf",
 };
 
-const MOVEMENT_TYPE_LABELS = {
+const MOVEMENT_TYPE_LABELS: Record<string, string> = {
   supply: "توريد",
   withdraw: "صرف",
+  withdrawal: "صرف",
+  adjust: "تسوية",
   adjustment: "تسوية",
-} as const;
+  return: "إرجاع",
+  sale: "بيع",
+};
+
+const INVOICE_STATUS_LABELS: Record<string, string> = {
+  paid: "مدفوعة",
+  paid_partial: "مدفوعة جزئياً",
+  refunded: "مرجعة",
+};
 
 function isReportType(value: string): value is ReportType {
-  return value === "orders" || value === "technicians" || value === "inventory-movements";
+  return (
+    value === "orders" ||
+    value === "technicians" ||
+    value === "inventory-movements" ||
+    value === "financial"
+  );
 }
 
 function escapeHtml(value: unknown) {
@@ -53,29 +71,51 @@ function escapeHtml(value: unknown) {
     .replace(/'/g, "&#039;");
 }
 
-function dataRecord(payload: unknown): Record<string, unknown> {
-  if (typeof payload !== "object" || payload === null || Array.isArray(payload)) return {};
-  const root = payload as Record<string, unknown>;
-  const data = root.data;
-  return typeof data === "object" && data !== null && !Array.isArray(data)
-    ? (data as Record<string, unknown>)
-    : root;
+type JsonRecord = Record<string, unknown>;
+
+function isRecord(value: unknown): value is JsonRecord {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function paginationTotal(payload: unknown, fallback: number) {
-  const root = typeof payload === "object" && payload !== null && !Array.isArray(payload)
-    ? (payload as Record<string, unknown>)
-    : {};
-  const data = dataRecord(payload);
-  const pagination = (
-    typeof root.pagination === "object" && root.pagination !== null
-      ? root.pagination
-      : typeof data.pagination === "object" && data.pagination !== null
-        ? data.pagination
-        : {}
-  ) as Record<string, unknown>;
-  const total = Number(pagination.total ?? pagination.totalItems ?? pagination.totalCount);
-  return Number.isFinite(total) ? total : fallback;
+function str(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return String(value);
+  return "";
+}
+
+function num(value: unknown): number {
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function dataRecord(payload: unknown): JsonRecord {
+  if (!isRecord(payload)) return {};
+  return isRecord(payload.data) ? payload.data : payload;
+}
+
+function recordArray(value: unknown): JsonRecord[] {
+  return Array.isArray(value) ? value.filter(isRecord) : [];
+}
+
+function labelFor(map: Record<string, string>, key: string) {
+  return map[key] ?? key ?? "غير محدد";
+}
+
+function money(value: unknown) {
+  const amount = num(value);
+  return `${amount.toLocaleString("en-US")} ل.س`;
+}
+
+function displayDate(value: string, fallback: string) {
+  return localDateKey(value) || fallback;
+}
+
+/** "completed: 2, new: 2" → "مكتمل: 2 • جديد: 2" using the given label map. */
+function breakdownText(value: unknown, labels: Record<string, string>) {
+  if (!isRecord(value)) return "";
+  return Object.entries(value)
+    .map(([key, count]) => `${labelFor(labels, key)}: ${num(count)}`)
+    .join(" • ");
 }
 
 async function fetchJson(url: string, authorization: string) {
@@ -94,101 +134,185 @@ async function fetchJson(url: string, authorization: string) {
   return response.json() as Promise<unknown>;
 }
 
-async function fetchFirstJson(urls: string | readonly string[], authorization: string) {
-  const candidates = Array.isArray(urls) ? urls : [urls];
-  let lastError: unknown;
+async function fetchReportData(url: string, from: string, to: string, authorization: string) {
+  const search = new URLSearchParams({ startDate: from, endDate: to });
+  const payload = await fetchJson(`${url}?${search}`, authorization);
+  return dataRecord(payload);
+}
 
-  for (const url of candidates) {
-    try {
-      return await fetchJson(url, authorization);
-    } catch (error) {
-      lastError = error;
+// GET /api/reports/requests
+async function fetchRequestsReport(from: string, to: string, authorization: string): Promise<ReportContent> {
+  const data = await fetchReportData(BACKEND_API_ENDPOINTS.reports.requests, from, to, authorization);
+  const summary = isRecord(data.summary) ? data.summary : {};
+  const requests = recordArray(data.requests);
+
+  const summaryItems: SummaryItem[] = [
+    { label: "إجمالي الطلبات", value: String(num(summary.totalRequests)) },
+    { label: "الطلبات المكتملة", value: String(num(summary.completedRequests)) },
+    { label: "الطلبات الملغاة", value: String(num(summary.cancelledRequests)) },
+    { label: "مرتبطة بفاتورة", value: String(num(summary.withInvoice)) },
+  ];
+  const byStatus = breakdownText(summary.byStatus, REQUEST_STATUS_LABELS);
+  const byType = breakdownText(summary.byType, REQUEST_TYPE_LABELS);
+  const byPriority = breakdownText(summary.byPriority, REQUEST_PRIORITY_LABELS);
+  if (byStatus) summaryItems.push({ label: "حسب الحالة", value: byStatus });
+  if (byType) summaryItems.push({ label: "حسب النوع", value: byType });
+  if (byPriority) summaryItems.push({ label: "حسب الأولوية", value: byPriority });
+
+  return {
+    headers: [
+      "رقم الطلب",
+      "العميل",
+      "هاتف العميل",
+      "النوع",
+      "الأولوية",
+      "الحالة",
+      "وصف العطل",
+      "الفنيون",
+      "الفاتورة",
+      "وقت الإنشاء",
+    ],
+    rows: requests.map((request) => {
+      const customer = isRecord(request.customer) ? request.customer : {};
+      const technicians = recordArray(request.technicians)
+        .map((technician) => str(technician.fullName))
+        .filter(Boolean)
+        .join("، ");
+      const invoice = isRecord(request.invoice) ? request.invoice : null;
+      const invoiceText = invoice
+        ? `${money(invoice.totalAmount)} (${labelFor(INVOICE_STATUS_LABELS, str(invoice.status))})`
+        : "لا يوجد";
+
+      return [
+        str(request.requestNumber) || "غير محدد",
+        str(customer.name) || "غير محدد",
+        str(customer.firstPhone) || "غير محدد",
+        labelFor(REQUEST_TYPE_LABELS, str(request.type)),
+        labelFor(REQUEST_PRIORITY_LABELS, str(request.priority)),
+        labelFor(REQUEST_STATUS_LABELS, str(request.status)),
+        str(request.faultDescription) || "غير محدد",
+        technicians || "غير محدد",
+        invoiceText,
+        localDisplayDateTime(str(request.createdAt), "غير محدد"),
+      ];
+    }),
+    summary: summaryItems,
+    periodStart: str(data.periodStart),
+    periodEnd: str(data.periodEnd),
+  };
+}
+
+// GET /api/reports/technicians
+async function fetchTechniciansReport(from: string, to: string, authorization: string): Promise<ReportContent> {
+  const data = await fetchReportData(BACKEND_API_ENDPOINTS.reports.technicians, from, to, authorization);
+  const summary = isRecord(data.summary) ? data.summary : {};
+  const technicians = recordArray(data.technicians);
+
+  return {
+    headers: [
+      "الفني",
+      "رقم المستخدم",
+      "الهاتف",
+      "الطلبات المسندة",
+      "المكتملة",
+      "قيد التنفيذ",
+      "الملغاة",
+      "نسبة الإنجاز",
+    ],
+    rows: technicians.map((technician) => [
+      str(technician.fullName) || "غير محدد",
+      str(technician.userNumber) || "غير محدد",
+      str(technician.phone) || "غير محدد",
+      String(num(technician.assigned)),
+      String(num(technician.completed)),
+      String(num(technician.inProgress)),
+      String(num(technician.cancelled)),
+      `${num(technician.completionRate)}%`,
+    ]),
+    summary: [
+      { label: "عدد الفنيين", value: String(num(summary.technicianCount)) },
+      { label: "إجمالي المسندة", value: String(num(summary.totalAssigned)) },
+      { label: "إجمالي المكتملة", value: String(num(summary.totalCompleted)) },
+      { label: "قيد التنفيذ", value: String(num(summary.totalInProgress)) },
+      { label: "الملغاة", value: String(num(summary.totalCancelled)) },
+    ],
+    periodStart: str(data.periodStart),
+    periodEnd: str(data.periodEnd),
+  };
+}
+
+// GET /api/reports/inventory-movements
+async function fetchInventoryMovementsReport(from: string, to: string, authorization: string): Promise<ReportContent> {
+  const data = await fetchReportData(
+    BACKEND_API_ENDPOINTS.reports.inventoryMovements,
+    from,
+    to,
+    authorization,
+  );
+  const summary = isRecord(data.summary) ? data.summary : {};
+  const movements = recordArray(data.movements);
+
+  const summaryItems: SummaryItem[] = [
+    { label: "إجمالي الحركات", value: String(num(summary.totalMovements)) },
+  ];
+  if (isRecord(summary.byType)) {
+    for (const [type, detail] of Object.entries(summary.byType)) {
+      if (!isRecord(detail)) continue;
+      summaryItems.push({
+        label: labelFor(MOVEMENT_TYPE_LABELS, type),
+        value: `${num(detail.count)} حركة (الكمية: ${num(detail.totalQuantity)})`,
+      });
     }
   }
 
-  throw lastError instanceof Error ? lastError : new Error("Backend report source failed.");
-}
-
-async function fetchRequestReportRows(from: string, to: string, authorization: string) {
-  const pageSize = 100;
-  const allRequests: RepairRequest[] = [];
-  let page = 1;
-  let total = 0;
-
-  do {
-    const searchParams = new URLSearchParams({
-      page: String(page),
-      limit: String(pageSize),
-      startDate: from,
-      endDate: to,
-    });
-    const payload = await fetchJson(
-      `${BACKEND_API_ENDPOINTS.requests.root}?${searchParams}`,
-      authorization,
-    );
-    const normalized = normalizeRepairRequestListResponse(payload, {
-      page,
-      limit: pageSize,
-    });
-
-    allRequests.push(...normalized.items);
-    total = normalized.total || paginationTotal(payload, allRequests.length);
-    page += 1;
-  } while (allRequests.length < total && page <= 50);
-
   return {
-    headers: ["رقم الطلب", "العميل", "الجهاز", "النوع", "الأولوية", "الحالة", "وقت الإنشاء"],
-    rows: allRequests.map((request) => [
-      request.requestNumber,
-      request.customer.name || "غير محدد",
-      request.devices[0]?.deviceName || request.devices[0]?.deviceType || "غير محدد",
-      REQUEST_TYPE_LABELS[request.type],
-      REQUEST_PRIORITY_LABELS[request.priority],
-      REQUEST_STATUS_LABELS[request.status],
-      localDisplayDateTime(request.createdAt, "غير محدد"),
-    ]),
+    headers: [
+      "رقم الحركة",
+      "القطعة",
+      "رقم القطعة",
+      "نوع الحركة",
+      "الكمية",
+      "المسؤول",
+      "المرجع",
+      "تاريخ الحركة",
+    ],
+    rows: movements.map((movement) => {
+      const part = isRecord(movement.part) ? movement.part : {};
+      const responsible = isRecord(movement.responsible) ? movement.responsible : {};
+
+      return [
+        str(movement.movementNo) || "غير محدد",
+        str(part.name) || "غير محددة",
+        str(part.sparePartNumber) || "غير محدد",
+        labelFor(MOVEMENT_TYPE_LABELS, str(movement.movementType)),
+        String(num(movement.quantity)),
+        str(responsible.fullName) || "غير محدد",
+        str(movement.reference) || "غير محدد",
+        localDisplayDateTime(str(movement.movementDate), "غير محدد"),
+      ];
+    }),
+    summary: summaryItems,
+    periodStart: str(data.periodStart),
+    periodEnd: str(data.periodEnd),
   };
 }
 
-async function fetchTechnicianReportRows(authorization: string) {
-  const payload = await fetchFirstJson(
-    BACKEND_API_ENDPOINTS.dashboard.technicianPerformance,
-    authorization,
-  );
-  const report = normalizeDashboardTechnicianPerformanceResponse(payload);
+// GET /api/reports/financial
+async function fetchFinancialReport(from: string, to: string, authorization: string): Promise<ReportContent> {
+  const data = await fetchReportData(BACKEND_API_ENDPOINTS.reports.financial, from, to, authorization);
 
   return {
-    headers: ["الفني", "رقم المستخدم", "مكتملة", "غير مكتملة", "نشطة", "مسحوبة للمركز", "مبيعات"],
-    rows: report.technicians.map((technician) => [
-      technician.technicianName || "غير محدد",
-      technician.userNumber || "غير محدد",
-      technician.completedCount,
-      technician.incompletedCount,
-      technician.activeCount,
-      technician.pulltocenterCount,
-      technician.sales,
-    ]),
-  };
-}
-
-async function fetchInventoryMovementReportRows(from: string, to: string, authorization: string) {
-  const payload = await fetchJson(BACKEND_API_ENDPOINTS.inventory.movements, authorization);
-  const movements = normalizeInventoryMovementList(payload).filter((movement) => {
-    const date = localDateKey(movement.createdAt);
-    return (!from || date >= from) && (!to || date <= to);
-  });
-
-  return {
-    headers: ["رقم الحركة", "رقم القطعة", "اسم القطعة", "نوع الحركة", "الكمية", "المسؤول", "وقت الإنشاء"],
-    rows: movements.map((movement) => [
-      movement.movementNumber || movement.id,
-      movement.partNumber || "غير محدد",
-      movement.partName || "غير محدد",
-      MOVEMENT_TYPE_LABELS[movement.movementType],
-      movement.quantity,
-      movement.owner || "غير محدد",
-      localDisplayDateTime(movement.createdAt, "غير محدد"),
-    ]),
+    headers: ["البند", "القيمة"],
+    rows: [
+      ["إجمالي الإيرادات", money(data.totalRevenues)],
+      ["التكاليف الثابتة", money(data.fixedCosts)],
+      ["التكاليف المتغيرة", money(data.variableCosts)],
+      ["تكاليف القطع", money(data.partsCosts)],
+      ["صافي الربح", money(data.netProfit)],
+    ],
+    summary: [{ label: "صافي الربح", value: money(data.netProfit) }],
+    periodStart: str(data.periodStart),
+    periodEnd: str(data.periodEnd),
   };
 }
 
@@ -198,12 +322,14 @@ function reportHtml({
   to,
   headers,
   rows,
+  summary,
 }: {
   title: string;
   from: string;
   to: string;
   headers: string[];
   rows: ReportRow[];
+  summary: SummaryItem[];
 }) {
   const tableHeaders = headers
     .map((header) => `<th>${escapeHtml(header)}</th>`)
@@ -219,6 +345,16 @@ function reportHtml({
         )
         .join("")
     : `<tr><td colspan="${headers.length}" class="empty">لا توجد بيانات ضمن الفترة المختارة.</td></tr>`;
+  const summaryItems = summary
+    .map(
+      (item) => `
+        <div class="summary-item">
+          <span class="summary-label">${escapeHtml(item.label)}</span>
+          <span class="summary-value">${escapeHtml(item.value)}</span>
+        </div>
+      `,
+    )
+    .join("");
 
   return `<!doctype html>
 <html lang="ar" dir="rtl">
@@ -241,7 +377,7 @@ function reportHtml({
       gap: 24px;
       border-bottom: 2px solid #9b7409;
       padding-bottom: 14px;
-      margin-bottom: 18px;
+      margin-bottom: 14px;
     }
     h1 {
       margin: 0 0 7px;
@@ -261,6 +397,23 @@ function reportHtml({
       font-weight: 700;
       white-space: nowrap;
     }
+    .summary {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 14px;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+    .summary-item {
+      border: 1px solid #e2d8c6;
+      border-radius: 6px;
+      background: #fbf8f2;
+      padding: 7px 11px;
+      font-size: 11px;
+    }
+    .summary-label { color: #6f675a; margin-inline-end: 6px; }
+    .summary-value { color: #7a5a05; font-weight: 700; }
     table {
       width: 100%;
       border-collapse: collapse;
@@ -302,6 +455,7 @@ function reportHtml({
     </div>
     <div class="count">عدد السجلات: ${rows.length}</div>
   </header>
+  ${summaryItems ? `<section class="summary">${summaryItems}</section>` : ""}
   <table>
     <thead><tr>${tableHeaders}</tr></thead>
     <tbody>${tableRows}</tbody>
@@ -365,18 +519,21 @@ export async function GET(request: Request, { params }: RouteContext) {
   try {
     const report =
       type === "orders"
-        ? await fetchRequestReportRows(from, to, authorization)
+        ? await fetchRequestsReport(from, to, authorization)
         : type === "technicians"
-          ? await fetchTechnicianReportRows(authorization)
-          : await fetchInventoryMovementReportRows(from, to, authorization);
+          ? await fetchTechniciansReport(from, to, authorization)
+          : type === "inventory-movements"
+            ? await fetchInventoryMovementsReport(from, to, authorization)
+            : await fetchFinancialReport(from, to, authorization);
 
     const pdf = await renderPdf(
       reportHtml({
         title: REPORT_TITLES[type],
-        from,
-        to,
+        from: displayDate(report.periodStart, from),
+        to: displayDate(report.periodEnd, to),
         headers: report.headers,
         rows: report.rows.map((row) => row.map((cell) => String(cell ?? ""))),
+        summary: report.summary,
       }),
     );
 

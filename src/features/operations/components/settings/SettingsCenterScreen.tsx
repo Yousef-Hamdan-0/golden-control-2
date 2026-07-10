@@ -19,12 +19,17 @@ import {
   type SettingsInput,
 } from "@/models/settings/settings.model";
 import { SectionTitle } from "../shared/SectionTitle";
+import { useRole } from "@/features/auth/hooks/use-role";
 
 type SettingsField = keyof SettingsInput;
 type SettingsErrors = Partial<Record<SettingsField, string>>;
 
 export function SettingsCenterScreen() {
   const toast = useToast();
+  // PATCH /settings and the logo upload are admin-only per the permissions
+  // matrix; other roles get a read-only view.
+  const { role } = useRole();
+  const readOnly = role !== null && role !== "admin";
   const settingsQuery = useSettingsQuery();
   const { update, uploadLogo } = useSettingsMutations();
   const [draft, setDraft] = useState<SettingsInput | null>(null);
@@ -168,6 +173,7 @@ export function SettingsCenterScreen() {
               value={draft.centerName}
               onChange={(event) => patchDraft("centerName", event.target.value)}
               placeholder="اسم المركز"
+              disabled={readOnly}
               aria-invalid={Boolean(errors.centerName)}
             />
           </Field>
@@ -176,6 +182,7 @@ export function SettingsCenterScreen() {
               value={draft.secondaryName ?? ""}
               onChange={(event) => patchDraft("secondaryName", event.target.value)}
               placeholder="الاسم الثانوي"
+              disabled={readOnly}
               aria-invalid={Boolean(errors.secondaryName)}
             />
           </Field>
@@ -184,6 +191,7 @@ export function SettingsCenterScreen() {
               value={draft.address}
               onChange={(event) => patchDraft("address", event.target.value)}
               placeholder="دمشق - المزة - شارع الجلاء"
+              disabled={readOnly}
               aria-invalid={Boolean(errors.address)}
             />
           </Field>
@@ -192,6 +200,7 @@ export function SettingsCenterScreen() {
               value={draft.phone1}
               onChange={(event) => patchDraft("phone1", event.target.value)}
               placeholder="011 123 4567"
+              disabled={readOnly}
               dir="ltr"
               aria-invalid={Boolean(errors.phone1)}
             />
@@ -201,6 +210,7 @@ export function SettingsCenterScreen() {
               value={draft.phone2 ?? ""}
               onChange={(event) => patchDraft("phone2", event.target.value)}
               placeholder="09xx xxx xxx"
+              disabled={readOnly}
               dir="ltr"
               aria-invalid={Boolean(errors.phone2)}
             />
@@ -210,6 +220,7 @@ export function SettingsCenterScreen() {
               value={draft.email}
               onChange={(event) => patchDraft("email", event.target.value)}
               placeholder="البريد الإلكتروني"
+              disabled={readOnly}
               dir="ltr"
               type="email"
               aria-invalid={Boolean(errors.email)}
@@ -221,6 +232,7 @@ export function SettingsCenterScreen() {
                 key={logoInputKey}
                 type="file"
                 accept="image/png,image/jpeg,image/webp"
+                disabled={readOnly}
                 className="bg-surface"
                 onChange={(event) => {
                   update.reset();
@@ -245,11 +257,17 @@ export function SettingsCenterScreen() {
                 onChange={(event) => patchDraft(field, event.target.value)}
                 className="min-h-20"
                 placeholder={`اكتب البند ${index + 1}`}
+                disabled={readOnly}
                 aria-invalid={Boolean(errors[field])}
               />
             </Field>
           ))}
-          <div className="flex justify-end md:col-span-2">
+          {readOnly ? (
+            <p className="text-right text-xs text-content-muted md:col-span-2">
+              تعديل بيانات المركز متاح لمدير النظام فقط.
+            </p>
+          ) : null}
+          <div className={readOnly ? "hidden" : "flex justify-end md:col-span-2"}>
             <Button type="submit" disabled={update.isPending || uploadLogo.isPending}>
               {update.isPending || uploadLogo.isPending ? (
                 <Spinner className="h-4 w-4" />

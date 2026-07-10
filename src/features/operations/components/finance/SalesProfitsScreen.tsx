@@ -4,7 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { useToast } from "@/components/ui/Toast";
 import { getApiErrorMessage } from "@/helpers/api.helper";
-import { useFinanceSummaryQuery } from "@/features/expenses/hooks/use-expenses";
+import {
+  useFinanceDailySummaryQuery,
+  useFinanceSummaryQuery,
+} from "@/features/expenses/hooks/use-expenses";
 import { Icon, type IconName } from "@/lib/icons";
 import { formatMoney } from "@/lib/format/currency";
 import { cn } from "@/lib/utils/cn";
@@ -40,6 +43,7 @@ interface MetricCardProps {
   icon: IconName;
   tone: MetricTone;
   series: number[];
+  format?: "money" | "count";
 }
 
 const TONE_STYLES: Record<
@@ -149,7 +153,7 @@ function Sparkline({ series, tone }: { series: number[]; tone: MetricTone }) {
   );
 }
 
-function MetricCard({ label, value, helper, icon, tone, series }: MetricCardProps) {
+function MetricCard({ label, value, helper, icon, tone, series, format = "money" }: MetricCardProps) {
   const style = TONE_STYLES[tone];
 
   return (
@@ -159,7 +163,7 @@ function MetricCard({ label, value, helper, icon, tone, series }: MetricCardProp
         <div>
           <p className="text-sm font-medium text-content-muted">{label}</p>
           <p className="mt-2 font-heading text-2xl font-bold leading-tight text-content xl:text-[1.65rem]">
-            {formatMoney(value, "SYP")}
+            {format === "count" ? value.toLocaleString("en-US") : formatMoney(value, "SYP")}
           </p>
         </div>
         <span className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-md", style.icon)}>
@@ -212,14 +216,37 @@ function SelectFilter({
 export function SalesProfitsScreen() {
   const toast = useToast();
   const [filters, setFilters] = useState<DateParts>({ day: "", month: "", year: "" });
-  const summaryParams = useMemo(() => dateRangeFromFilters(filters), [filters]);
+  const hasSpecificDate = Boolean(filters.day && filters.month && filters.year);
+  // A full day/month/year selection uses the daily summary API
+  // (GET /api/finance/summary?date=...); otherwise the range summary loads.
+  const selectedDate = hasSpecificDate
+    ? isoDate(filters.year, filters.month, filters.day)
+    : "";
+  const summaryParams = useMemo(
+    () =>
+      hasSpecificDate
+        ? { startDate: "", endDate: "" }
+        : dateRangeFromFilters(filters),
+    [filters, hasSpecificDate],
+  );
   const summaryQuery = useFinanceSummaryQuery(summaryParams);
+  const dailySummaryQuery = useFinanceDailySummaryQuery(selectedDate);
+  const dailySummary = hasSpecificDate ? dailySummaryQuery.data : undefined;
 
   useEffect(() => {
     if (summaryQuery.isError && summaryQuery.error) {
       toast.error("تعذر تحميل الملخص المالي", getApiErrorMessage(summaryQuery.error));
     }
   }, [summaryQuery.error, summaryQuery.isError, toast]);
+
+  useEffect(() => {
+    if (dailySummaryQuery.isError && dailySummaryQuery.error) {
+      toast.error(
+        "تعذر تحميل الملخص المالي اليومي",
+        getApiErrorMessage(dailySummaryQuery.error),
+      );
+    }
+  }, [dailySummaryQuery.error, dailySummaryQuery.isError, toast]);
 
   const years = useMemo(
     () => {
@@ -228,7 +255,6 @@ export function SalesProfitsScreen() {
     },
     [],
   );
-  const hasSpecificDate = Boolean(filters.day && filters.month && filters.year);
 
   const dashboard = useMemo(() => {
     const summary = summaryQuery.data;
@@ -256,7 +282,60 @@ export function SalesProfitsScreen() {
       ? "أكمل اختيار اليوم والشهر والسنة"
       : "عرض كل البيانات";
 
-  const metrics: MetricCardProps[] = [
+  // Daily mode (specific date selected): the six fields of GET /api/finance/summary.
+  const dailyMetrics: MetricCardProps[] = [
+    {
+      label: "إجمالي المبيعات",
+      value: dailySummary?.totalSales ?? 0,
+      helper: "مبيعات فواتير اليوم المحدد",
+      icon: "chart",
+      tone: "gold",
+      series: seriesForValue(dailySummary?.totalSales ?? 0),
+    },
+    {
+      label: "إجمالي المبالغ المدفوعة",
+      value: dailySummary?.totalPaid ?? 0,
+      helper: "المدفوع على فواتير اليوم",
+      icon: "wallet",
+      tone: "success",
+      series: seriesForValue(dailySummary?.totalPaid ?? 0),
+    },
+    {
+      label: "إجمالي المبالغ المتبقية",
+      value: dailySummary?.totalRemaining ?? 0,
+      helper: "المتبقي على فواتير اليوم",
+      icon: "clock",
+      tone: "info",
+      series: seriesForValue(dailySummary?.totalRemaining ?? 0),
+    },
+    {
+      label: "إجمالي تكلفة القطع",
+      value: dailySummary?.totalPartsCost ?? 0,
+      helper: "تكلفة القطع لفواتير اليوم",
+      icon: "box",
+      tone: "neutral",
+      series: seriesForValue(dailySummary?.totalPartsCost ?? 0),
+    },
+    {
+      label: "صافي الربح",
+      value: dailySummary?.netProfit ?? 0,
+      helper: "صافي ربح اليوم المحدد",
+      icon: "shield",
+      tone: (dailySummary?.netProfit ?? 0) >= 0 ? "success" : "danger",
+      series: seriesForValue(dailySummary?.netProfit ?? 0),
+    },
+    {
+      label: "عدد الفواتير",
+      value: dailySummary?.invoiceCount ?? 0,
+      helper: "فواتير اليوم المحدد",
+      icon: "file",
+      tone: "gold",
+      series: seriesForValue(dailySummary?.invoiceCount ?? 0),
+      format: "count",
+    },
+  ];
+
+  const rangeMetrics: MetricCardProps[] = [
     {
       label: "إجمالي المبيعات",
       value: dashboard.totals.sales,
@@ -306,6 +385,8 @@ export function SalesProfitsScreen() {
       series: dashboard.series.netProfit,
     },
   ];
+
+  const metrics = hasSpecificDate ? dailyMetrics : rangeMetrics;
 
   return (
     <div className="space-y-6" dir="rtl">
@@ -372,7 +453,13 @@ export function SalesProfitsScreen() {
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-4 text-xs text-content-muted">
           <span>العرض الحالي: <strong className="font-semibold text-content">{filterDescription}</strong></span>
-          <span>{summaryQuery.isLoading ? "جاري تحميل الملخص..." : "البيانات من API المالية"}</span>
+          <span>
+            {(hasSpecificDate ? dailySummaryQuery.isLoading : summaryQuery.isLoading)
+              ? "جاري تحميل الملخص..."
+              : hasSpecificDate
+                ? "ملخص يومي من GET /api/finance/summary"
+                : "البيانات من API المالية"}
+          </span>
         </div>
       </Card>
 

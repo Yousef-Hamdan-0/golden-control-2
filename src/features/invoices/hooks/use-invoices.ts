@@ -65,5 +65,25 @@ export function useInvoiceMutations() {
     },
   });
 
-  return { create, recordPayment };
+  const refund = useMutation({
+    mutationFn: (invoiceId: string) => invoiceService.refund(invoiceId),
+    onSuccess: async (refunded, invoiceId) => {
+      // The refund response has no items/payments/request, so merge only the
+      // changed fields into the cached detail for an instant UI update.
+      qc.setQueryData<Invoice>(queryKeys.invoices.detail(invoiceId), (current) =>
+        current
+          ? {
+              ...current,
+              status: refunded.status,
+              returned: refunded.returned,
+              total: refunded.total,
+              paid: refunded.paid,
+            }
+          : current,
+      );
+      await invalidateInvoices();
+    },
+  });
+
+  return { create, recordPayment, refund };
 }

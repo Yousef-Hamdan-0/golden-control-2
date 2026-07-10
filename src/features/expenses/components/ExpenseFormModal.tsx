@@ -15,6 +15,14 @@ import {
   type ExpenseRecord,
 } from "@/features/expenses/models/expense.model";
 
+/** Keep manual typing working: accept Arabic-Indic digits and strip the rest. */
+function sanitizeAmountText(value: string) {
+  return value
+    .replace(/[٠-٩]/g, (digit) => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)))
+    .replace(/[۰-۹]/g, (digit) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit)))
+    .replace(/[^\d]/g, "");
+}
+
 interface ExpenseFormModalProps {
   initialMonth: string;
   expense?: ExpenseRecord;
@@ -39,6 +47,9 @@ export function ExpenseFormModal({
     amount: expense?.amount ?? 0,
     month: expense?.month ?? initialMonth,
   }));
+  const [amountValue, setAmountValue] = useState(() =>
+    expense?.amount ? String(expense.amount) : "",
+  );
   const [error, setError] = useState("");
   const [pendingEdit, setPendingEdit] = useState<ExpenseInput | null>(null);
 
@@ -47,7 +58,7 @@ export function ExpenseFormModal({
     const normalized: ExpenseInput = {
       ...draft,
       title: draft.title.trim(),
-      amount: Number(draft.amount),
+      amount: amountValue.trim() === "" ? 0 : Number(amountValue),
     };
 
     if (!normalized.title) {
@@ -130,21 +141,21 @@ export function ExpenseFormModal({
               <div className="relative">
                 <Input
                   id="expense-amount"
-                  type="number"
-                  min="1"
-                  step="1000"
+                  type="text"
                   inputMode="numeric"
                   dir="ltr"
                   className="pl-14"
-                  value={draft.amount || ""}
+                  value={amountValue}
                   placeholder="0"
                   disabled={submitting}
-                  onChange={(event) =>
+                  onChange={(event) => {
+                    const cleaned = sanitizeAmountText(event.target.value);
+                    setAmountValue(cleaned);
                     setDraft((current) => ({
                       ...current,
-                      amount: Number(event.target.value),
-                    }))
-                  }
+                      amount: cleaned === "" ? 0 : Number(cleaned),
+                    }));
+                  }}
                 />
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-content-muted">
                   {CURRENCY_SYMBOL}

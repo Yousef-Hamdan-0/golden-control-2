@@ -76,6 +76,44 @@ export const requestRepository = {
     };
   },
 
+  /** Technician-only list of the signed-in technician's own requests. */
+  async listMine(params: RequestListParams = {}): Promise<Paginated<RepairRequest>> {
+    const query = listQuery(params);
+    const searchParams = new URLSearchParams({
+      page: String(query.page),
+      limit: String(query.limit),
+    });
+
+    if (query.status !== "all") searchParams.set("status", query.status);
+    if (query.priority !== "all") searchParams.set("priority", query.priority);
+    if (query.type !== "all") searchParams.set("type", query.type);
+    if (query.startDate) searchParams.set("startDate", query.startDate);
+    if (query.endDate) searchParams.set("endDate", query.endDate);
+    if (query.search) searchParams.set("search", query.search);
+
+    const payload = await requestAuthenticatedApi(
+      `${API_ENDPOINTS.technician.myRequests}?${searchParams}`,
+      { method: "GET" },
+    );
+    const result = normalizeRepairRequestListResponse(payload, query);
+
+    return {
+      items: result.items,
+      total: result.total,
+      page: result.page,
+      pageSize: result.limit,
+    };
+  },
+
+  /** Technician-only status update (PUT /technician/requests/:id/status). */
+  async updateStatus(id: string, status: RepairRequestStatus): Promise<void> {
+    await requestAuthenticatedApi(API_ENDPOINTS.technician.requestStatus(id), {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+  },
+
   async getById(id: string): Promise<RepairRequest> {
     const payload = await requestAuthenticatedApi(API_ENDPOINTS.requests.byId(id), {
       method: "GET",

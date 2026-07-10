@@ -19,6 +19,7 @@ export const NAVIGATION: NavItem[] = [
     label: "لوحة القيادة",
     href: "/dashboard",
     icon: "shield",
+    roles: ["admin"],
   },
   {
     label: "إدارة المستخدمين",
@@ -34,18 +35,24 @@ export const NAVIGATION: NavItem[] = [
     label: "إدارة العملاء",
     href: "/customers",
     icon: "user",
+    roles: ["admin", "manager", "employee"],
   },
   {
     label: "إدارة الفنيين",
     icon: "wrench",
     children: [
-      { label: "المخزون اليومي", href: "/technicians/inventory" },
-      { label: "الأداء", href: "/technicians/performance" },
+      {
+        label: "المخزون اليومي",
+        href: "/technicians/inventory",
+        roles: ["admin", "manager", "employee"],
+      },
+      { label: "الأداء", href: "/technicians/performance", roles: ["admin"] },
     ],
   },
   {
     label: "إدارة الطلبات",
     icon: "clipboard",
+    roles: ["admin", "manager", "employee"],
     children: [
       { label: "طلبات خارجية", href: "/orders?type=external" },
       { label: "طلبات داخلية", href: "/orders?type=internal" },
@@ -55,16 +62,28 @@ export const NAVIGATION: NavItem[] = [
     ],
   },
   {
+    // Technicians see their own requests instead of the full requests list.
+    label: "طلباتي",
+    href: "/orders",
+    icon: "clipboard",
+    roles: ["technician"],
+  },
+  {
     label: "إدارة المخزون",
     icon: "box",
     children: [
-      { label: "قطع الغيار", href: "/inventory" },
-      { label: "حركة المخزون", href: "/inventory/movement" },
+      {
+        label: "قطع الغيار",
+        href: "/inventory",
+        roles: ["admin", "manager", "employee", "technician"],
+      },
+      { label: "حركة المخزون", href: "/inventory/movement", roles: ["admin"] },
     ],
   },
   {
     label: "إدارة الفواتير",
     icon: "file",
+    roles: ["admin", "manager", "employee"],
     children: [
       { label: "الفواتير الداخلية", href: "/invoices?type=internal" },
       { label: "الفواتير الخارجية", href: "/invoices?type=external" },
@@ -75,6 +94,7 @@ export const NAVIGATION: NavItem[] = [
   {
     label: "الإدارة المالية",
     icon: "wallet",
+    roles: ["admin"],
     children: [
       { label: "المصروفات", href: "/finance/expenses" },
       { label: "تسويات الرواتب", href: "/finance/payroll-adjustments" },
@@ -84,6 +104,7 @@ export const NAVIGATION: NavItem[] = [
   {
     label: "التقارير",
     icon: "chart",
+    roles: ["admin"],
     children: [
       { label: "تقرير الطلبات", href: "/reports/orders" },
       { label: "تقارير الفنيين", href: "/reports/technicians" },
@@ -94,7 +115,28 @@ export const NAVIGATION: NavItem[] = [
 ];
 
 export const NAV_FOOTER: NavItem[] = [
-  { label: "سعر الصرف", href: "/settings/exchange-rate", icon: "exchange" },
+  // Exchange rate is an edit-only screen (PATCH /settings) → admin only.
+  { label: "سعر الصرف", href: "/settings/exchange-rate", icon: "exchange", roles: ["admin"] },
+  // Settings view link is visible to everyone; editing is blocked server-side
+  // (PATCH /settings) for non-admins.
   { label: "الإعدادات", href: "/settings/center", icon: "gear" },
   { label: "تسجيل الخروج", href: "/login", icon: "logout" },
 ];
+
+/** Keep only the items (and children) the given role is allowed to open. */
+export function filterNavByRole(items: NavItem[], role: Role | null): NavItem[] {
+  if (!role) return items;
+  return items.reduce<NavItem[]>((visible, item) => {
+    if (item.roles && !item.roles.includes(role)) return visible;
+    if (item.children && item.children.length > 0) {
+      const children = item.children.filter(
+        (child) => !child.roles || child.roles.includes(role),
+      );
+      if (children.length === 0) return visible;
+      visible.push({ ...item, children });
+    } else {
+      visible.push(item);
+    }
+    return visible;
+  }, []);
+}

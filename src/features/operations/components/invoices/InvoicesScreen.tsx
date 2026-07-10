@@ -27,6 +27,8 @@ import {
   useInvoicesQuery,
 } from "@/features/invoices/hooks/use-invoices";
 import { useDollarExchangeRate } from "@/features/settings/hooks/use-settings";
+import { useRole } from "@/features/auth/hooks/use-role";
+import { ConfirmToast } from "@/components/ui/ConfirmToast";
 import { useInventoryAllPartsQuery } from "@/features/inventory/hooks/use-inventory";
 import { typeLabel, currencyLabel, remaining } from "../../utils/invoice";
 import { SectionTitle } from "../shared/SectionTitle";
@@ -68,7 +70,10 @@ export function InvoicesScreen() {
   const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null);
   const [paymentInvoice, setPaymentInvoice] = useState<Invoice | null>(null);
   const [page, setPage] = useState(1);
-  const { recordPayment } = useInvoiceMutations();
+  const [refundInvoice, setRefundInvoice] = useState<Invoice | null>(null);
+  const { recordPayment, refund } = useInvoiceMutations();
+  const { role } = useRole();
+  const isAdmin = role === "admin";
   const dollarExchangeRate = useDollarExchangeRate();
   const queryIsRequestId = isUuid(query);
   const baseListParams = useMemo(
@@ -131,6 +136,18 @@ export function InvoicesScreen() {
   const currentPage = activeListQuery.data?.page ?? page;
   const visibleInvoices = invoices;
   const tableTotal = activeListQuery.data?.total ?? 0;
+
+  function confirmRefund() {
+    if (!refundInvoice) return;
+    const displayNumber = invoiceDisplayNumber(refundInvoice);
+    refund.mutate(refundInvoice.id, {
+      onSuccess: () => {
+        setRefundInvoice(null);
+        toast.success("تم إرجاع الفاتورة", `تم إرجاع الفاتورة ${displayNumber} بنجاح.`);
+      },
+      onError: (error) => toast.error("تعذر إرجاع الفاتورة", getApiErrorMessage(error)),
+    });
+  }
 
   function savePayment(payment: InvoicePayment, convertedAmount: number) {
     if (!paymentInvoice) return;
@@ -216,6 +233,18 @@ export function InvoicesScreen() {
           invoice={activeViewingInvoiceWithPayments}
           onClose={() => setViewingInvoice(null)}
           onAddPayment={() => setPaymentInvoice(activeViewingInvoiceWithPayments)}
+          onReturnInvoice={isAdmin ? (invoice) => setRefundInvoice(invoice) : undefined}
+        />
+      ) : null}
+      {refundInvoice ? (
+        <ConfirmToast
+          title="تأكيد إرجاع الفاتورة"
+          message={`هل تريد إرجاع الفاتورة ${invoiceDisplayNumber(refundInvoice)}؟`}
+          confirmLabel="إرجاع الفاتورة"
+          tone="danger"
+          isLoading={refund.isPending}
+          onCancel={() => setRefundInvoice(null)}
+          onConfirm={confirmRefund}
         />
       ) : null}
       {paymentInvoice ? (

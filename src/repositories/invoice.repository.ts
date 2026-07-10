@@ -124,6 +124,13 @@ export const invoiceRepository = {
     return normalizeInvoiceResponse(payload);
   },
 
+  async refund(id: string): Promise<Invoice> {
+    const payload = await requestAuthenticatedApi(API_ENDPOINTS.invoices.refund(id), {
+      method: "POST",
+    });
+    return normalizeInvoiceResponse(payload);
+  },
+
   async downloadPdf(id: string): Promise<AuthenticatedBlobResponse> {
     return requestAuthenticatedBlob(API_ENDPOINTS.invoices.pdf(id), {
       method: "GET",

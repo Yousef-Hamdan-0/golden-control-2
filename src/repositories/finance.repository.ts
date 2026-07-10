@@ -35,6 +35,17 @@ export interface FinancialSummary {
   periodEnd: string;
 }
 
+/** GET /api/finance/summary — sales/profit summary for one specific date. */
+export interface DailyFinancialSummary {
+  date: string;
+  totalSales: number;
+  totalPaid: number;
+  totalRemaining: number;
+  totalPartsCost: number;
+  netProfit: number;
+  invoiceCount: number;
+}
+
 type JsonRecord = Record<string, unknown>;
 
 function isRecord(value: unknown): value is JsonRecord {
@@ -73,6 +84,19 @@ function normalizeFinancialSummary(payload: unknown): FinancialSummary {
     netProfit: numberValue(data.netProfit, data.net_profit),
     periodStart: stringValue(data.periodStart, data.period_start),
     periodEnd: stringValue(data.periodEnd, data.period_end),
+  };
+}
+
+function normalizeDailyFinancialSummary(payload: unknown): DailyFinancialSummary {
+  const data = dataRecord(payload);
+  return {
+    date: stringValue(data.date),
+    totalSales: numberValue(data.totalSales, data.total_sales),
+    totalPaid: numberValue(data.totalPaid, data.total_paid),
+    totalRemaining: numberValue(data.totalRemaining, data.total_remaining),
+    totalPartsCost: numberValue(data.totalPartsCost, data.total_parts_cost),
+    netProfit: numberValue(data.netProfit, data.net_profit),
+    invoiceCount: numberValue(data.invoiceCount, data.invoice_count),
   };
 }
 
@@ -140,6 +164,15 @@ export const financeRepository = {
     await requestAuthenticatedApi(API_ENDPOINTS.finance.expenseById(id), {
       method: "DELETE",
     });
+  },
+
+  async getDailySummary(date: string): Promise<DailyFinancialSummary> {
+    const searchParams = new URLSearchParams({ date: date.trim() });
+    const payload = await requestAuthenticatedApi(
+      `${API_ENDPOINTS.finance.summary}?${searchParams}`,
+      { method: "GET" },
+    );
+    return normalizeDailyFinancialSummary(payload);
   },
 
   async getSummary(params: FinancialSummaryParams): Promise<FinancialSummary> {

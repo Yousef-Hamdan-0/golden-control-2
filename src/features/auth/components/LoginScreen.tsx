@@ -5,6 +5,7 @@ import type { FormEvent } from "react";
 import { useState } from "react";
 import { getApiErrorMessage } from "@/helpers/api.helper";
 import { getDeviceToken } from "@/helpers/device-token.helper";
+import { defaultRouteForRole, normalizeRole } from "@/lib/auth/permissions";
 import { authService } from "@/services/auth.service";
 import {
   AuthInput,
@@ -37,7 +38,7 @@ export function LoginScreen() {
     setError("");
 
     try {
-      await authService.login(
+      const session = await authService.login(
         {
           email,
           password,
@@ -45,7 +46,8 @@ export function LoginScreen() {
         },
         remember,
       );
-      router.replace("/dashboard");
+      const role = normalizeRole(session.role);
+      router.replace(role ? defaultRouteForRole(role) : "/dashboard");
       router.refresh();
     } catch (loginError) {
       setError(getApiErrorMessage(loginError));

@@ -23,9 +23,13 @@ import {
 import { CustomerDetailsModal } from "@/features/customers/components/CustomerDetailsModal";
 import { CustomerFormModal } from "@/features/customers/components/CustomerFormModal";
 import { customerSearchParams } from "@/features/customers/components/customer-display.helpers";
+import { useRole } from "@/features/auth/hooks/use-role";
 
 export function CustomersScreen() {
   const toast = useToast();
+  // DELETE /customers/:id is admin-only per the permissions matrix.
+  const { role } = useRole();
+  const isAdmin = role === "admin";
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -270,19 +274,21 @@ export function CustomersScreen() {
                           >
                             <Icon name="pencil" size={18} />
                           </button>
-                          <button
-                            type="button"
-                            aria-label={`تعطيل ${customer.name}`}
-                            title="تعطيل"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              remove.reset();
-                              setCustomerToDelete(customer);
-                            }}
-                            className="rounded-sm p-1.5 text-danger hover:bg-danger-soft"
-                          >
-                            <Icon name="trash" size={18} />
-                          </button>
+                          {isAdmin ? (
+                            <button
+                              type="button"
+                              aria-label={`تعطيل ${customer.name}`}
+                              title="تعطيل"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                remove.reset();
+                                setCustomerToDelete(customer);
+                              }}
+                              className="rounded-sm p-1.5 text-danger hover:bg-danger-soft"
+                            >
+                              <Icon name="trash" size={18} />
+                            </button>
+                          ) : null}
                         </div>
                       </td>
                     </tr>

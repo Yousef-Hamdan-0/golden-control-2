@@ -27,8 +27,12 @@ interface RequestsTableProps {
   pdfRequestId: string | null;
   onPage: (page: number) => void;
   onDetails: (request: RepairRequest) => void;
-  onEdit: (request: RepairRequest) => void;
-  onDownloadPdf: (request: RepairRequest) => void;
+  /** Omitted for roles that cannot edit (technician). */
+  onEdit?: (request: RepairRequest) => void;
+  /** Omitted for roles that cannot download the PDF (technician). */
+  onDownloadPdf?: (request: RepairRequest) => void;
+  /** Technician-only status update action. */
+  onUpdateStatus?: (request: RepairRequest) => void;
 }
 
 export function RequestsTable({
@@ -42,6 +46,7 @@ export function RequestsTable({
   onDetails,
   onEdit,
   onDownloadPdf,
+  onUpdateStatus,
 }: RequestsTableProps) {
   return (
     <Card className="overflow-hidden">
@@ -112,31 +117,49 @@ export function RequestsTable({
                       >
                         <Icon name="eye" size={18} />
                       </button>
-                      <button
-                        type="button"
-                        aria-label={`تعديل ${request.requestNumber}`}
-                        title="تعديل"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onEdit(request);
-                        }}
-                        className="rounded-sm p-1.5 text-content-muted hover:bg-surface-2"
-                      >
-                        <Icon name="pencil" size={18} />
-                      </button>
-                      <button
-                        type="button"
-                        aria-label={`PDF ${request.requestNumber}`}
-                        title="تنزيل PDF"
-                        disabled={pdfRequestId === request.id}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onDownloadPdf(request);
-                        }}
-                        className="rounded-sm p-1.5 text-content-muted hover:bg-surface-2 disabled:opacity-50"
-                      >
-                        <Icon name="file" size={18} />
-                      </button>
+                      {onEdit ? (
+                        <button
+                          type="button"
+                          aria-label={`تعديل ${request.requestNumber}`}
+                          title="تعديل"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onEdit(request);
+                          }}
+                          className="rounded-sm p-1.5 text-content-muted hover:bg-surface-2"
+                        >
+                          <Icon name="pencil" size={18} />
+                        </button>
+                      ) : null}
+                      {onUpdateStatus ? (
+                        <button
+                          type="button"
+                          aria-label={`تحديث حالة ${request.requestNumber}`}
+                          title="تحديث الحالة"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onUpdateStatus(request);
+                          }}
+                          className="rounded-sm p-1.5 text-content-muted hover:bg-surface-2"
+                        >
+                          <Icon name="wrench" size={18} />
+                        </button>
+                      ) : null}
+                      {onDownloadPdf ? (
+                        <button
+                          type="button"
+                          aria-label={`PDF ${request.requestNumber}`}
+                          title="تنزيل PDF"
+                          disabled={pdfRequestId === request.id}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onDownloadPdf(request);
+                          }}
+                          className="rounded-sm p-1.5 text-content-muted hover:bg-surface-2 disabled:opacity-50"
+                        >
+                          <Icon name="file" size={18} />
+                        </button>
+                      ) : null}
                     </div>
                   </td>
                 </tr>

@@ -12,6 +12,7 @@ import { useToast } from "@/components/ui/Toast";
 import { getApiErrorMessage } from "@/helpers/api.helper";
 import { Icon } from "@/lib/icons";
 import { useUsersQuery } from "@/features/users/hooks/use-users-query";
+import { useRole } from "@/features/auth/hooks/use-role";
 import {
   useDailyInventoryAllQuery,
   useDailyInventoryMutations,
@@ -30,12 +31,19 @@ export function DailyInventoryForm({ onCancel, onSaved }: DailyInventoryFormProp
   const router = useRouter();
   const toast = useToast();
   const { create } = useDailyInventoryMutations();
-  // Reuse the users feature to populate the technician picker.
-  const { data: techs } = useUsersQuery({
-    role: "technician",
-    status: "available",
-    pageSize: 1000,
-  });
+  // Reuse the users feature to populate the technician picker. GET /users is
+  // admin-only per the permissions matrix, so the picker loads for admins
+  // only; other roles see an explanatory note instead of a broken list.
+  const { role } = useRole();
+  const isAdmin = role === "admin";
+  const { data: techs } = useUsersQuery(
+    {
+      role: "technician",
+      status: "available",
+      pageSize: 1000,
+    },
+    isAdmin,
+  );
   const dailyInventoryQuery = useDailyInventoryAllQuery();
   const isCheckingDailyInventory =
     dailyInventoryQuery.isLoading || dailyInventoryQuery.isFetching;
@@ -122,6 +130,11 @@ export function DailyInventoryForm({ onCancel, onSaved }: DailyInventoryFormProp
               })}
             </Select>
           </Field>
+          {!isAdmin ? (
+            <p className="text-xs text-content-muted">
+              قائمة الفنيين متاحة لمدير النظام فقط حالياً.
+            </p>
+          ) : null}
           {isCheckingDailyInventory ? (
             <p className="text-xs text-content-muted">جارٍ التحقق من سجلات المخزون الحالية...</p>
           ) : null}

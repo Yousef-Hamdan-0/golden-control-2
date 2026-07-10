@@ -335,7 +335,22 @@ export function normalizeInventoryMovement(payload: unknown, index: number): Inv
     ),
     movementType: normalizeMovementType(raw.movementType ?? raw.movement_type ?? raw.type),
     quantity: numberValue(raw.quantity, raw.qty),
-    owner: stringValue(raw.owner, raw.createdBy, raw.created_by, raw.userName, "إدارة المخزون"),
+    owner:
+      publicCodeValue(
+        nestedName(raw.responsible),
+        nestedName(raw.responsibleUser),
+        nestedName(raw.responsible_user),
+        nestedName(raw.user),
+        nestedName(raw.createdByUser),
+        nestedName(raw.created_by_user),
+        nestedName(raw.owner),
+        raw.responsibleName,
+        raw.responsible_name,
+        raw.owner,
+        raw.createdBy,
+        raw.created_by,
+        raw.userName,
+      ) || "إدارة المخزون",
     reference: stringValue(raw.reference),
     createdAt: dateValue(raw.createdAt, raw.created_at),
   };
@@ -381,7 +396,8 @@ export class InventoryMovementPayloadModel {
     const parsed = InventoryMovementInputSchema.parse(this.input);
     return {
       partId: parsed.partId,
-      movementType: parsed.movementType,
+      // The backend expects "adjust" for the quantity-adjustment movement.
+      movementType: parsed.movementType === "adjustment" ? "adjust" : parsed.movementType,
       quantity: parsed.quantity,
       reference: parsed.reference ?? "",
     };

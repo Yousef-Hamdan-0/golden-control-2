@@ -44,6 +44,7 @@ export const queryKeys = {
   requests: {
     all: ["requests"] as const,
     list: (params: RequestListParams) => ["requests", "list", params] as const,
+    myList: (params: RequestListParams) => ["requests", "my-list", params] as const,
     detail: (id: string) => ["requests", "detail", id] as const,
     statusHistory: (id: string) => ["requests", "status-history", id] as const,
   },
@@ -68,6 +69,7 @@ export const queryKeys = {
       detail: (id: string) => ["finance", "expenses", "detail", id] as const,
     },
     summary: (params: FinancialSummaryParams) => ["finance", "summary", params] as const,
+    dailySummary: (date: string) => ["finance", "daily-summary", date] as const,
   },
   payroll: {
     all: ["payroll-records"] as const,

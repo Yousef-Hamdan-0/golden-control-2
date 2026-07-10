@@ -451,6 +451,8 @@ export function normalizeInvoice(payload: unknown): Invoice {
     request.latest_assignment,
     request.assignment,
     request.assignments,
+    invoice.technicians,
+    request.technicians,
   );
   const assignmentTechnician = firstRecord(assignment.technician, assignment.user);
   const technician = firstRecord(

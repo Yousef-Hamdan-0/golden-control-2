@@ -324,6 +324,22 @@ function htmlShell(title: string, brand: DocumentBrand, body: string) {
       color: ${MUTED};
       font-size: 10px;
     }
+    /* Non-table sections must never split across two pages: if a section does
+       not fit, it moves whole to the next page. Tables (.table/.mini-table)
+       are intentionally excluded and keep splitting between pages. */
+    .top-strip,
+    .request-columns,
+    .request-col,
+    .grid-2,
+    .summary-row,
+    .panel,
+    .notice,
+    .totals,
+    .warranty,
+    .terms {
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
   </style>
 </head>
 <body>

@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 
-export async function proxyRepairRequest(request: Request, backendUrl: string) {
+export async function proxyRepairRequest(
+  request: Request,
+  backendUrl: string,
+  options?: { bodyOverride?: string },
+) {
   const authorization = request.headers.get("authorization");
   if (!authorization?.startsWith("Bearer ")) {
     return NextResponse.json(
@@ -15,13 +19,19 @@ export async function proxyRepairRequest(request: Request, backendUrl: string) {
   });
   const contentType = request.headers.get("content-type");
   if (contentType) headers.set("Content-Type", contentType);
+  if (options?.bodyOverride !== undefined) headers.set("Content-Type", "application/json");
 
   try {
     const hasBody = request.method !== "GET" && request.method !== "HEAD";
     const upstreamResponse = await fetch(backendUrl, {
       method: request.method,
       headers,
-      body: hasBody ? await request.arrayBuffer() : undefined,
+      body:
+        options?.bodyOverride !== undefined
+          ? options.bodyOverride
+          : hasBody
+            ? await request.arrayBuffer()
+            : undefined,
       cache: "no-store",
     });
     const responseBody = await upstreamResponse.arrayBuffer();

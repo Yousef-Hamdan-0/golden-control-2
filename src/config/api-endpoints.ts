@@ -40,6 +40,7 @@ export const API_ROUTES = {
     root: "/api/invoices",
     byId: (id: string) => `/api/invoices/${encodeURIComponent(id)}`,
     pdf: (id: string) => `/api/invoices/${encodeURIComponent(id)}/pdf`,
+    refund: (id: string) => `/api/invoices/${encodeURIComponent(id)}/refund`,
   },
   payments: {
     root: "/api/payments",
@@ -62,6 +63,17 @@ export const API_ROUTES = {
     parts: "/api/inventory/parts",
     partById: (id: string) => `/api/inventory/parts/${encodeURIComponent(id)}`,
     movements: "/api/inventory/movements",
+  },
+  technician: {
+    myRequests: "/api/technician/my-requests",
+    requestStatus: (id: string) =>
+      `/api/technician/requests/${encodeURIComponent(id)}/status`,
+  },
+  reports: {
+    requests: "/api/reports/requests",
+    technicians: "/api/reports/technicians",
+    inventoryMovements: "/api/reports/inventory-movements",
+    financial: "/api/reports/financial",
   },
   settings: {
     root: "/api/settings",
@@ -90,6 +102,7 @@ export const API_ENDPOINTS = {
   payrollRecords: API_ROUTES.payrollRecords,
   finance: API_ROUTES.finance,
   inventory: API_ROUTES.inventory,
+  technician: API_ROUTES.technician,
   settings: API_ROUTES.settings,
 } as const;
 
@@ -137,6 +150,7 @@ export const BACKEND_API_ENDPOINTS = {
     root: createApiUrl(API_ROUTES.invoices.root),
     byId: (id: string) => createApiUrl(API_ROUTES.invoices.byId(id)),
     pdf: (id: string) => createApiUrl(API_ROUTES.invoices.pdf(id)),
+    refund: (id: string) => createApiUrl(API_ROUTES.invoices.refund(id)),
   },
   payments: {
     root: createApiUrl(API_ROUTES.payments.root),
@@ -158,6 +172,16 @@ export const BACKEND_API_ENDPOINTS = {
     parts: createApiUrl(API_ROUTES.inventory.parts),
     partById: (id: string) => createApiUrl(API_ROUTES.inventory.partById(id)),
     movements: createApiUrl(API_ROUTES.inventory.movements),
+  },
+  technician: {
+    myRequests: createApiUrl(API_ROUTES.technician.myRequests),
+    requestStatus: (id: string) => createApiUrl(API_ROUTES.technician.requestStatus(id)),
+  },
+  reports: {
+    requests: createApiUrl(API_ROUTES.reports.requests),
+    technicians: createApiUrl(API_ROUTES.reports.technicians),
+    inventoryMovements: createApiUrl(API_ROUTES.reports.inventoryMovements),
+    financial: createApiUrl(API_ROUTES.reports.financial),
   },
   settings: {
     root: createApiUrl(API_ROUTES.settings.root),

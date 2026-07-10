@@ -22,6 +22,7 @@ import { DateFilterModal } from "../shared/DateFilterModal";
 import { EmptyState } from "../shared/EmptyState";
 import { PartFormModal } from "./PartFormModal";
 import { QuantityAdjustmentModal } from "./QuantityAdjustmentModal";
+import { useRole } from "@/features/auth/hooks/use-role";
 import {
   useInventoryMovementsQuery,
   useInventoryMutations,
@@ -68,6 +69,10 @@ function movementReference(type: InventoryMovementType) {
 }
 
 export function InventoryScreen({ section = "parts" }: { section?: string }) {
+  // Parts writes and movements are admin-only per the matrix; every role may
+  // view the parts list.
+  const { role } = useRole();
+  const isAdmin = role === "admin";
   const toast = useToast();
   const [query, setQuery] = useState("");
   const [showSupplyModal, setShowSupplyModal] = useState(false);
@@ -275,22 +280,24 @@ export function InventoryScreen({ section = "parts" }: { section?: string }) {
             aria-label="بحث المخزون"
             className="md:flex-1"
           />
-          <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
-            <Button type="button" className="shrink-0" onClick={() => setShowSupplyModal(true)}>
-              <Icon name="plus" size={18} />
-              إضافة قطعة
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="shrink-0"
-              onClick={() => setShowQuantityModal(true)}
-              disabled={!visibleParts.length}
-            >
-              <Icon name="pencil" size={18} />
-              تعديل الكمية
-            </Button>
-          </div>
+          {isAdmin ? (
+            <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
+              <Button type="button" className="shrink-0" onClick={() => setShowSupplyModal(true)}>
+                <Icon name="plus" size={18} />
+                إضافة قطعة
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="shrink-0"
+                onClick={() => setShowQuantityModal(true)}
+                disabled={!visibleParts.length}
+              >
+                <Icon name="pencil" size={18} />
+                تعديل الكمية
+              </Button>
+            </div>
+          ) : null}
         </Card>
       ) : null}
 
@@ -403,26 +410,30 @@ export function InventoryScreen({ section = "parts" }: { section?: string }) {
                         {formatMoney(item.quantity * item.costUsd, "USD", { decimals: 2 })}
                       </td>
                       <td className="px-4 py-4">
-                        <div className="flex items-center justify-start gap-2" dir="rtl">
-                          <button
-                            type="button"
-                            aria-label={`تعديل ${item.sparePartNumber}`}
-                            title="تعديل"
-                            onClick={() => setEditingPart(item)}
-                            className="rounded-sm p-1.5 text-content-muted hover:bg-surface-2"
-                          >
-                            <Icon name="pencil" size={18} />
-                          </button>
-                          <button
-                            type="button"
-                            aria-label={`حذف ${item.sparePartNumber}`}
-                            title="حذف"
-                            onClick={() => setPartToDelete(item)}
-                            className="rounded-sm p-1.5 text-danger hover:bg-danger-soft"
-                          >
-                            <Icon name="trash" size={18} />
-                          </button>
-                        </div>
+                        {isAdmin ? (
+                          <div className="flex items-center justify-start gap-2" dir="rtl">
+                            <button
+                              type="button"
+                              aria-label={`تعديل ${item.sparePartNumber}`}
+                              title="تعديل"
+                              onClick={() => setEditingPart(item)}
+                              className="rounded-sm p-1.5 text-content-muted hover:bg-surface-2"
+                            >
+                              <Icon name="pencil" size={18} />
+                            </button>
+                            <button
+                              type="button"
+                              aria-label={`حذف ${item.sparePartNumber}`}
+                              title="حذف"
+                              onClick={() => setPartToDelete(item)}
+                              className="rounded-sm p-1.5 text-danger hover:bg-danger-soft"
+                            >
+                              <Icon name="trash" size={18} />
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-content-muted">عرض فقط</span>
+                        )}
                       </td>
                     </tr>
                   ))

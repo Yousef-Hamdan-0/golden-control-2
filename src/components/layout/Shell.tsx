@@ -2,15 +2,21 @@
 
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
 import { Spinner } from "@/components/ui/Spinner";
+import { useToast } from "@/components/ui/Toast";
 import {
   clearAuthSession,
   readAuthSession,
 } from "@/helpers/auth-session.helper";
 import { authService } from "@/services/auth.service";
+import {
+  canAccessRoute,
+  defaultRouteForRole,
+  normalizeRole,
+} from "@/lib/auth/permissions";
 
 /**
  * Authenticated app shell. Sidebar is fixed on the right (RTL);
@@ -18,8 +24,11 @@ import { authService } from "@/services/auth.service";
  */
 export function Shell({ title = "نظرة عامة", children }: { title?: string; children: ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const toast = useToast();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSessionVerified, setIsSessionVerified] = useState(false);
+  const [isRouteAllowed, setIsRouteAllowed] = useState(true);
 
   useEffect(() => {
     let isActive = true;
@@ -50,6 +59,22 @@ export function Shell({ title = "نظرة عامة", children }: { title?: strin
     };
   }, [router]);
 
+  // Role-based screen guard: block direct navigation to an unauthorized screen.
+  useEffect(() => {
+    if (!isSessionVerified) return;
+    const role = normalizeRole(readAuthSession()?.role);
+    if (!role) return;
+
+    if (canAccessRoute(role, pathname)) {
+      setIsRouteAllowed(true);
+      return;
+    }
+
+    setIsRouteAllowed(false);
+    toast.error("لا صلاحية", "ليس لديك صلاحية للوصول إلى هذه الصفحة.");
+    router.replace(defaultRouteForRole(role));
+  }, [isSessionVerified, pathname, router, toast]);
+
   if (!isSessionVerified) {
     return (
       <div className="flex min-h-screen items-center justify-center gap-3 bg-bg text-sm text-content-muted">
@@ -64,7 +89,16 @@ export function Shell({ title = "نظرة عامة", children }: { title?: strin
       <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
       <div className="lg:mr-64">
         <Topbar title={title} onMenuClick={() => setIsSidebarOpen(true)} />
-        <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">{children}</main>
+        <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
+          {isRouteAllowed ? (
+            children
+          ) : (
+            <div className="flex min-h-[60vh] items-center justify-center gap-3 text-sm text-content-muted">
+              <Spinner />
+              <span>ليس لديك صلاحية لهذه الصفحة، جارٍ إعادة التوجيه...</span>
+            </div>
+          )}
+        </main>
       </div>
     </div>
   );

@@ -1,5 +1,6 @@
 import {
   financeRepository,
+  type DailyFinancialSummary,
   type ExpenseListParams,
   type FinancialSummary,
   type FinancialSummaryParams,
@@ -10,7 +11,12 @@ import type {
   ExpenseRecord,
 } from "@/features/expenses/models/expense.model";
 
-export type { ExpenseListParams, FinancialSummary, FinancialSummaryParams };
+export type {
+  DailyFinancialSummary,
+  ExpenseListParams,
+  FinancialSummary,
+  FinancialSummaryParams,
+};
 
 export const financeService = {
   listExpenses(params: ExpenseListParams): Promise<ExpenseRecord[]> {
@@ -35,6 +41,10 @@ export const financeService = {
 
   getSummary(params: FinancialSummaryParams): Promise<FinancialSummary> {
     return financeRepository.getSummary(params);
+  },
+
+  getDailySummary(date: string): Promise<DailyFinancialSummary> {
+    return financeRepository.getDailySummary(date);
   },
 
   downloadReportPdf(params: FinancialSummaryParams): Promise<AuthenticatedBlobResponse> {

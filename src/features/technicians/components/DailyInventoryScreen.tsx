@@ -10,6 +10,7 @@ import { getApiErrorMessage } from "@/helpers/api.helper";
 import { Icon } from "@/lib/icons";
 import { PAGE_SIZE } from "@/config/constants";
 import { useUsersQuery } from "@/features/users/hooks/use-users-query";
+import { useRole } from "@/features/auth/hooks/use-role";
 import { DailyInventoryCard } from "@/features/technicians/components/DailyInventoryCard";
 import { DailyInventoryForm } from "@/features/technicians/components/DailyInventoryForm";
 import {
@@ -22,24 +23,29 @@ export function DailyInventoryScreen() {
   const [page, setPage] = useState(1);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const dailyInventoryQuery = useDailyInventoryAllQuery();
-  const availableTechniciansQuery = useUsersQuery({
-    role: "technician",
-    status: "available",
-    pageSize: 1000,
-  });
+  // GET /users is admin-only, so the "available technicians" filter (and the
+  // delete action — DELETE /inventory/daily/:id) applies for admins only.
+  const { role } = useRole();
+  const isAdmin = role === "admin";
+  const availableTechniciansQuery = useUsersQuery(
+    {
+      role: "technician",
+      status: "available",
+      pageSize: 1000,
+    },
+    isAdmin,
+  );
   const { remove } = useDailyInventoryMutations();
 
   const availableTechnicianIds = useMemo(
     () => new Set((availableTechniciansQuery.data?.items ?? []).map((technician) => technician.id)),
     [availableTechniciansQuery.data?.items],
   );
-  const activeInventoryItems = useMemo(
-    () =>
-      (dailyInventoryQuery.data?.items ?? []).filter((entry) =>
-        availableTechnicianIds.has(entry.technicianId),
-      ),
-    [availableTechnicianIds, dailyInventoryQuery.data?.items],
-  );
+  const activeInventoryItems = useMemo(() => {
+    const items = dailyInventoryQuery.data?.items ?? [];
+    if (!isAdmin) return items;
+    return items.filter((entry) => availableTechnicianIds.has(entry.technicianId));
+  }, [availableTechnicianIds, dailyInventoryQuery.data?.items, isAdmin]);
   const total = activeInventoryItems.length;
   const pageSize = PAGE_SIZE;
   const pages = Math.max(1, Math.ceil(total / pageSize));
@@ -50,8 +56,9 @@ export function DailyInventoryScreen() {
     (currentPage - 1) * pageSize,
     currentPage * pageSize,
   );
-  const isLoading = dailyInventoryQuery.isLoading || availableTechniciansQuery.isLoading;
-  const isError = dailyInventoryQuery.isError || availableTechniciansQuery.isError;
+  const isLoading =
+    dailyInventoryQuery.isLoading || (isAdmin && availableTechniciansQuery.isLoading);
+  const isError = dailyInventoryQuery.isError || (isAdmin && availableTechniciansQuery.isError);
   const refetch = () => {
     void dailyInventoryQuery.refetch();
     void availableTechniciansQuery.refetch();
@@ -112,13 +119,19 @@ export function DailyInventoryScreen() {
               key={entry.id}
               entry={entry}
               isDeleting={remove.isPending}
-              onDelete={() =>
-                remove.mutate(entry.id, {
-                  onSuccess: () =>
-                    toast.success("تم حذف المخزون", `تم حذف مخزون ${entry.technicianName} بنجاح.`),
-                  onError: (error) =>
-                    toast.error("تعذر حذف المخزون", getApiErrorMessage(error)),
-                })
+              onDelete={
+                isAdmin
+                  ? () =>
+                      remove.mutate(entry.id, {
+                        onSuccess: () =>
+                          toast.success(
+                            "تم حذف المخزون",
+                            `تم حذف مخزون ${entry.technicianName} بنجاح.`,
+                          ),
+                        onError: (error) =>
+                          toast.error("تعذر حذف المخزون", getApiErrorMessage(error)),
+                      })
+                  : undefined
               }
             />
           ))}

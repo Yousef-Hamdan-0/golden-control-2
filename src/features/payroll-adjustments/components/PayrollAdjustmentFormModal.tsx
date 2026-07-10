@@ -39,6 +39,14 @@ const MONTH_OPTIONS = [
   { value: 12, label: "كانون الأول" },
 ];
 
+/** Keep manual typing working: accept Arabic-Indic digits and strip the rest. */
+function sanitizeAmountText(value: string) {
+  return value
+    .replace(/[٠-٩]/g, (digit) => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)))
+    .replace(/[۰-۹]/g, (digit) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit)))
+    .replace(/[^\d]/g, "");
+}
+
 function monthParts(value: string) {
   const [year, month] = value.split("-").map(Number);
   const today = new Date();
@@ -207,9 +215,7 @@ export function PayrollAdjustmentFormModal({
             <div className="relative">
               <Input
                 id="payroll-amount"
-                type="number"
-                min="1"
-                step="1000"
+                type="text"
                 inputMode="numeric"
                 dir="ltr"
                 className="pl-14"
@@ -217,10 +223,11 @@ export function PayrollAdjustmentFormModal({
                 placeholder="0"
                 disabled={submitting}
                 onChange={(event) => {
-                  setAmountValue(event.target.value);
+                  const cleaned = sanitizeAmountText(event.target.value);
+                  setAmountValue(cleaned);
                   setDraft((current) => ({
                     ...current,
-                    amount: Number(event.target.value),
+                    amount: cleaned === "" ? 0 : Number(cleaned),
                   }));
                 }}
               />

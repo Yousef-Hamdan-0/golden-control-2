@@ -23,6 +23,10 @@ export const invoiceService = {
     return invoiceRepository.create(input);
   },
 
+  refund(id: string) {
+    return invoiceRepository.refund(id);
+  },
+
   downloadPdf(id: string) {
     return invoiceRepository.downloadPdf(id);
   },

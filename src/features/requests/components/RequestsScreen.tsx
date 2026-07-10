@@ -31,6 +31,7 @@ import {
   type RepairRequestType,
 } from "@/models/requests/request.model";
 import {
+  useMyRequestsQuery,
   useRequestMutations,
   useRequestQuery,
   useRequestsQuery,
@@ -39,8 +40,10 @@ import {
 import { RequestDetailsModal } from "@/features/requests/components/RequestDetailsModal";
 import { RequestFormModal } from "@/features/requests/components/RequestFormModal";
 import { RequestsTable } from "@/features/requests/components/RequestsTable";
+import { TechnicianStatusModal } from "@/features/requests/components/TechnicianStatusModal";
 import { technicianDisplayName } from "@/features/requests/components/request-display.helpers";
 import { useUsersAllQuery } from "@/features/users/hooks/use-users-query";
+import { useRole } from "@/features/auth/hooks/use-role";
 
 type StatusFilter = RepairRequestStatus | "all";
 type PriorityFilter = RepairRequestPriority | "all";
@@ -101,13 +104,16 @@ export function RequestsScreen() {
   const [showCreateModal, setShowCreateModal] = useState(params.get("create") === "1");
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
   const [editingRequest, setEditingRequest] = useState<RepairRequest | null>(null);
+  const [statusRequest, setStatusRequest] = useState<RepairRequest | null>(null);
   const [pdfRequestId, setPdfRequestId] = useState<string | null>(null);
   const creatingRequestRef = useRef(false);
   const { create, update } = useRequestMutations();
-  const usersQuery = useUsersAllQuery({
-    role: "all",
-    status: "all",
-  });
+  const { role } = useRole();
+  const isTechnician = role === "technician";
+  const isAdmin = role === "admin";
+  // GET /users is admin-only (permissions matrix); other roles fall back to
+  // the technician name embedded in each request.
+  const usersQuery = useUsersAllQuery({ role: "all", status: "all" }, isAdmin);
 
   const listParams = useMemo(
     () => ({
@@ -122,13 +128,14 @@ export function RequestsScreen() {
     }),
     [dateFilter.from, dateFilter.to, page, priority, query, status, type],
   );
-  const {
-    data,
-    error: listError,
-    isLoading,
-    isError,
-    refetch,
-  } = useRequestsQuery(listParams);
+  // Technicians list only their own requests (GET /technician/my-requests);
+  // other roles use the full list. Both queries share the same params/filters,
+  // and exactly one runs once the role is known.
+  const requestsQuery = useRequestsQuery(listParams, role !== null && !isTechnician);
+  const myRequestsQuery = useMyRequestsQuery(listParams, isTechnician);
+  const activeQuery = isTechnician ? myRequestsQuery : requestsQuery;
+  const { data, error: listError, isError, refetch } = activeQuery;
+  const isLoading = role === null || activeQuery.isLoading;
   const requests = data?.items ?? EMPTY_REQUESTS;
   const currentPage = data?.page ?? page;
   const tableRequests = requests;
@@ -136,7 +143,9 @@ export function RequestsScreen() {
     requests.find((request) => request.id === selectedRequestId) ?? null;
   const detailsQuery = useRequestQuery(selectedRequestId);
   const detailsRequest = detailsQuery.data ?? selectedPreview;
-  const statusHistoryQuery = useRequestStatusHistoryQuery(selectedRequestId);
+  // Status-history endpoint is denied to technicians; they rely on the
+  // history embedded in the request itself.
+  const statusHistoryQuery = useRequestStatusHistoryQuery(selectedRequestId, !isTechnician);
   const embeddedStatusHistory = detailsRequest?.statusHistory ?? [];
   const visibleStatusHistory = statusHistoryQuery.data?.length
     ? statusHistoryQuery.data
@@ -224,19 +233,25 @@ export function RequestsScreen() {
   return (
     <div className="space-y-6">
       <SectionTitle
-        title="إدارة الطلبات"
-        subtitle="إنشاء طلبات الصيانة ومتابعة الحالات والفنيين وسجل الطلبات."
+        title={isTechnician ? "طلباتي" : "إدارة الطلبات"}
+        subtitle={
+          isTechnician
+            ? "متابعة الطلبات المسندة إليك وتحديث حالاتها."
+            : "إنشاء طلبات الصيانة ومتابعة الحالات والفنيين وسجل الطلبات."
+        }
         action={
-          <Button
-            type="button"
-            onClick={() => {
-              create.reset();
-              setShowCreateModal(true);
-            }}
-          >
-            <Icon name="plus" size={18} />
-            طلب صيانة جديد
-          </Button>
+          isTechnician ? undefined : (
+            <Button
+              type="button"
+              onClick={() => {
+                create.reset();
+                setShowCreateModal(true);
+              }}
+            >
+              <Icon name="plus" size={18} />
+              طلب صيانة جديد
+            </Button>
+          )
         }
       />
 
@@ -249,7 +264,7 @@ export function RequestsScreen() {
         ]}
       />
 
-      {showCreateModal ? (
+      {showCreateModal && !isTechnician ? (
         <RequestFormModal
           defaultType={defaultRequestType}
           submitting={create.isPending}
@@ -287,13 +302,21 @@ export function RequestsScreen() {
           usersById={usersById}
           downloadingPdf={pdfRequestId === selectedRequestId}
           onClose={() => setSelectedRequestId(null)}
-          onEdit={(request) => {
-            update.reset();
-            setSelectedRequestId(null);
-            setEditingRequest(request);
-          }}
-          onDownloadPdf={downloadPdf}
+          onEdit={
+            isTechnician
+              ? undefined
+              : (request) => {
+                  update.reset();
+                  setSelectedRequestId(null);
+                  setEditingRequest(request);
+                }
+          }
+          onDownloadPdf={isTechnician ? undefined : downloadPdf}
         />
+      ) : null}
+
+      {statusRequest ? (
+        <TechnicianStatusModal request={statusRequest} onClose={() => setStatusRequest(null)} />
       ) : null}
       {showDateFilter ? (
         <DateFilterModal
@@ -389,11 +412,16 @@ export function RequestsScreen() {
           pdfRequestId={pdfRequestId}
           onPage={setPage}
           onDetails={(request) => setSelectedRequestId(request.id)}
-          onEdit={(request) => {
-            update.reset();
-            setEditingRequest(request);
-          }}
-          onDownloadPdf={downloadPdf}
+          onEdit={
+            isTechnician
+              ? undefined
+              : (request) => {
+                  update.reset();
+                  setEditingRequest(request);
+                }
+          }
+          onDownloadPdf={isTechnician ? undefined : downloadPdf}
+          onUpdateStatus={isTechnician ? setStatusRequest : undefined}
         />
       )}
     </div>

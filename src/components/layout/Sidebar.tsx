@@ -3,7 +3,10 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { NAVIGATION, NAV_FOOTER, type NavItem } from "@/config/navigation";
+import { NAVIGATION, NAV_FOOTER, filterNavByRole, type NavItem } from "@/config/navigation";
+import { defaultRouteForRole } from "@/lib/auth/permissions";
+import { ROLE_LABELS_AR } from "@/models/auth/user.model";
+import { useRole } from "@/features/auth/hooks/use-role";
 import { useCurrentUserQuery } from "@/features/users/hooks/use-users-query";
 import { UserAvatar } from "@/features/users/components/UserAvatar";
 import { Icon } from "@/lib/icons";
@@ -57,6 +60,10 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const currentUserQuery = useCurrentUserQuery();
   const currentUser = currentUserQuery.data;
+  const { role } = useRole();
+  const navigation = filterNavByRole(NAVIGATION, role);
+  const footerItems = filterNavByRole(NAV_FOOTER, role);
+  const homeHref = role ? defaultRouteForRole(role) : "/dashboard";
 
   useEffect(() => {
     setSession(readAuthSession());
@@ -121,9 +128,7 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
                 {session?.name ?? CURRENT_USER.fullName}
               </div>
               <div className="mt-1 max-w-36 truncate text-xs text-content-muted">
-                {session?.role === "admin" || session?.role === "Admin"
-                  ? "مدير النظام"
-                  : session?.role ?? CURRENT_USER.jobTitle}
+                {role ? ROLE_LABELS_AR[role] : session?.role ?? CURRENT_USER.jobTitle}
               </div>
             </div>
             <UserAvatar
@@ -147,11 +152,11 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
 
         <div className="p-3">
           <Link
-            href="/dashboard"
+            href={homeHref}
             onClick={closeSidebar}
             className={cn(
               "flex w-full items-center justify-start gap-3 rounded-md px-4 py-3 text-right",
-              isActive(pathname, searchParams, "/dashboard", true)
+              isActive(pathname, searchParams, homeHref, true)
                 ? "bg-gold-soft"
                 : "hover:bg-gold-soft",
             )}
@@ -169,7 +174,7 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
 
         {/* Groups */}
         <nav className="flex-1 overflow-y-auto px-3 pb-4">
-          {NAVIGATION.filter((i) => i.href !== "/dashboard").map((item) => {
+          {navigation.filter((i) => i.href !== "/dashboard").map((item) => {
             const active = groupActive(pathname, searchParams, item);
             const isOpenGroup = open === item.label;
             const isLeafLink = typeof item.href === "string" && !item.children?.length;
@@ -253,7 +258,7 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
 
         {/* Footer */}
         <div className="border-t border-border p-3">
-          {NAV_FOOTER.map((item) =>
+          {footerItems.map((item) =>
             item.label === "تسجيل الخروج" ? (
               <button
                 key={item.label}

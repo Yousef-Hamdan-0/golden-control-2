@@ -63,8 +63,10 @@ export function RequestDetailsModal({
   usersById?: Map<string, string>;
   downloadingPdf: boolean;
   onClose: () => void;
-  onEdit: (request: RepairRequest) => void;
-  onDownloadPdf: (request: RepairRequest) => void;
+  /** Omitted for roles that cannot edit (technician). */
+  onEdit?: (request: RepairRequest) => void;
+  /** Omitted for roles that cannot download the PDF (technician). */
+  onDownloadPdf?: (request: RepairRequest) => void;
 }) {
   const toast = useToast();
   const queryClient = useQueryClient();
@@ -175,22 +177,28 @@ export function RequestDetailsModal({
 
         {request ? (
           <>
-            <div className="flex flex-wrap items-center justify-end gap-2 border-b border-border pb-4">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={downloadingPdf}
-                onClick={() => onDownloadPdf(request)}
-              >
-                <Icon name="file" size={16} />
-                {downloadingPdf ? "جاري التحميل..." : "PDF"}
-              </Button>
-              <Button type="button" size="sm" onClick={() => onEdit(request)}>
-                <Icon name="pencil" size={16} />
-                تعديل
-              </Button>
-            </div>
+            {onEdit || onDownloadPdf ? (
+              <div className="flex flex-wrap items-center justify-end gap-2 border-b border-border pb-4">
+                {onDownloadPdf ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={downloadingPdf}
+                    onClick={() => onDownloadPdf(request)}
+                  >
+                    <Icon name="file" size={16} />
+                    {downloadingPdf ? "جاري التحميل..." : "PDF"}
+                  </Button>
+                ) : null}
+                {onEdit ? (
+                  <Button type="button" size="sm" onClick={() => onEdit(request)}>
+                    <Icon name="pencil" size={16} />
+                    تعديل
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
 
             <RequestSummarySection request={request} technicianDisplayName={technicianDisplayName} />
 

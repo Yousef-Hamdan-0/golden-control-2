@@ -1,5 +1,6 @@
 import type { Order, Invoice } from "../types";
 import { API_BASE_URL } from "@/config/api-endpoints";
+import { settingsService } from "@/services/settings.service";
 import { formatMoney } from "@/lib/format/currency";
 import { localDisplayDateTime } from "@/lib/format/date";
 import { PAYMENT_METHOD_LABELS } from "../constants";
@@ -157,14 +158,9 @@ async function getPrintBrand(): Promise<PrintBrand> {
   };
 
   try {
-    const response = await fetch(`${API_BASE_URL}/api/settings`, {
-      headers: { Accept: "application/json" },
-      cache: "no-store",
-    });
-    if (!response.ok) return fallback;
-    const payload = await response.json();
-    const data =
-      typeof payload?.data === "object" && payload.data !== null ? payload.data : payload;
+    // Authenticated settings fetch (same source the settings screen uses), so
+    // the printed copy and the PDF both show the terms saved in the settings.
+    const data = await settingsService.get();
     return {
       logoUrl: mediaUrl(data.logoPath) ?? fallback.logoUrl,
       centerName: data.centerName || fallback.centerName,

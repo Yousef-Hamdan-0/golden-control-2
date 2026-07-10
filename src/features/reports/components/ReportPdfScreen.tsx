@@ -8,7 +8,6 @@ import { Field } from "@/components/ui/Input";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Icon } from "@/lib/icons";
 import { cn } from "@/lib/utils/cn";
-import { financeService } from "@/services/finance.service";
 import { requestAuthenticatedBlob } from "@/helpers/authenticated-api.helper";
 
 export type ReportType =
@@ -82,15 +81,14 @@ export function ReportPdfScreen({ type }: { type: ReportType }) {
     setError("");
 
     try {
-      const reportResponse = type === "financial"
-        ? await financeService.downloadReportPdf({ startDate: from, endDate: to })
-        : await (async () => {
-            const search = new URLSearchParams({ from, to });
-            return requestAuthenticatedBlob(`${REPORTS_API_BASE}/${type}?${search.toString()}`, {
-              method: "GET",
-              headers: { Accept: "application/pdf, application/json" },
-            });
-          })();
+      const search = new URLSearchParams({ from, to });
+      const reportResponse = await requestAuthenticatedBlob(
+        `${REPORTS_API_BASE}/${type}?${search.toString()}`,
+        {
+          method: "GET",
+          headers: { Accept: "application/pdf, application/json" },
+        },
+      );
 
       if (!reportResponse.contentType.includes("application/pdf")) {
         throw new Error("استجابة الخادم ليست ملف PDF صالحًا.");

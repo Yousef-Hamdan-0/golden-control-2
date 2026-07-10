@@ -10,6 +10,7 @@ import { Icon } from "@/lib/icons";
 import { formatMoney } from "@/lib/format/currency";
 import { localDateTimeKey, localDisplayDateTime } from "@/lib/format/date";
 import { CURRENT_USER } from "@/lib/auth/current-user";
+import { useRole } from "@/features/auth/hooks/use-role";
 import type { Order, Invoice } from "../../types";
 import { INVOICES } from "../../data/seed";
 import {
@@ -44,6 +45,10 @@ export function OrderDetailsModal({
   onCompleteOrder?: (order: Order) => void;
   onClose: () => void;
 }) {
+  // Real signed-in role; default to the least-privileged assumption while it
+  // resolves rather than the old always-admin mock.
+  const { role } = useRole();
+  const currentRole = role ?? "employee";
   const [showInvoiceDetails, setShowInvoiceDetails] = useState(false);
   const [showInvoiceForm, setShowInvoiceForm] = useState(false);
   const [createdInvoice, setCreatedInvoice] = useState<Invoice | null>(null);
@@ -67,7 +72,7 @@ export function OrderDetailsModal({
       return;
     }
 
-    if (!canCreateInvoiceForOrder(order, CURRENT_USER.role)) {
+    if (!canCreateInvoiceForOrder(order, currentRole)) {
       setInvoiceNotice(
         order.type === "external"
           ? "إنشاء فاتورة الطلب الخارجي متاح فقط لمدير النظام."

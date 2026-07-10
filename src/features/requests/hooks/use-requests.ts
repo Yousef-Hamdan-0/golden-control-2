@@ -6,13 +6,24 @@ import { requestService } from "@/services/request.service";
 import type { RequestListParams } from "@/repositories/request.repository";
 import type {
   RepairRequestInput,
+  RepairRequestStatus,
   RequestRecordsInput,
 } from "@/models/requests/request.model";
 
-export function useRequestsQuery(params: RequestListParams) {
+export function useRequestsQuery(params: RequestListParams, enabled = true) {
   return useQuery({
     queryKey: queryKeys.requests.list(params),
     queryFn: () => requestService.list(params),
+    enabled,
+  });
+}
+
+/** Technician-only view of the signed-in technician's requests. */
+export function useMyRequestsQuery(params: RequestListParams, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.requests.myList(params),
+    queryFn: () => requestService.listMine(params),
+    enabled,
   });
 }
 
@@ -24,11 +35,11 @@ export function useRequestQuery(id: string | null) {
   });
 }
 
-export function useRequestStatusHistoryQuery(id: string | null) {
+export function useRequestStatusHistoryQuery(id: string | null, enabled = true) {
   return useQuery({
     queryKey: queryKeys.requests.statusHistory(id ?? ""),
     queryFn: () => requestService.listStatusHistory(id ?? ""),
-    enabled: Boolean(id),
+    enabled: Boolean(id) && enabled,
   });
 }
 
@@ -53,6 +64,12 @@ export function useRequestMutations() {
     },
   });
 
+  const updateStatus = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: RepairRequestStatus }) =>
+      requestService.updateStatus(id, status),
+    onSuccess: invalidateList,
+  });
+
   const uploadRecords = useMutation({
     mutationFn: ({ input }: { input: RequestRecordsInput; requestId?: string }) =>
       requestService.uploadRecords(input),
@@ -66,5 +83,5 @@ export function useRequestMutations() {
     },
   });
 
-  return { create, update, uploadRecords };
+  return { create, update, updateStatus, uploadRecords };
 }

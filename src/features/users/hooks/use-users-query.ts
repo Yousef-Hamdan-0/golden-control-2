@@ -9,17 +9,22 @@ import type { UserListParams } from "@/repositories/user.repository";
  * Role + status are part of the key, so switching a filter fetches that slice
  * immediately and caches each combination (instant re-switch).
  */
-export function useUsersQuery(params: UserListParams) {
+export function useUsersQuery(params: UserListParams, enabled = true) {
   return useQuery({
     queryKey: queryKeys.users.list(params),
     queryFn: () => userService.listByRole(params),
+    enabled,
   });
 }
 
-export function useUsersAllQuery(params: Omit<UserListParams, "page" | "pageSize">) {
+export function useUsersAllQuery(
+  params: Omit<UserListParams, "page" | "pageSize">,
+  enabled = true,
+) {
   return useQuery({
     queryKey: queryKeys.users.listAll(params),
     queryFn: () => userService.listAllByRole(params),
+    enabled,
   });
 }
 

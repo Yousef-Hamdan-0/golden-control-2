@@ -7,6 +7,7 @@ import type { Paginated } from "@/repositories/user.repository";
 import type {
   RepairRequest,
   RepairRequestInput,
+  RepairRequestStatus,
   RepairRequestStatusHistoryItem,
   RequestRecordsInput,
 } from "@/models/requests/request.model";
@@ -14,6 +15,14 @@ import type {
 export const requestService = {
   list(params: RequestListParams): Promise<Paginated<RepairRequest>> {
     return requestRepository.list(params);
+  },
+
+  listMine(params: RequestListParams): Promise<Paginated<RepairRequest>> {
+    return requestRepository.listMine(params);
+  },
+
+  updateStatus(id: string, status: RepairRequestStatus): Promise<void> {
+    return requestRepository.updateStatus(id, status);
   },
 
   getById(id: string): Promise<RepairRequest> {

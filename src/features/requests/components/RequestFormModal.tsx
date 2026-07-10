@@ -8,6 +8,8 @@ import { Modal } from "@/components/ui/Modal";
 import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
 import { Icon } from "@/lib/icons";
+import { useRole } from "@/features/auth/hooks/use-role";
+import { isLikelyIdentifier } from "@/features/requests/components/request-display.helpers";
 import { useUsersAllQuery } from "@/features/users/hooks/use-users-query";
 import {
   RepairRequestInputSchema,
@@ -123,10 +125,29 @@ export function RequestFormModal({
   const isEdit = Boolean(request);
   const [draft, setDraft] = useState<RequestFormDraft>(() => initialDraft(request, defaultType));
   const [errors, setErrors] = useState<FieldErrors>({});
-  const { data: technicians = [] } = useUsersAllQuery({
-    role: "technician",
-    status: "available",
-  });
+  const { role } = useRole();
+  const isAdmin = role === "admin";
+  // GET /users is admin-only per the permissions matrix, so the technician
+  // list loads only for admins. Manager/employee keep or clear the current
+  // technician; restoring assignment for them needs a backend endpoint that
+  // exposes the technicians list to those roles.
+  const { data: technicians = [] } = useUsersAllQuery(
+    { role: "technician", status: "available" },
+    isAdmin,
+  );
+  // The matrix limits employee edits to techId/priority/date/status (the
+  // server strips everything else) — lock the other fields in the UI too.
+  const lockEmployeeFields = isEdit && role === "employee";
+  const currentTechnician =
+    !isAdmin && request?.technicianId
+      ? {
+          id: request.technicianId,
+          name:
+            request.technicianName && !isLikelyIdentifier(request.technicianName)
+              ? request.technicianName
+              : "الفني الحالي",
+        }
+      : null;
 
   function setCustomerField(
     field: keyof RequestFormDraft["customer"],
@@ -203,7 +224,7 @@ export function RequestFormModal({
                 value={draft.customer.name}
                 onChange={(event) => setCustomerField("name", event.target.value)}
                 placeholder="أحمد محمد"
-                disabled={submitting}
+                disabled={submitting || lockEmployeeFields}
               />
             </Field>
             <Field label="الهاتف الأول" error={errors["customer.firstPhone"]}>
@@ -212,7 +233,7 @@ export function RequestFormModal({
                 value={draft.customer.firstPhone}
                 onChange={(event) => setCustomerField("firstPhone", event.target.value)}
                 placeholder="09xx xxx xxx"
-                disabled={submitting}
+                disabled={submitting || lockEmployeeFields}
               />
             </Field>
             <Field label="الهاتف الثاني" error={errors["customer.secondPhone"]}>
@@ -221,7 +242,7 @@ export function RequestFormModal({
                 value={draft.customer.secondPhone}
                 onChange={(event) => setCustomerField("secondPhone", event.target.value)}
                 placeholder="اختياري"
-                disabled={submitting}
+                disabled={submitting || lockEmployeeFields}
               />
             </Field>
             <Field label="العنوان" error={errors["customer.address"]}>
@@ -229,7 +250,7 @@ export function RequestFormModal({
                 value={draft.customer.address}
                 onChange={(event) => setCustomerField("address", event.target.value)}
                 placeholder="دمشق - المزة - شارع الجلاء"
-                disabled={submitting}
+                disabled={submitting || lockEmployeeFields}
               />
             </Field>
             <Field
@@ -242,7 +263,7 @@ export function RequestFormModal({
                 value={draft.customer.locationLink}
                 onChange={(event) => setCustomerField("locationLink", event.target.value)}
                 placeholder="https://maps.google.com/?q=Damascus+Mezzeh"
-                disabled={submitting}
+                disabled={submitting || lockEmployeeFields}
               />
             </Field>
           </div>
@@ -251,7 +272,7 @@ export function RequestFormModal({
         <section className="space-y-3">
           <div className="flex items-center justify-between gap-3">
             <h3 className="font-heading text-base font-bold text-gold">الأجهزة</h3>
-            <Button type="button" variant="outline" size="sm" onClick={addDevice} disabled={submitting}>
+            <Button type="button" variant="outline" size="sm" onClick={addDevice} disabled={submitting || lockEmployeeFields}>
               <Icon name="plus" size={16} />
               جهاز آخر
             </Button>
@@ -267,7 +288,7 @@ export function RequestFormModal({
                       variant="danger"
                       size="sm"
                       onClick={() => removeDevice(index)}
-                      disabled={submitting}
+                      disabled={submitting || lockEmployeeFields}
                     >
                       <Icon name="trash" size={16} />
                       حذف
@@ -280,7 +301,7 @@ export function RequestFormModal({
                       value={device.deviceType}
                       onChange={(event) => updateDevice(index, { deviceType: event.target.value })}
                       placeholder="Smartphone"
-                      disabled={submitting}
+                      disabled={submitting || lockEmployeeFields}
                     />
                   </Field>
                   <Field label="اسم الجهاز" error={errors[`devices.${index}.deviceName`]}>
@@ -288,7 +309,7 @@ export function RequestFormModal({
                       value={device.deviceName}
                       onChange={(event) => updateDevice(index, { deviceName: event.target.value })}
                       placeholder="iPhone 13 Pro"
-                      disabled={submitting}
+                      disabled={submitting || lockEmployeeFields}
                     />
                   </Field>
                   <Field label="العلامة التجارية" error={errors[`devices.${index}.brand`]}>
@@ -296,7 +317,7 @@ export function RequestFormModal({
                       value={device.brand}
                       onChange={(event) => updateDevice(index, { brand: event.target.value })}
                       placeholder="Apple"
-                      disabled={submitting}
+                      disabled={submitting || lockEmployeeFields}
                     />
                   </Field>
                   <Field label="الموديل" error={errors[`devices.${index}.model`]}>
@@ -304,7 +325,7 @@ export function RequestFormModal({
                       value={device.model}
                       onChange={(event) => updateDevice(index, { model: event.target.value })}
                       placeholder="A2636"
-                      disabled={submitting}
+                      disabled={submitting || lockEmployeeFields}
                     />
                   </Field>
                 </div>
@@ -325,7 +346,7 @@ export function RequestFormModal({
                     type: event.target.value as RepairRequestType,
                   }))
                 }
-                disabled={submitting}
+                disabled={submitting || lockEmployeeFields}
               >
                 {REQUEST_TYPE_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -370,12 +391,20 @@ export function RequestFormModal({
                 disabled={submitting}
               >
                 <option value="">بدون تحديد</option>
+                {currentTechnician ? (
+                  <option value={currentTechnician.id}>{currentTechnician.name}</option>
+                ) : null}
                 {technicians.map((technician) => (
                   <option key={technician.id} value={technician.id}>
                     {technician.fullName}
                   </option>
                 ))}
               </Select>
+              {!isAdmin ? (
+                <p className="mt-1 text-xs text-content-muted">
+                  قائمة الفنيين متاحة لمدير النظام فقط حالياً.
+                </p>
+              ) : null}
             </Field>
             {isEdit ? (
               <Field label="الحالة">
@@ -409,7 +438,7 @@ export function RequestFormModal({
                 setDraft((current) => ({ ...current, faultDescription: event.target.value }))
               }
               placeholder="الجهاز لا يعمل والشاشة مكسورة"
-              disabled={submitting}
+              disabled={submitting || lockEmployeeFields}
             />
           </Field>
           <Field label="ملاحظات" error={errors.notes}>
@@ -420,7 +449,7 @@ export function RequestFormModal({
                 setDraft((current) => ({ ...current, notes: event.target.value }))
               }
               placeholder="يحتاج إلى قطع غيار خاصة"
-              disabled={submitting}
+              disabled={submitting || lockEmployeeFields}
             />
           </Field>
         </section>
