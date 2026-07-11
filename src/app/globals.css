@@ -31,6 +31,16 @@
   }
 }
 
+/* Login brand panel — meshing maintenance gears (transform-only). */
+@keyframes gear-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 table {
   width: 100%;
 }

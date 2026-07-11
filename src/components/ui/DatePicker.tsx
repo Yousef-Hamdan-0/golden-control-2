@@ -5,10 +5,10 @@ import { cn } from "@/lib/utils/cn";
 import { Icon } from "@/lib/icons";
 import { OverlayPortal } from "@/components/ui/OverlayPortal";
 import {
-  SYRIAC_MONTHS,
   WEEKDAY_LABELS,
   WEEK_START_DAY,
   formatSyriacDate,
+  monthLabel,
 } from "@/lib/format/months";
 
 const POPUP_WIDTH = 300;
@@ -206,7 +206,7 @@ export function DatePicker({
               <Icon name="chevron-right" size={18} />
             </button>
             <div className="font-heading text-sm font-bold text-content">
-              {SYRIAC_MONTHS[view.month]} {view.year}
+              {monthLabel(view.month + 1)} {view.year}
             </div>
             <button
               type="button"

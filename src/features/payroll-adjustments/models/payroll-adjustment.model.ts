@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { monthLabel } from "@/lib/format/months";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -227,23 +228,15 @@ export function isPayrollMonth(value: string) {
 export function formatPayrollMonth(value: string) {
   if (!isPayrollMonth(value)) return value;
 
-  return new Intl.DateTimeFormat("ar-SY-u-nu-latn", {
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(`${value}-01T12:00:00Z`));
+  const [year, month] = value.split("-").map(Number);
+  return `${monthLabel(month)} ${year}`;
 }
 
 export function formatPayrollDate(value: string) {
   const date = new Date(`${value}T12:00:00Z`);
   if (Number.isNaN(date.getTime())) return value;
 
-  return new Intl.DateTimeFormat("ar-SY-u-nu-latn", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(date);
+  return `${date.getUTCDate()} ${monthLabel(date.getUTCMonth() + 1)} ${date.getUTCFullYear()}`;
 }
 
 export function nextPayrollAdjustmentId(adjustments: readonly PayrollAdjustment[]) {

@@ -10,23 +10,9 @@ import {
 } from "@/features/expenses/hooks/use-expenses";
 import { Icon, type IconName } from "@/lib/icons";
 import { formatMoney } from "@/lib/format/currency";
+import { monthLabel, SYRIAC_MONTHS } from "@/lib/format/months";
 import { cn } from "@/lib/utils/cn";
 import { SectionTitle } from "../shared/SectionTitle";
-
-const MONTHS = [
-  "كانون الثاني",
-  "شباط",
-  "آذار",
-  "نيسان",
-  "أيار",
-  "حزيران",
-  "تموز",
-  "آب",
-  "أيلول",
-  "تشرين الأول",
-  "تشرين الثاني",
-  "كانون الأول",
-] as const;
 
 type MetricTone = "gold" | "success" | "info" | "danger" | "neutral";
 
@@ -285,7 +271,7 @@ export function SalesProfitsScreen() {
 
   const hasFilterSelection = Boolean(filters.day || filters.month || filters.year);
   const filterDescription = hasSpecificDate
-    ? `${filters.day} / ${MONTHS[Number(filters.month) - 1]} / ${filters.year}`
+    ? `${filters.day} / ${monthLabel(Number(filters.month))} / ${filters.year}`
     : hasFilterSelection
       ? "أكمل اختيار اليوم والشهر والسنة"
       : "عرض كل البيانات";
@@ -434,8 +420,8 @@ export function SalesProfitsScreen() {
               onChange={(month) => setFilters((current) => ({ ...current, month }))}
             >
               <option value="">اختر الشهر</option>
-              {MONTHS.map((month, index) => (
-                <option key={month} value={index + 1}>{month}</option>
+              {SYRIAC_MONTHS.map((month, index) => (
+                <option key={month} value={index + 1}>{monthLabel(index + 1)}</option>
               ))}
             </SelectFilter>
             <SelectFilter

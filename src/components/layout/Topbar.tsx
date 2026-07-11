@@ -5,18 +5,19 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Icon } from "@/lib/icons";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import { monthLabel } from "@/lib/format/months";
 
 function todayLabel(): string {
-  const parts = new Intl.DateTimeFormat("ar-u-nu-latn", {
+  const parts = new Intl.DateTimeFormat("en-CA", {
     day: "numeric",
-    month: "long",
+    month: "numeric",
     year: "numeric",
     timeZone: "Asia/Amman",
   }).formatToParts(new Date());
   const part = (type: Intl.DateTimeFormatPartTypes) =>
     parts.find((item) => item.type === type)?.value ?? "";
 
-  return `اليوم، ${part("day")} ${part("month")} ${part("year")}`;
+  return `اليوم، ${part("day")} ${monthLabel(Number(part("month")))} ${part("year")}`;
 }
 
 function routeTitle(pathname: string, fallback: string): string {

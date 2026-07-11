@@ -87,8 +87,13 @@ export function RequestsTable({
                       {request.customer.firstPhone || "غير محدد"}
                     </div>
                   </td>
-                  <td className="max-w-[150px] px-2.5 py-4 text-content-muted">
-                    {request.customer.address || "غير محدد"}
+                  {/* Exception to the app-wide truncation: the customer
+                      address wraps onto a second line (max 2) instead of
+                      being clipped to a single ellipsised line. */}
+                  <td className="w-[180px] max-w-[180px] whitespace-normal px-2.5 py-4 text-content-muted">
+                    <div className="line-clamp-2 !whitespace-normal break-words leading-5">
+                      {request.customer.address || "غير محدد"}
+                    </div>
                   </td>
                   <td className="max-w-[130px] px-2.5 py-4 text-content-muted">
                     {primaryDevice(request)}

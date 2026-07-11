@@ -18,6 +18,17 @@ export const SYRIAC_MONTHS = [
   "كانون الأول",
 ] as const;
 
+/**
+ * App-wide month display format: the month name with its number in
+ * parentheses, e.g. "نيسان (4)". Every screen that shows a month name goes
+ * through this helper so the format stays identical everywhere.
+ * @param month 1-based month number (1 = كانون الثاني).
+ */
+export function monthLabel(month: number): string {
+  const name = SYRIAC_MONTHS[month - 1];
+  return name ? `${name} (${month})` : "";
+}
+
 /** Weekday short labels, starting on Saturday (Levant week start). */
 export const WEEKDAY_LABELS = [
   "سبت",
@@ -34,13 +45,13 @@ export const WEEK_START_DAY = 6;
 
 /**
  * Format a "YYYY-MM-DD" key into a readable Syriac-month date, e.g.
- * "15 نيسان 2026". Returns an empty string for missing/invalid values.
+ * "15 نيسان (4) 2026". Returns an empty string for missing/invalid values.
  */
 export function formatSyriacDate(value: string): string {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
   if (!match) return "";
   const [, year, month, day] = match;
-  const monthName = SYRIAC_MONTHS[Number(month) - 1];
-  if (!monthName) return "";
-  return `${Number(day)} ${monthName} ${year}`;
+  const label = monthLabel(Number(month));
+  if (!label) return "";
+  return `${Number(day)} ${label} ${year}`;
 }

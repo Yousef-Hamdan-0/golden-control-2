@@ -4,6 +4,60 @@ import { BackendLogo } from "@/components/brand/BackendLogo";
 const BRAND_NAME = "AL-KHUBARA COMPANY";
 const BRAND_SUBTITLE = "Maintenance Center";
 
+/**
+ * Solid maintenance gear (SVG, currentColor) used by the animated cluster
+ * behind the brand content. Purely decorative — hidden from screen readers.
+ */
+function Gear({ className, teeth = 8 }: { className?: string; teeth?: number }) {
+  return (
+    <svg viewBox="0 0 100 100" aria-hidden="true" className={className}>
+      <g fill="currentColor">
+        {Array.from({ length: teeth }).map((_, index) => (
+          <rect
+            key={index}
+            x="44"
+            y="2"
+            width="12"
+            height="20"
+            rx="4"
+            transform={`rotate(${(360 / teeth) * index} 50 50)`}
+          />
+        ))}
+        <path
+          fillRule="evenodd"
+          d="M50 16a34 34 0 1 0 0 68 34 34 0 0 0 0-68Zm0 20a14 14 0 1 1 0 28 14 14 0 0 1 0-28Z"
+        />
+      </g>
+    </svg>
+  );
+}
+
+/**
+ * Meshing gear cluster: neighbouring gears counter-rotate at speeds matched
+ * to their size so the teeth appear mechanically linked. Transform-only
+ * animation (GPU-friendly) and disabled under prefers-reduced-motion.
+ */
+function GearCluster() {
+  return (
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+      {/* Main pair meshing at the top-left of the panel */}
+      <Gear className="absolute -top-10 left-[-44px] h-44 w-44 text-[var(--gold)] opacity-[0.16] [animation:gear-spin_18s_linear_infinite] motion-reduce:[animation:none]" />
+      <Gear
+        teeth={9}
+        className="absolute top-16 left-16 h-24 w-24 text-[var(--gold-active)] opacity-[0.2] [animation:gear-spin_9.5s_linear_infinite_reverse] motion-reduce:[animation:none]"
+      />
+      {/* Large slow gear anchored to the bottom-right corner */}
+      <Gear
+        teeth={10}
+        className="absolute bottom-[-72px] right-[-56px] h-64 w-64 text-[var(--gold)] opacity-[0.12] [animation:gear-spin_26s_linear_infinite_reverse] motion-reduce:[animation:none]"
+      />
+      <Gear
+        className="absolute bottom-24 right-24 h-16 w-16 text-[var(--gold-hover)] opacity-[0.22] [animation:gear-spin_7s_linear_infinite] motion-reduce:[animation:none]"
+      />
+    </div>
+  );
+}
+
 function GridIcon({ className = "" }: { className?: string }) {
   return (
     <svg
@@ -70,6 +124,7 @@ export function AuthBrandPanel() {
   return (
     <section className="relative flex min-h-[360px] flex-1 items-center justify-center overflow-hidden bg-[var(--surface-2)] px-6 py-12 lg:min-h-screen">
       <div className="absolute inset-0 bg-[radial-gradient(75%_65%_at_20%_12%,var(--auth-brand-glow)_0%,transparent_58%),radial-gradient(70%_55%_at_90%_90%,var(--auth-gold-glow)_0%,transparent_62%)]" />
+      <GearCluster />
 
       <div className="relative flex w-full max-w-[460px] flex-col items-center text-center">
         <div className="mb-5 flex h-24 w-24 items-center justify-center rounded-md bg-[var(--surface)] text-white shadow-[0_12px_28px_rgba(138,107,47,0.22)]">

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { monthLabel } from "@/lib/format/months";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -139,11 +140,8 @@ export function isExpenseMonth(value: string) {
 export function formatExpenseMonth(value: string) {
   if (!isExpenseMonth(value)) return value;
 
-  return new Intl.DateTimeFormat("ar-SY-u-nu-latn", {
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(`${value}-01T12:00:00Z`));
+  const [year, month] = value.split("-").map(Number);
+  return `${monthLabel(month)} ${year}`;
 }
 
 export function nextExpenseId(expenses: readonly ExpenseRecord[]) {

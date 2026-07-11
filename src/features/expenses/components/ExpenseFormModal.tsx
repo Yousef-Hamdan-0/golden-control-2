@@ -7,6 +7,7 @@ import { Field, Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { Select } from "@/components/ui/Select";
 import { CURRENCY_SYMBOL } from "@/config/constants";
+import { monthLabel, SYRIAC_MONTHS } from "@/lib/format/months";
 import { Icon } from "@/lib/icons";
 import {
   EXPENSE_CATEGORY_LABELS,
@@ -14,21 +15,6 @@ import {
   type ExpenseInput,
   type ExpenseRecord,
 } from "@/features/expenses/models/expense.model";
-
-const MONTH_OPTIONS = [
-  { value: 1, label: "كانون الثاني" },
-  { value: 2, label: "شباط" },
-  { value: 3, label: "آذار" },
-  { value: 4, label: "نيسان" },
-  { value: 5, label: "أيار" },
-  { value: 6, label: "حزيران" },
-  { value: 7, label: "تموز" },
-  { value: 8, label: "آب" },
-  { value: 9, label: "أيلول" },
-  { value: 10, label: "تشرين الأول" },
-  { value: 11, label: "تشرين الثاني" },
-  { value: 12, label: "كانون الأول" },
-];
 
 const CURRENT_YEAR = new Date().getFullYear();
 const YEAR_OPTIONS = Array.from({ length: 7 }, (_, index) => CURRENT_YEAR + 1 - index);
@@ -219,9 +205,9 @@ export function ExpenseFormModal({
                     }))
                   }
                 >
-                  {MONTH_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {`${option.label} (${option.value})`}
+                  {SYRIAC_MONTHS.map((name, index) => (
+                    <option key={name} value={index + 1}>
+                      {monthLabel(index + 1)}
                     </option>
                   ))}
                 </Select>

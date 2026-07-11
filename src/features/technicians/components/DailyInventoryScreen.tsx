@@ -150,11 +150,11 @@ export function DailyInventoryScreen() {
       )}
 
       {/* Pagination */}
-      <div className="flex items-center justify-between gap-3 text-sm text-content-muted">
+      <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-content-muted">
         <span>
           عرض {start}-{end} من أصل {total} سجل
         </span>
-        <div className="flex items-center gap-1">
+        <div className="flex flex-wrap items-center gap-1">
           <Button
             variant="outline"
             size="sm"

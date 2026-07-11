@@ -2,7 +2,7 @@
 
 import { Field } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
-import { SYRIAC_MONTHS } from "@/lib/format/months";
+import { monthLabel, SYRIAC_MONTHS } from "@/lib/format/months";
 
 const CURRENT_YEAR = new Date().getFullYear();
 const YEARS = Array.from({ length: 8 }, (_, index) => CURRENT_YEAR + 1 - index);
@@ -52,7 +52,7 @@ export function MonthYearFilter({
           <option value="">كل الأشهر</option>
           {SYRIAC_MONTHS.map((name, index) => (
             <option key={name} value={String(index + 1)}>
-              {name}
+              {monthLabel(index + 1)}
             </option>
           ))}
         </Select>
