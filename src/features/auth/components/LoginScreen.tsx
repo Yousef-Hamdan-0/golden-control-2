@@ -5,6 +5,7 @@ import type { FormEvent } from "react";
 import { useState } from "react";
 import { getApiErrorMessage } from "@/helpers/api.helper";
 import { getDeviceToken } from "@/helpers/device-token.helper";
+import { clearAuthSession } from "@/helpers/auth-session.helper";
 import { defaultRouteForRole, normalizeRole } from "@/lib/auth/permissions";
 import { authService } from "@/services/auth.service";
 import {
@@ -47,6 +48,15 @@ export function LoginScreen() {
         remember,
       );
       const role = normalizeRole(session.role);
+
+      // The technician web dashboard was removed — technicians work from
+      // their mobile app, so the site has no screens for them after login.
+      if (role === "technician") {
+        clearAuthSession();
+        setError("حسابات الفنيين تعمل عبر تطبيق الجوال فقط ولا تملك لوحة تحكم على الموقع.");
+        return;
+      }
+
       router.replace(role ? defaultRouteForRole(role) : "/dashboard");
       router.refresh();
     } catch (loginError) {

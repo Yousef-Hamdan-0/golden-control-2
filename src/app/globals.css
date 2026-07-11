@@ -47,6 +47,22 @@ td {
   vertical-align: middle;
 }
 
+/* Long cell content is truncated with an ellipsis instead of stretching the
+   row or breaking the table layout; the full value is available in the
+   details page/modal. Applied to every table in the app (same limit
+   everywhere); screens may tighten specific columns with max-w-[...] like the
+   requests table does. */
+td,
+td div,
+td span,
+td strong,
+td p,
+td a {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 th [dir="ltr"],
 td [dir="ltr"] {
   direction: ltr;

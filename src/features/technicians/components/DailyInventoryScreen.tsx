@@ -23,17 +23,20 @@ export function DailyInventoryScreen() {
   const [page, setPage] = useState(1);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const dailyInventoryQuery = useDailyInventoryAllQuery();
-  // GET /users is admin-only, so the "available technicians" filter (and the
-  // delete action — DELETE /inventory/daily/:id) applies for admins only.
+  // GET /users (list) is allowed for admin/manager/employee, so the
+  // "available technicians" filter behaves identically for the three roles.
+  // The delete action stays admin-only (DELETE /inventory/daily/:id).
   const { role } = useRole();
   const isAdmin = role === "admin";
+  const canListTechnicians =
+    role === "admin" || role === "manager" || role === "employee";
   const availableTechniciansQuery = useUsersQuery(
     {
       role: "technician",
       status: "available",
       pageSize: 1000,
     },
-    isAdmin,
+    canListTechnicians,
   );
   const { remove } = useDailyInventoryMutations();
 
@@ -43,9 +46,9 @@ export function DailyInventoryScreen() {
   );
   const activeInventoryItems = useMemo(() => {
     const items = dailyInventoryQuery.data?.items ?? [];
-    if (!isAdmin) return items;
+    if (!canListTechnicians) return items;
     return items.filter((entry) => availableTechnicianIds.has(entry.technicianId));
-  }, [availableTechnicianIds, dailyInventoryQuery.data?.items, isAdmin]);
+  }, [availableTechnicianIds, dailyInventoryQuery.data?.items, canListTechnicians]);
   const total = activeInventoryItems.length;
   const pageSize = PAGE_SIZE;
   const pages = Math.max(1, Math.ceil(total / pageSize));
@@ -57,8 +60,11 @@ export function DailyInventoryScreen() {
     currentPage * pageSize,
   );
   const isLoading =
-    dailyInventoryQuery.isLoading || (isAdmin && availableTechniciansQuery.isLoading);
-  const isError = dailyInventoryQuery.isError || (isAdmin && availableTechniciansQuery.isError);
+    dailyInventoryQuery.isLoading ||
+    (canListTechnicians && availableTechniciansQuery.isLoading);
+  const isError =
+    dailyInventoryQuery.isError ||
+    (canListTechnicians && availableTechniciansQuery.isError);
   const refetch = () => {
     void dailyInventoryQuery.refetch();
     void availableTechniciansQuery.refetch();

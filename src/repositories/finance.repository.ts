@@ -178,8 +178,10 @@ export const financeRepository = {
   async getSummary(params: FinancialSummaryParams): Promise<FinancialSummary> {
     const query = dateRangeQuery(params);
     const searchParams = new URLSearchParams(query);
+    // The backend moved the range summary to the financial report endpoint;
+    // /api/finance/summary now only serves the single-day summary (?date=).
     const payload = await requestAuthenticatedApi(
-      `${API_ENDPOINTS.finance.summary}?${searchParams}`,
+      `${API_ENDPOINTS.reports.financialData}?${searchParams}`,
       { method: "GET" },
     );
     return normalizeFinancialSummary(payload);

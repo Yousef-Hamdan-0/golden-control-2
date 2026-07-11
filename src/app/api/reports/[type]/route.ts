@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import puppeteer from "puppeteer";
 import { BACKEND_API_ENDPOINTS } from "@/config/api-endpoints";
+import { launchPdfBrowser } from "@/lib/pdf/launch-browser";
 import { localDateKey, localDisplayDateTime } from "@/lib/format/date";
 import {
   REQUEST_PRIORITY_LABELS,
@@ -466,10 +466,7 @@ function reportHtml({
 }
 
 async function renderPdf(html: string) {
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox", "--font-render-hinting=medium"],
-  });
+  const browser = await launchPdfBrowser();
 
   try {
     const page = await browser.newPage();

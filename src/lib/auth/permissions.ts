@@ -30,16 +30,17 @@ const ROUTE_ROLES: { prefix: string; roles: Role[] }[] = [
   { prefix: "/technicians/performance", roles: ["admin"] },
   { prefix: "/technicians/inventory", roles: ["admin", "manager", "employee"] },
   { prefix: "/technicians", roles: ["admin", "manager", "employee"] },
-  // Technicians reach the requests screen through their "طلباتي" menu link.
-  { prefix: "/orders", roles: ["admin", "manager", "employee", "technician"] },
+  // The technician web dashboard was removed — technicians use the mobile app,
+  // so no screen route includes the technician role anymore.
+  { prefix: "/orders", roles: ["admin", "manager", "employee"] },
   { prefix: "/inventory/movement", roles: ["admin"] },
-  { prefix: "/inventory", roles: ["admin", "manager", "employee", "technician"] },
+  { prefix: "/inventory", roles: ["admin", "manager", "employee"] },
   { prefix: "/invoices", roles: ["admin", "manager", "employee"] },
   { prefix: "/finance", roles: ["admin"] },
   { prefix: "/reports", roles: ["admin"] },
-  // Settings view is open to all; editing is enforced server-side (PATCH).
+  // Settings view is open to signed-in staff; editing is enforced server-side.
   { prefix: "/settings/exchange-rate", roles: ["admin"] },
-  { prefix: "/settings", roles: ALL_ROLES },
+  { prefix: "/settings", roles: ["admin", "manager", "employee"] },
 ];
 
 function matchesPrefix(pathname: string, prefix: string): boolean {
@@ -91,9 +92,10 @@ const API_RULES: ApiRule[] = [
   { test: (p) => p.startsWith("/api/auth/"), roles: ALL_ROLES },
   { test: (p) => re("/api/users/me").test(p), roles: ALL_ROLES },
 
-  // Users — admin only per the permissions matrix. The technician-assignment
-  // dropdown skips its users fetch for other roles (see RequestFormModal);
-  // restoring it for manager/employee needs a dedicated backend endpoint.
+  // Users — writes and per-user reads stay admin-only, but manager/employee
+  // may read the list (GET /users) to fill the technician-assignment dropdown
+  // in the requests screens.
+  { test: (p) => p === "/api/users", methods: ["GET"], roles: ["admin", "manager", "employee"] },
   { test: (p) => p === "/api/users" || re("/api/users/:id").test(p), roles: ["admin"] },
 
   // Customers
@@ -143,9 +145,6 @@ const API_RULES: ApiRule[] = [
     roles: ["admin", "manager", "employee"],
   },
 
-  // Technician-only
-  { test: (p) => p.startsWith("/api/technician/"), roles: ["technician"] },
-
   // Dashboard & report generation — admin only
   { test: (p) => p.startsWith("/api/dashboard"), roles: ["admin"] },
   { test: (p) => p.startsWith("/api/reports"), roles: ["admin"] },
@@ -173,5 +172,17 @@ export function canAccessApi(role: Role, method: string, pathname: string): bool
 
 /* --------------------- Employee request-edit fields --------------------- */
 
-/** Fields an Employee may change via PATCH /requests/:id. */
-export const EMPLOYEE_REQUEST_FIELDS = ["techId", "priority", "date", "status"] as const;
+/**
+ * Fields an Employee may change via PATCH /requests/:id. Both the matrix
+ * aliases (techId/date) and the actual payload keys the frontend sends
+ * (technicianId/scheduledDate) are listed so the filter never strips the
+ * technician assignment or the maintenance date.
+ */
+export const EMPLOYEE_REQUEST_FIELDS = [
+  "techId",
+  "technicianId",
+  "priority",
+  "date",
+  "scheduledDate",
+  "status",
+] as const;

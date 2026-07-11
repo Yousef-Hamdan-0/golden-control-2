@@ -235,7 +235,7 @@ export function CustomersScreen() {
                       <td className="px-4 py-4 font-bold text-gold" dir="ltr">
                         {customer.customerNumber}
                       </td>
-                      <td className="px-4 py-4 font-semibold text-content">
+                      <td className="max-w-[150px] px-4 py-4 font-semibold text-content">
                         {customer.name}
                       </td>
                       <td className="px-4 py-4 text-content-muted" dir="ltr">
@@ -244,7 +244,7 @@ export function CustomersScreen() {
                       <td className="px-4 py-4 text-content-muted" dir="ltr">
                         {customer.secondPhone || "غير محدد"}
                       </td>
-                      <td className="px-4 py-4 text-content-muted">
+                      <td className="max-w-[150px] px-4 py-4 text-content-muted">
                         {customer.address || "غير محدد"}
                       </td>
                       <td className="px-4 py-4">

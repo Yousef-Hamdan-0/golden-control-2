@@ -62,20 +62,13 @@ export const NAVIGATION: NavItem[] = [
     ],
   },
   {
-    // Technicians see their own requests instead of the full requests list.
-    label: "طلباتي",
-    href: "/orders",
-    icon: "clipboard",
-    roles: ["technician"],
-  },
-  {
     label: "إدارة المخزون",
     icon: "box",
     children: [
       {
         label: "قطع الغيار",
         href: "/inventory",
-        roles: ["admin", "manager", "employee", "technician"],
+        roles: ["admin", "manager", "employee"],
       },
       { label: "حركة المخزون", href: "/inventory/movement", roles: ["admin"] },
     ],

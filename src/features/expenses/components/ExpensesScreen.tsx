@@ -245,7 +245,7 @@ export function ExpensesScreen({ initialCategory = "all" }: ExpensesScreenProps)
               ) : visibleExpenses.length ? (
                 visibleExpenses.map((expense) => (
                   <tr key={expense.id} className="border-t border-border hover:bg-gold-soft">
-                    <td className="px-4 py-4 font-semibold text-content">{expense.title}</td>
+                    <td className="max-w-[150px] px-4 py-4 font-semibold text-content">{expense.title}</td>
                     <td className="px-4 py-4">
                       <Badge tone={expense.category === "fixed" ? "gold" : "info"}>
                         {EXPENSE_CATEGORY_LABELS[expense.category]}

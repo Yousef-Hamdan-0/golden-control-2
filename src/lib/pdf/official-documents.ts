@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import puppeteer from "puppeteer";
+import { launchPdfBrowser } from "@/lib/pdf/launch-browser";
 import { API_BASE_URL } from "@/config/api-endpoints";
 import { PAYMENT_METHOD_LABELS } from "@/features/operations/constants";
 import type { Invoice } from "@/features/operations/types";
@@ -95,7 +95,9 @@ async function localAssetDataUri(fileName: string) {
 }
 
 async function remoteAssetDataUri(url: string) {
-  const response = await fetch(url, { cache: "no-store" });
+  // A hanging logo fetch must not stall PDF generation past the client's
+  // download timeout; fall back to the bundled logo instead.
+  const response = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(5_000) });
   if (!response.ok) throw new Error("Logo fetch failed");
   const mime = response.headers.get("content-type") ?? mimeFromPath(url);
   const buffer = Buffer.from(await response.arrayBuffer());
@@ -360,10 +362,7 @@ function htmlShell(title: string, brand: DocumentBrand, body: string) {
 }
 
 async function renderHtmlToPdf(html: string) {
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox", "--font-render-hinting=medium"],
-  });
+  const browser = await launchPdfBrowser();
 
   try {
     const page = await browser.newPage();

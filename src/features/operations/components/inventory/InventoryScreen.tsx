@@ -338,7 +338,7 @@ export function InventoryScreen({ section = "parts" }: { section?: string }) {
                         <td className="whitespace-nowrap px-4 py-4 font-bold text-gold">
                           {movement.movementNumber || "رقم غير متاح"}
                         </td>
-                        <td className="px-4 py-4 text-content">
+                        <td className="max-w-[150px] px-4 py-4 text-content">
                           <div className="whitespace-nowrap font-medium">{movement.partName || "قطعة غير محددة"}</div>
                         </td>
                         <td className="px-4 py-4">
@@ -347,8 +347,8 @@ export function InventoryScreen({ section = "parts" }: { section?: string }) {
                           </Badge>
                         </td>
                         <td className="whitespace-nowrap px-4 py-4 text-content-muted">{movement.quantity}</td>
-                        <td className="whitespace-nowrap px-4 py-4 text-content-muted">{movement.owner}</td>
-                        <td className="whitespace-nowrap px-4 py-4 text-content-muted">{movement.reference || "غير محدد"}</td>
+                        <td className="max-w-[150px] whitespace-nowrap px-4 py-4 text-content-muted">{movement.owner}</td>
+                        <td className="max-w-[150px] whitespace-nowrap px-4 py-4 text-content-muted">{movement.reference || "غير محدد"}</td>
                         <td className="whitespace-nowrap px-4 py-4 text-content-muted">
                           {localDisplayDateTime(movement.createdAt, "غير محدد")}
                         </td>
@@ -396,7 +396,7 @@ export function InventoryScreen({ section = "parts" }: { section?: string }) {
                       <td className="px-4 py-4">
                         <div className="font-bold text-gold">{item.sparePartNumber}</div>
                       </td>
-                      <td className="px-4 py-4 text-content">{item.name}</td>
+                      <td className="max-w-[150px] px-4 py-4 text-content">{item.name}</td>
                       <td className="px-4 py-4">
                         <Badge tone={item.quantity <= 0 ? "danger" : "success"} dot>
                           {item.quantity}

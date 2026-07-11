@@ -65,6 +65,15 @@ export function Shell({ title = "نظرة عامة", children }: { title?: strin
     const role = normalizeRole(readAuthSession()?.role);
     if (!role) return;
 
+    // The technician web dashboard was removed — end any technician session
+    // instead of redirect-looping between screens they cannot open.
+    if (role === "technician") {
+      clearAuthSession();
+      toast.error("لا صلاحية", "حسابات الفنيين تعمل عبر تطبيق الجوال فقط.");
+      router.replace("/login");
+      return;
+    }
+
     if (canAccessRoute(role, pathname)) {
       setIsRouteAllowed(true);
       return;

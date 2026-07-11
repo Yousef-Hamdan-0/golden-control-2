@@ -3,6 +3,9 @@
    Dark mode uses the next-themes class strategy (class="dark" on <html>). */
 
 :root {
+  /* Native controls (selects, date inputs, scrollbars) follow the theme. */
+  color-scheme: light;
+
   /* surfaces — light mode */
   --bg: #faf8f3;
   --surface: #ffffff;
@@ -46,6 +49,8 @@
 }
 
 .dark {
+  color-scheme: dark;
+
   --bg: #0b0b0c;
   --surface: #121214;
   --surface-2: #1a1a1d;
@@ -56,7 +61,9 @@
 
   --gold: #b08d3c;
   --gold-hover: #c6a24a;
-  --gold-active: #8a6b2f;
+  /* Brighter than the light-mode value: #8a6b2f is unreadable as text on the
+     dark background, and this keeps enough contrast under white button text. */
+  --gold-active: #9d7c35;
   --gold-soft: rgba(176, 141, 60, 0.16);
 
   --gold-rgb: 176 141 60;
@@ -65,7 +72,9 @@
   --text: #f5f5f5;
   --text-muted: #a1a1a1;
 
-  --border: #2a2418;
+  /* Slightly lighter than before so card/table borders stay visible on the
+     dark surfaces instead of disappearing into them. */
+  --border: #363021;
   --auth-brand-glow: rgba(176, 141, 60, 0.10);
   --auth-gold-glow: rgba(176, 141, 60, 0.22);
 

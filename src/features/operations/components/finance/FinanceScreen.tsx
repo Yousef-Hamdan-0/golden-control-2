@@ -31,10 +31,17 @@ export function FinanceScreen({ section }: { section?: string[] }) {
   const title = financeTitle(section);
   const isReport = section?.[0] === "reports";
   const [page, setPage] = useState(1);
-  const summaryQuery = useFinanceSummaryQuery({
-    startDate: "2000-01-01",
-    endDate: new Date().toISOString().slice(0, 10),
-  });
+  // The financial report API caps the period at 3 months.
+  const summaryRange = (() => {
+    const start = new Date();
+    start.setMonth(start.getMonth() - 3);
+    start.setDate(start.getDate() + 1);
+    return {
+      startDate: start.toISOString().slice(0, 10),
+      endDate: new Date().toISOString().slice(0, 10),
+    };
+  })();
+  const summaryQuery = useFinanceSummaryQuery(summaryRange);
   const summary = summaryQuery.data;
   const salesTotal = summary?.totalRevenues ?? 0;
   const expensesTotal = (summary?.fixedCosts ?? 0) + (summary?.variableCosts ?? 0);

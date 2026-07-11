@@ -177,26 +177,12 @@ export function RequestDetailsModal({
 
         {request ? (
           <>
-            {onEdit || onDownloadPdf ? (
+            {onEdit ? (
               <div className="flex flex-wrap items-center justify-end gap-2 border-b border-border pb-4">
-                {onDownloadPdf ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={downloadingPdf}
-                    onClick={() => onDownloadPdf(request)}
-                  >
-                    <Icon name="file" size={16} />
-                    {downloadingPdf ? "جاري التحميل..." : "PDF"}
-                  </Button>
-                ) : null}
-                {onEdit ? (
-                  <Button type="button" size="sm" onClick={() => onEdit(request)}>
-                    <Icon name="pencil" size={16} />
-                    تعديل
-                  </Button>
-                ) : null}
+                <Button type="button" size="sm" onClick={() => onEdit(request)}>
+                  <Icon name="pencil" size={16} />
+                  تعديل
+                </Button>
               </div>
             ) : null}
 
@@ -226,6 +212,20 @@ export function RequestDetailsModal({
             />
 
             <RequestRecordsSection records={request.records} />
+
+            {onDownloadPdf ? (
+              <div className="flex justify-end border-t border-border pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={downloadingPdf}
+                  onClick={() => onDownloadPdf(request)}
+                >
+                  <Icon name="file" size={16} />
+                  {downloadingPdf ? "جاري التحميل..." : "تحميل PDF"}
+                </Button>
+              </div>
+            ) : null}
           </>
         ) : null}
       </div>

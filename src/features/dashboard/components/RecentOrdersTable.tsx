@@ -55,9 +55,9 @@ export function RecentOrdersTable({
                 <td className="px-5 py-5 font-bold text-gold">
                   #{order.requestNumber || order.id}
                 </td>
-                <td className="px-5 py-5">{order.client}</td>
-                <td className="px-5 py-5 text-content-muted">{order.device}</td>
-                <td className="px-5 py-5">{order.technician}</td>
+                <td className="max-w-[150px] px-5 py-5">{order.client}</td>
+                <td className="max-w-[150px] px-5 py-5 text-content-muted">{order.device}</td>
+                <td className="max-w-[150px] px-5 py-5">{order.technician}</td>
                 <td className="px-5 py-5">
                   <Badge tone={requestStatusMeta(order.status).tone} dot>
                     {requestStatusMeta(order.status).label}

@@ -64,16 +64,12 @@ export const API_ROUTES = {
     partById: (id: string) => `/api/inventory/parts/${encodeURIComponent(id)}`,
     movements: "/api/inventory/movements",
   },
-  technician: {
-    myRequests: "/api/technician/my-requests",
-    requestStatus: (id: string) =>
-      `/api/technician/requests/${encodeURIComponent(id)}/status`,
-  },
   reports: {
     requests: "/api/reports/requests",
     technicians: "/api/reports/technicians",
     inventoryMovements: "/api/reports/inventory-movements",
     financial: "/api/reports/financial",
+    financialData: "/api/reports/financial/data",
   },
   settings: {
     root: "/api/settings",
@@ -102,8 +98,8 @@ export const API_ENDPOINTS = {
   payrollRecords: API_ROUTES.payrollRecords,
   finance: API_ROUTES.finance,
   inventory: API_ROUTES.inventory,
-  technician: API_ROUTES.technician,
   settings: API_ROUTES.settings,
+  reports: API_ROUTES.reports,
 } as const;
 
 export const BACKEND_API_ENDPOINTS = {
@@ -172,10 +168,6 @@ export const BACKEND_API_ENDPOINTS = {
     parts: createApiUrl(API_ROUTES.inventory.parts),
     partById: (id: string) => createApiUrl(API_ROUTES.inventory.partById(id)),
     movements: createApiUrl(API_ROUTES.inventory.movements),
-  },
-  technician: {
-    myRequests: createApiUrl(API_ROUTES.technician.myRequests),
-    requestStatus: (id: string) => createApiUrl(API_ROUTES.technician.requestStatus(id)),
   },
   reports: {
     requests: createApiUrl(API_ROUTES.reports.requests),

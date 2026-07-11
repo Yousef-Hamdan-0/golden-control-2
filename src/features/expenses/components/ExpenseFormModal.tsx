@@ -15,6 +15,40 @@ import {
   type ExpenseRecord,
 } from "@/features/expenses/models/expense.model";
 
+const MONTH_OPTIONS = [
+  { value: 1, label: "كانون الثاني" },
+  { value: 2, label: "شباط" },
+  { value: 3, label: "آذار" },
+  { value: 4, label: "نيسان" },
+  { value: 5, label: "أيار" },
+  { value: 6, label: "حزيران" },
+  { value: 7, label: "تموز" },
+  { value: 8, label: "آب" },
+  { value: 9, label: "أيلول" },
+  { value: 10, label: "تشرين الأول" },
+  { value: 11, label: "تشرين الثاني" },
+  { value: 12, label: "كانون الأول" },
+];
+
+const CURRENT_YEAR = new Date().getFullYear();
+const YEAR_OPTIONS = Array.from({ length: 7 }, (_, index) => CURRENT_YEAR + 1 - index);
+
+function monthKey(year: number, month: number) {
+  return `${year}-${String(month).padStart(2, "0")}`;
+}
+
+function monthPartsFromKey(value: string) {
+  const [year, month] = value.split("-").map(Number);
+  const today = new Date();
+  return {
+    year: Number.isFinite(year) ? year : today.getFullYear(),
+    month:
+      Number.isFinite(month) && month >= 1 && month <= 12
+        ? month
+        : today.getMonth() + 1,
+  };
+}
+
 /** Keep manual typing working: accept Arabic-Indic digits and strip the rest. */
 function sanitizeAmountText(value: string) {
   return value
@@ -52,6 +86,11 @@ export function ExpenseFormModal({
   );
   const [error, setError] = useState("");
   const [pendingEdit, setPendingEdit] = useState<ExpenseInput | null>(null);
+  const draftMonthParts = monthPartsFromKey(draft.month);
+  // Keep an out-of-range stored year (old expense) selectable while editing.
+  const yearOptions = YEAR_OPTIONS.includes(draftMonthParts.year)
+    ? YEAR_OPTIONS
+    : [draftMonthParts.year, ...YEAR_OPTIONS];
 
   function submitExpense(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -164,16 +203,49 @@ export function ExpenseFormModal({
             </Field>
 
             <Field label="الشهر والسنة" htmlFor="expense-month">
-              <Input
-                id="expense-month"
-                type="month"
-                dir="ltr"
-                value={draft.month}
-                disabled={submitting}
-                onChange={(event) =>
-                  setDraft((current) => ({ ...current, month: event.target.value }))
-                }
-              />
+              <div className="grid grid-cols-2 gap-2">
+                <Select
+                  id="expense-month"
+                  aria-label="الشهر"
+                  value={monthPartsFromKey(draft.month).month}
+                  disabled={submitting}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      month: monthKey(
+                        monthPartsFromKey(current.month).year,
+                        Number(event.target.value),
+                      ),
+                    }))
+                  }
+                >
+                  {MONTH_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {`${option.label} (${option.value})`}
+                    </option>
+                  ))}
+                </Select>
+                <Select
+                  aria-label="السنة"
+                  value={monthPartsFromKey(draft.month).year}
+                  disabled={submitting}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      month: monthKey(
+                        Number(event.target.value),
+                        monthPartsFromKey(current.month).month,
+                      ),
+                    }))
+                  }
+                >
+                  {yearOptions.map((year) => (
+                    <option key={year} value={year}>
+                      {year}
+                    </option>
+                  ))}
+                </Select>
+              </div>
             </Field>
           </div>
 

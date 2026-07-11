@@ -69,7 +69,10 @@ async function requestBlobWithAccessToken(
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 15_000);
+  // Blob downloads cover the server-generated PDFs (requests, invoices,
+  // reports): puppeteer launch + backend fetches routinely exceed 15s, and an
+  // early abort made the download fail for every role. 60s covers cold starts.
+  const timeoutId = setTimeout(() => controller.abort(), 60_000);
   const headers = new Headers(options.headers);
   headers.set("Authorization", `Bearer ${accessToken}`);
 

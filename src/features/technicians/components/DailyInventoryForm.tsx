@@ -31,18 +31,19 @@ export function DailyInventoryForm({ onCancel, onSaved }: DailyInventoryFormProp
   const router = useRouter();
   const toast = useToast();
   const { create } = useDailyInventoryMutations();
-  // Reuse the users feature to populate the technician picker. GET /users is
-  // admin-only per the permissions matrix, so the picker loads for admins
-  // only; other roles see an explanatory note instead of a broken list.
+  // Reuse the users feature to populate the technician picker. GET /users
+  // (list) is allowed for admin/manager/employee, so the picker loads for the
+  // three roles and the form looks identical for all of them.
   const { role } = useRole();
-  const isAdmin = role === "admin";
+  const canListTechnicians =
+    role === "admin" || role === "manager" || role === "employee";
   const { data: techs } = useUsersQuery(
     {
       role: "technician",
       status: "available",
       pageSize: 1000,
     },
-    isAdmin,
+    canListTechnicians,
   );
   const dailyInventoryQuery = useDailyInventoryAllQuery();
   const isCheckingDailyInventory =
@@ -130,11 +131,6 @@ export function DailyInventoryForm({ onCancel, onSaved }: DailyInventoryFormProp
               })}
             </Select>
           </Field>
-          {!isAdmin ? (
-            <p className="text-xs text-content-muted">
-              قائمة الفنيين متاحة لمدير النظام فقط حالياً.
-            </p>
-          ) : null}
           {isCheckingDailyInventory ? (
             <p className="text-xs text-content-muted">جارٍ التحقق من سجلات المخزون الحالية...</p>
           ) : null}

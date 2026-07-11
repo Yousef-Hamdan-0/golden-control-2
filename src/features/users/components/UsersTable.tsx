@@ -93,13 +93,13 @@ export function UsersTable({ users, isLoading, total, page, pageSize, onPage, on
                         {u.userNumber ?? "—"}
                       </button>
                     </td>
-                    <td className="px-4 py-4 text-content">
+                    <td className="max-w-[150px] px-4 py-4 text-content">
                       <div className="flex items-center gap-2.5">
                         <UserAvatar name={u.fullName} imageUrl={u.imageUrl} size="sm" />
-                        <span>{u.fullName}</span>
+                        <span className="max-w-[110px]">{u.fullName}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-4 text-content-muted">{u.email}</td>
+                    <td className="max-w-[150px] px-4 py-4 text-content-muted">{u.email}</td>
                     <td className="px-4 py-4 text-content-muted" dir="ltr">
                       {u.phone}
                     </td>

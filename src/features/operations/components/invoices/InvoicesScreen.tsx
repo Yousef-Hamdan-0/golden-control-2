@@ -344,8 +344,8 @@ export function InvoicesScreen() {
               ) : visibleInvoices.map((invoice) => (
                 <tr key={invoice.id} className="border-b border-border last:border-0 hover:bg-gold-soft">
                   <td className="px-4 py-4 font-bold text-gold" dir="ltr">{invoiceDisplayNumber(invoice)}</td>
-                  <td className="px-4 py-4 text-content">
-                    <span className="font-medium">{invoice.client}</span>
+                  <td className="max-w-[200px] px-4 py-4 text-content">
+                    <span className="max-w-[110px] font-medium">{invoice.client}</span>
                     <span className="mx-2 text-content-muted">-</span>
                     <span className="text-xs text-content-muted" dir="ltr">{invoice.clientPhone}</span>
                   </td>

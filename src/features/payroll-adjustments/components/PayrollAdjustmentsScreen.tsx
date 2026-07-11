@@ -331,7 +331,7 @@ export function PayrollAdjustmentsScreen() {
 
                   return (
                     <tr key={adjustment.id} className="border-t border-border hover:bg-gold-soft">
-                      <td className="px-4 py-4 font-semibold text-content">
+                      <td className="max-w-[150px] px-4 py-4 font-semibold text-content">
                         {user?.fullName ?? "مستخدم غير محدد"}
                       </td>
                       <td className="px-4 py-4 text-content-muted">
@@ -345,7 +345,7 @@ export function PayrollAdjustmentsScreen() {
                       <td className="px-4 py-4 font-medium text-content" dir="ltr">
                         {formatMoney(adjustment.amount, "SYP")}
                       </td>
-                      <td className="max-w-64 px-4 py-4 text-content-muted">
+                      <td className="max-w-[150px] px-4 py-4 text-content-muted">
                         {adjustment.note || "لا توجد"}
                       </td>
                       <td className="px-4 py-4 text-content-muted">

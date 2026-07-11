@@ -8,7 +8,6 @@ import { PAGE_SIZE } from "@/config/constants";
 import { EmptyState } from "@/features/operations/components/shared/EmptyState";
 import { Icon } from "@/lib/icons";
 import {
-  REQUEST_PRIORITY_LABELS,
   REQUEST_STATUS_LABELS,
   REQUEST_STATUS_TONE,
   type RepairRequest,
@@ -31,8 +30,6 @@ interface RequestsTableProps {
   onEdit?: (request: RepairRequest) => void;
   /** Omitted for roles that cannot download the PDF (technician). */
   onDownloadPdf?: (request: RepairRequest) => void;
-  /** Technician-only status update action. */
-  onUpdateStatus?: (request: RepairRequest) => void;
 }
 
 export function RequestsTable({
@@ -46,24 +43,23 @@ export function RequestsTable({
   onDetails,
   onEdit,
   onDownloadPdf,
-  onUpdateStatus,
 }: RequestsTableProps) {
   return (
     <Card className="overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="min-w-[920px] w-full text-right text-sm">
+        <table className="w-full text-right text-sm">
           <thead>
             <tr className="bg-surface-2 text-content-muted">
               {[
                 "رقم الطلب",
                 "العميل",
+                "عنوان العميل",
                 "الجهاز",
                 "الفني",
                 "الحالة",
-                "الأولوية",
                 "الإجراءات",
               ].map((header) => (
-                <th key={header} className="px-4 py-3 font-medium">
+                <th key={header} className="px-2.5 py-3 font-medium">
                   {header}
                 </th>
               ))}
@@ -80,31 +76,33 @@ export function RequestsTable({
                   key={request.id}
                   className="border-b border-border hover:bg-gold-soft"
                 >
-                  <td className="px-4 py-4 font-bold text-gold" dir="ltr">
+                  <td className="px-2.5 py-4 font-bold text-gold" dir="ltr">
                     {request.requestNumber}
                   </td>
-                  <td className="px-4 py-4">
-                    <div className="font-semibold text-content">{request.customer.name}</div>
-                    <div className="text-xs text-content-muted" dir="ltr">
+                  <td className="max-w-[150px] px-2.5 py-4">
+                    <div className="max-w-[140px] font-semibold text-content">
+                      {request.customer.name}
+                    </div>
+                    <div className="max-w-[140px] text-xs text-content-muted" dir="ltr">
                       {request.customer.firstPhone || "غير محدد"}
                     </div>
                   </td>
-                  <td className="px-4 py-4 text-content-muted">{primaryDevice(request)}</td>
-                  <td className="px-4 py-4 text-content">
+                  <td className="max-w-[150px] px-2.5 py-4 text-content-muted">
+                    {request.customer.address || "غير محدد"}
+                  </td>
+                  <td className="max-w-[130px] px-2.5 py-4 text-content-muted">
+                    {primaryDevice(request)}
+                  </td>
+                  <td className="max-w-[120px] px-2.5 py-4 text-content">
                     {technicianDisplayName(request, usersById)}
                   </td>
-                  <td className="px-4 py-4">
+                  <td className="px-2.5 py-4">
                     <Badge tone={REQUEST_STATUS_TONE[request.status]} dot>
                       {REQUEST_STATUS_LABELS[request.status]}
                     </Badge>
                   </td>
-                  <td className="px-4 py-4">
-                    <Badge tone={request.priority === "emergency" ? "danger" : "neutral"}>
-                      {REQUEST_PRIORITY_LABELS[request.priority]}
-                    </Badge>
-                  </td>
-                  <td className="px-4 py-4">
-                    <div className="flex items-center justify-start gap-2" dir="rtl">
+                  <td className="px-2.5 py-4">
+                    <div className="flex items-center justify-start gap-1" dir="rtl">
                       <button
                         type="button"
                         aria-label={`تفاصيل ${request.requestNumber}`}
@@ -129,20 +127,6 @@ export function RequestsTable({
                           className="rounded-sm p-1.5 text-content-muted hover:bg-surface-2"
                         >
                           <Icon name="pencil" size={18} />
-                        </button>
-                      ) : null}
-                      {onUpdateStatus ? (
-                        <button
-                          type="button"
-                          aria-label={`تحديث حالة ${request.requestNumber}`}
-                          title="تحديث الحالة"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            onUpdateStatus(request);
-                          }}
-                          className="rounded-sm p-1.5 text-content-muted hover:bg-surface-2"
-                        >
-                          <Icon name="wrench" size={18} />
                         </button>
                       ) : null}
                       {onDownloadPdf ? (

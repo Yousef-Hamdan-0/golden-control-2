@@ -90,13 +90,21 @@ function todayKey() {
   return new Date().toISOString().slice(0, 10);
 }
 
+/** The financial report API caps the period at 3 months. */
+function lastThreeMonthsRange() {
+  const start = new Date();
+  start.setMonth(start.getMonth() - 3);
+  start.setDate(start.getDate() + 1);
+  return { startDate: start.toISOString().slice(0, 10), endDate: todayKey() };
+}
+
 function dateRangeFromFilters(filters: DateParts) {
   if (filters.day && filters.month && filters.year) {
     const date = isoDate(filters.year, filters.month, filters.day);
     return { startDate: date, endDate: date };
   }
 
-  return { startDate: "2000-01-01", endDate: todayKey() };
+  return lastThreeMonthsRange();
 }
 
 function seriesForValue(value: number) {

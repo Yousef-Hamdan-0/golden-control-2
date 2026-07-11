@@ -126,20 +126,23 @@ export function RequestFormModal({
   const [draft, setDraft] = useState<RequestFormDraft>(() => initialDraft(request, defaultType));
   const [errors, setErrors] = useState<FieldErrors>({});
   const { role } = useRole();
-  const isAdmin = role === "admin";
-  // GET /users is admin-only per the permissions matrix, so the technician
-  // list loads only for admins. Manager/employee keep or clear the current
-  // technician; restoring assignment for them needs a backend endpoint that
-  // exposes the technicians list to those roles.
+  // Admin, manager and employee can all assign/change the technician, so the
+  // technician list loads for the three roles (GET /users list is allowed
+  // for them in the permissions layer).
+  const canAssignTechnician =
+    role === "admin" || role === "manager" || role === "employee";
   const { data: technicians = [] } = useUsersAllQuery(
     { role: "technician", status: "available" },
-    isAdmin,
+    canAssignTechnician,
   );
-  // The matrix limits employee edits to techId/priority/date/status (the
+  // The matrix limits employee edits to technician/priority/date/status (the
   // server strips everything else) — lock the other fields in the UI too.
   const lockEmployeeFields = isEdit && role === "employee";
+  // Keep the currently assigned technician selectable even if they are not in
+  // the fetched list (e.g. no longer "available" or the list failed to load).
   const currentTechnician =
-    !isAdmin && request?.technicianId
+    request?.technicianId &&
+    !technicians.some((technician) => technician.id === request.technicianId)
       ? {
           id: request.technicianId,
           name:
@@ -400,11 +403,6 @@ export function RequestFormModal({
                   </option>
                 ))}
               </Select>
-              {!isAdmin ? (
-                <p className="mt-1 text-xs text-content-muted">
-                  قائمة الفنيين متاحة لمدير النظام فقط حالياً.
-                </p>
-              ) : null}
             </Field>
             {isEdit ? (
               <Field label="الحالة">
