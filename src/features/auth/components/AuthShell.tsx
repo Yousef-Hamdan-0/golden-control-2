@@ -11,7 +11,9 @@ export function AuthShell({ children }: { children: ReactNode }) {
 
       <section className="relative flex min-h-[560px] flex-1 items-center justify-center bg-[var(--surface)] px-6 pb-24 pt-14 lg:min-h-screen lg:px-12">
         <div className="w-full max-w-[448px]">{children}</div>
+
       </section>
     </main>
   );
 }
+

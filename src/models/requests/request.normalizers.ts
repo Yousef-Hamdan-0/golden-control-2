@@ -961,3 +961,34 @@ export function requestToInput(request: RepairRequest): RepairRequestInput {
     status: request.status,
   };
 }
+
+/** POST /api/requests/assign-bulk — assigns several requests to one technician. */
+export interface BulkAssignInput {
+  requestIds: string[];
+  technicianId: string;
+}
+
+export interface BulkAssignResultItem {
+  requestId: string;
+  requestNumber: string;
+}
+
+export interface BulkAssignResult {
+  assignments: BulkAssignResultItem[];
+  notFoundRequestIds: string[];
+}
+
+export function normalizeBulkAssignResponse(payload: unknown): BulkAssignResult {
+  const root = isRecord(payload) ? payload : {};
+  const data = isRecord(root.data) ? root.data : {};
+  const rawAssignments = Array.isArray(data.assignments) ? data.assignments : [];
+  const rawNotFound = Array.isArray(data.notFoundRequestIds) ? data.notFoundRequestIds : [];
+
+  return {
+    assignments: rawAssignments.filter(isRecord).map((item) => ({
+      requestId: stringValue(item.requestId, item.request_id),
+      requestNumber: stringValue(item.requestNumber, item.request_number),
+    })),
+    notFoundRequestIds: rawNotFound.map((id) => stringValue(id)).filter(Boolean),
+  };
+}

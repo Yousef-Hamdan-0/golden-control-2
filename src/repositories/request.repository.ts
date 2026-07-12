@@ -7,12 +7,15 @@ import {
 } from "@/helpers/authenticated-api.helper";
 import {
   maybeNormalizeRepairRequestResponse,
+  normalizeBulkAssignResponse,
   normalizeRepairRequestListResponse,
   normalizeRepairRequestResponse,
   normalizeStatusHistoryResponse,
   RepairRequestPayloadModel,
   RequestListQuerySchema,
   RequestRecordsInputSchema,
+  type BulkAssignInput,
+  type BulkAssignResult,
   type RepairRequest,
   type RepairRequestInput,
   type RepairRequestPriority,
@@ -126,5 +129,14 @@ export const requestRepository = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
+  },
+
+  async assignBulk(input: BulkAssignInput): Promise<BulkAssignResult> {
+    const payload = await requestAuthenticatedApi(API_ENDPOINTS.requests.assignBulk, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    return normalizeBulkAssignResponse(payload);
   },
 };

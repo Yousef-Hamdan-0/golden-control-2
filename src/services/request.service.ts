@@ -5,6 +5,8 @@ import {
 import type { AuthenticatedBlobResponse } from "@/helpers/authenticated-api.helper";
 import type { Paginated } from "@/repositories/user.repository";
 import type {
+  BulkAssignInput,
+  BulkAssignResult,
   RepairRequest,
   RepairRequestInput,
   RepairRequestStatusHistoryItem,
@@ -38,5 +40,9 @@ export const requestService = {
 
   uploadRecords(input: RequestRecordsInput): Promise<void> {
     return requestRepository.uploadRecords(input);
+  },
+
+  assignBulk(input: BulkAssignInput): Promise<BulkAssignResult> {
+    return requestRepository.assignBulk(input);
   },
 };

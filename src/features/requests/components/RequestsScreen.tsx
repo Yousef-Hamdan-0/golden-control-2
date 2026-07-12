@@ -36,6 +36,7 @@ import {
   useRequestsQuery,
   useRequestStatusHistoryQuery,
 } from "@/features/requests/hooks/use-requests";
+import { AssignTechnicianModal } from "@/features/requests/components/AssignTechnicianModal";
 import { RequestDetailsModal } from "@/features/requests/components/RequestDetailsModal";
 import { RequestFormModal } from "@/features/requests/components/RequestFormModal";
 import { RequestsTable } from "@/features/requests/components/RequestsTable";
@@ -103,8 +104,15 @@ export function RequestsScreen() {
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
   const [editingRequest, setEditingRequest] = useState<RepairRequest | null>(null);
   const [pdfRequestId, setPdfRequestId] = useState<string | null>(null);
+  const [printRequestId, setPrintRequestId] = useState<string | null>(null);
+  // Bulk "assign to technician" selection (UI only; API wired later).
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedRequests, setSelectedRequests] = useState<Map<string, RepairRequest>>(
+    () => new Map(),
+  );
+  const [showAssignModal, setShowAssignModal] = useState(false);
   const creatingRequestRef = useRef(false);
-  const { create, update } = useRequestMutations();
+  const { create, update, assignBulk } = useRequestMutations();
   const { role } = useRole();
   // GET /users (list) is allowed for admin/manager/employee — the roles that
   // reach this screen (the technician web dashboard was removed).
@@ -179,6 +187,72 @@ export function RequestsScreen() {
     } finally {
       setPdfRequestId(null);
     }
+  }
+
+  // Prints the exact same server-generated PDF used by "تحميل PDF", so the
+  // printed copy and the downloaded file are guaranteed to be identical (same
+  // bytes, same call to requestService.downloadReceipt).
+  async function printRequestReport(request: RepairRequest) {
+    setPrintRequestId(request.id);
+    try {
+      const response = await requestService.downloadReceipt(request.id);
+      const url = URL.createObjectURL(response.blob);
+      const printWindow = window.open(url, "_blank");
+      if (printWindow) {
+        printWindow.addEventListener("load", () => printWindow.print());
+      } else {
+        toast.error("تعذر فتح التقرير", "يرجى السماح بالنوافذ المنبثقة لهذا الموقع.");
+      }
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (error) {
+      toast.error("تعذر طباعة التقرير", getPdfDownloadErrorMessage(error));
+    } finally {
+      setPrintRequestId(null);
+    }
+  }
+
+  function toggleSelectionMode() {
+    setIsSelectionMode((current) => {
+      // Leaving selection mode clears every selection.
+      if (current) setSelectedRequests(new Map());
+      return !current;
+    });
+  }
+
+  function toggleRequestSelection(request: RepairRequest) {
+    setSelectedRequests((current) => {
+      const next = new Map(current);
+      if (next.has(request.id)) next.delete(request.id);
+      else next.set(request.id, request);
+      return next;
+    });
+  }
+
+  function submitBulkAssign(technicianId: string) {
+    assignBulk.mutate(
+      { requestIds: Array.from(selectedRequests.keys()), technicianId },
+      {
+        onSuccess: (result) => {
+          setShowAssignModal(false);
+          setSelectedRequests(new Map());
+          setIsSelectionMode(false);
+
+          if (result.notFoundRequestIds.length > 0) {
+            toast.error(
+              "لم يتم العثور على بعض الطلبات",
+              `تعذر إسناد ${result.notFoundRequestIds.length} من الطلبات المحددة لأنها غير موجودة. تم إسناد البقية بنجاح.`,
+            );
+            return;
+          }
+
+          toast.success(
+            "تم الإسناد",
+            `تم إسناد ${result.assignments.length} طلب/طلبات إلى الفني بنجاح.`,
+          );
+        },
+        onError: (error) => toast.error("تعذر إسناد الطلبات", getApiErrorMessage(error)),
+      },
+    );
   }
 
   function submitCreate(input: RepairRequestInput) {
@@ -283,6 +357,7 @@ export function RequestsScreen() {
           }
           usersById={usersById}
           downloadingPdf={pdfRequestId === selectedRequestId}
+          printingPdf={printRequestId === selectedRequestId}
           onClose={() => setSelectedRequestId(null)}
           onEdit={(request) => {
             update.reset();
@@ -290,6 +365,7 @@ export function RequestsScreen() {
             setEditingRequest(request);
           }}
           onDownloadPdf={downloadPdf}
+          onPrintReport={printRequestReport}
         />
       ) : null}
       {showDateFilter ? (
@@ -369,6 +445,30 @@ export function RequestsScreen() {
         </Button>
       </FilterCard>
 
+      {/* Bulk-assign toolbar: selection toggle + assign action (new requests only). */}
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {selectedRequests.size > 0 ? (
+          <Button
+            type="button"
+            onClick={() => {
+              assignBulk.reset();
+              setShowAssignModal(true);
+            }}
+          >
+            <Icon name="wrench" size={18} />
+            إسناد إلى فني ({selectedRequests.size})
+          </Button>
+        ) : null}
+        <Button
+          type="button"
+          variant={isSelectionMode ? "primary" : "outline"}
+          onClick={toggleSelectionMode}
+        >
+          <Icon name="clipboard" size={18} />
+          {isSelectionMode ? "إلغاء التحديد" : "تحديد الطلبات"}
+        </Button>
+      </div>
+
       {isError && !data ? (
         <div className="rounded-md border border-danger/30 bg-danger-soft p-6 text-center text-sm text-danger">
           تعذر تحميل الطلبات.{" "}
@@ -384,6 +484,9 @@ export function RequestsScreen() {
           totalRequests={totalRequests}
           usersById={usersById}
           pdfRequestId={pdfRequestId}
+          selectionMode={isSelectionMode}
+          selectedIds={new Set(selectedRequests.keys())}
+          onToggleSelect={toggleRequestSelection}
           onPage={setPage}
           onDetails={(request) => setSelectedRequestId(request.id)}
           onEdit={(request) => {
@@ -393,6 +496,18 @@ export function RequestsScreen() {
           onDownloadPdf={downloadPdf}
         />
       )}
+
+      {showAssignModal ? (
+        <AssignTechnicianModal
+          requests={Array.from(selectedRequests.values())}
+          onClose={() => {
+            if (!assignBulk.isPending) setShowAssignModal(false);
+          }}
+          onAssign={submitBulkAssign}
+          submitting={assignBulk.isPending}
+          submitError={assignBulk.error ? getApiErrorMessage(assignBulk.error) : undefined}
+        />
+      ) : null}
     </div>
   );
 }

@@ -31,7 +31,7 @@ export interface PayrollAdjustmentInput {
 }
 
 export const PAYROLL_ADJUSTMENT_LABELS: Record<PayrollAdjustmentType, string> = {
-  salary: "راتب",
+  salary: "سلفة",
   bonus: "مكافأة",
   deduction: "خصم",
   overtime: "عمل إضافي",

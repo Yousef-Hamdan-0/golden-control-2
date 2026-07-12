@@ -8,6 +8,9 @@ import {
   useFinanceDailySummaryQuery,
   useFinanceSummaryQuery,
 } from "@/features/expenses/hooks/use-expenses";
+import { useInvoicesAllQuery } from "@/features/invoices/hooks/use-invoices";
+import { useDollarExchangeRate } from "@/features/settings/hooks/use-settings";
+import { remaining } from "@/features/operations/utils/invoice";
 import { Icon, type IconName } from "@/lib/icons";
 import { formatMoney } from "@/lib/format/currency";
 import { monthLabel, SYRIAC_MONTHS } from "@/lib/format/months";
@@ -226,6 +229,11 @@ export function SalesProfitsScreen() {
   const summaryQuery = useFinanceSummaryQuery(summaryParams);
   const dailySummaryQuery = useFinanceDailySummaryQuery(selectedDate);
   const dailySummary = hasSpecificDate ? dailySummaryQuery.data : undefined;
+  const dollarExchangeRate = useDollarExchangeRate();
+  // Range mode has no single API field for "paid"/"remaining"/invoice count
+  // over a period, so they are aggregated for real from the invoices that
+  // fall within the same period (same date range as the financial summary).
+  const rangeInvoicesQuery = useInvoicesAllQuery(summaryParams, !hasSpecificDate);
 
   useEffect(() => {
     if (summaryQuery.isError && summaryQuery.error) {
@@ -242,6 +250,12 @@ export function SalesProfitsScreen() {
     }
   }, [dailySummaryQuery.error, dailySummaryQuery.isError, toast]);
 
+  useEffect(() => {
+    if (rangeInvoicesQuery.isError && rangeInvoicesQuery.error) {
+      toast.error("تعذر تحميل بيانات الفواتير", getApiErrorMessage(rangeInvoicesQuery.error));
+    }
+  }, [rangeInvoicesQuery.error, rangeInvoicesQuery.isError, toast]);
+
   const years = useMemo(
     () => {
       const currentYear = new Date().getFullYear();
@@ -252,22 +266,35 @@ export function SalesProfitsScreen() {
 
   const dashboard = useMemo(() => {
     const summary = summaryQuery.data;
-    const expenses = (summary?.fixedCosts ?? 0) + (summary?.variableCosts ?? 0);
     const sales = summary?.totalRevenues ?? 0;
     const parts = summary?.partsCosts ?? 0;
     const netProfit = summary?.netProfit ?? 0;
+    // Aggregate real paid/remaining/invoice-count from the period's invoices,
+    // converting USD invoices to SYP with the live exchange rate so mixed
+    // currencies sum correctly (same conversion approach used across invoices).
+    const rangeInvoices = rangeInvoicesQuery.data ?? [];
+    let paidSyp = 0;
+    let totalSyp = 0;
+    for (const invoice of rangeInvoices) {
+      const factor = invoice.currency === "USD" ? dollarExchangeRate : 1;
+      paidSyp += invoice.paid * factor;
+      totalSyp += invoice.total * factor;
+    }
+    const invoiceCount = rangeInvoices.length;
+    const remainingSyp = remaining(totalSyp, paidSyp);
+
     return {
-      totals: { sales, paid: sales, remaining: 0, expenses, parts, netProfit },
+      totals: { sales, paid: paidSyp, remaining: remainingSyp, invoiceCount, parts, netProfit },
       series: {
         sales: seriesForValue(sales),
-        paid: seriesForValue(sales),
-        remaining: seriesForValue(0),
-        expenses: seriesForValue(expenses),
+        paid: seriesForValue(paidSyp),
+        remaining: seriesForValue(remainingSyp),
+        invoiceCount: seriesForValue(invoiceCount),
         parts: seriesForValue(parts),
         netProfit: seriesForValue(netProfit),
       },
     };
-  }, [summaryQuery.data]);
+  }, [summaryQuery.data, rangeInvoicesQuery.data, dollarExchangeRate]);
 
   const hasFilterSelection = Boolean(filters.day || filters.month || filters.year);
   const filterDescription = hasSpecificDate
@@ -341,7 +368,7 @@ export function SalesProfitsScreen() {
     {
       label: "إجمالي المبالغ المدفوعة",
       value: dashboard.totals.paid,
-      helper: "Revenue محسوبة من الدفعات",
+      helper: "من فواتير الفترة (API)",
       icon: "wallet",
       tone: "success",
       series: dashboard.series.paid,
@@ -349,18 +376,19 @@ export function SalesProfitsScreen() {
     {
       label: "إجمالي المبالغ المتبقية",
       value: dashboard.totals.remaining,
-      helper: "غير متوفر من API الحالي",
+      helper: "من فواتير الفترة (API)",
       icon: "clock",
       tone: "info",
       series: dashboard.series.remaining,
     },
     {
-      label: "إجمالي المصروفات",
-      value: dashboard.totals.expenses,
-      helper: "ثابتة ومتغيرة من API",
+      label: "عدد الفواتير",
+      value: dashboard.totals.invoiceCount,
+      helper: "من فواتير الفترة (API)",
       icon: "file",
-      tone: "danger",
-      series: dashboard.series.expenses,
+      tone: "gold",
+      series: dashboard.series.invoiceCount,
+      format: "count",
     },
     {
       label: "إجمالي سعر القطع المستهلكة",
@@ -448,7 +476,9 @@ export function SalesProfitsScreen() {
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-4 text-xs text-content-muted">
           <span>العرض الحالي: <strong className="font-semibold text-content">{filterDescription}</strong></span>
           <span>
-            {(hasSpecificDate ? dailySummaryQuery.isLoading : summaryQuery.isLoading)
+            {(hasSpecificDate
+              ? dailySummaryQuery.isLoading
+              : summaryQuery.isLoading || rangeInvoicesQuery.isLoading)
               ? "جاري تحميل الملخص..."
               : hasSpecificDate
                 ? "ملخص يومي من GET /api/finance/summary"

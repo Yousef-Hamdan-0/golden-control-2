@@ -24,6 +24,7 @@ import {
   useInvoiceMutations,
   useInvoicePaymentsQuery,
   useInvoiceQuery,
+  useInvoicesAllQuery,
   useInvoicesQuery,
 } from "@/features/invoices/hooks/use-invoices";
 import { useDollarExchangeRate } from "@/features/settings/hooks/use-settings";
@@ -99,6 +100,11 @@ export function InvoicesScreen() {
   );
   const activeListQuery = useInvoicesQuery(listParams);
   const invoices = activeListQuery.data?.items ?? EMPTY_INVOICES;
+  // KPI cards must reflect every invoice matching the active filters (including
+  // refunded ones, and any page beyond the one currently shown), not just the
+  // single page rendered in the table below.
+  const kpiInvoicesQuery = useInvoicesAllQuery(baseListParams);
+  const kpiInvoices = kpiInvoicesQuery.data ?? EMPTY_INVOICES;
   const detailQuery = useInvoiceQuery(viewingInvoice?.id ?? null);
   const paymentsQuery = useInvoicePaymentsQuery(viewingInvoice?.id ?? null);
   const activeViewingInvoice = detailQuery.data ?? viewingInvoice;
@@ -128,10 +134,13 @@ export function InvoicesScreen() {
     setPage(1);
   }, [currencyParam, typeParam]);
 
-  const total = invoices.reduce((sum, invoice) => sum + invoice.total, 0);
-  const paid = invoices.reduce((sum, invoice) => sum + invoice.paid, 0);
-  const completedInvoices = invoices.filter((invoice) => invoice.status === "paid").length;
-  const incompletedInvoices = invoices.filter((invoice) => invoice.status !== "paid").length;
+  const total = kpiInvoices.reduce((sum, invoice) => sum + invoice.total, 0);
+  const paid = kpiInvoices.reduce((sum, invoice) => sum + invoice.paid, 0);
+  const completedInvoices = kpiInvoices.filter((invoice) => invoice.status === "paid").length;
+  const incompletedInvoices = kpiInvoices.filter((invoice) => invoice.status !== "paid").length;
+  // The invoices list is already filtered to a single currency via the API
+  // when the user picks one, so the cards can display it directly.
+  const cardsCurrency = currency === "all" ? undefined : currency;
   const hasDateFilter = Boolean(dateFilter.from || dateFilter.to);
   const currentPage = activeListQuery.data?.page ?? page;
   const visibleInvoices = invoices;
@@ -174,6 +183,12 @@ export function InvoicesScreen() {
       toast.error("تعذر تحميل الفواتير", getApiErrorMessage(activeListQuery.error));
     }
   }, [activeListQuery.error, activeListQuery.isError, toast]);
+
+  useEffect(() => {
+    if (kpiInvoicesQuery.isError && kpiInvoicesQuery.error) {
+      toast.error("تعذر تحميل إجماليات الفواتير", getApiErrorMessage(kpiInvoicesQuery.error));
+    }
+  }, [kpiInvoicesQuery.error, kpiInvoicesQuery.isError, toast]);
 
   function refreshList() {
     void activeListQuery.refetch();
@@ -261,8 +276,8 @@ export function InvoicesScreen() {
         cards={[
           { label: "عدد الفواتير المكتملة", value: String(completedInvoices), icon: "file" },
           { label: "عدد الفواتير غير المكتملة", value: String(incompletedInvoices), icon: "alert", tone: "gold" },
-          { label: "المدفوع", value: formatMoney(paid), icon: "wallet", tone: "success" },
-          { label: "المتبقي", value: formatMoney(total - paid), icon: "clock", tone: "gold" },
+          { label: "المدفوع", value: formatMoney(paid, cardsCurrency), icon: "wallet", tone: "success" },
+          { label: "المتبقي", value: formatMoney(total - paid, cardsCurrency), icon: "clock", tone: "gold" },
         ]}
       />
       <FilterCard className="lg:grid-cols-[minmax(320px,2fr)_repeat(4,minmax(120px,1fr))_auto]">

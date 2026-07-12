@@ -108,6 +108,11 @@ const API_RULES: ApiRule[] = [
   // Requests
   { test: (p) => p === "/api/requests", methods: ["POST"], roles: ["admin", "manager", "employee"] },
   { test: (p) => p === "/api/requests", methods: ["GET"], roles: ALL_ROLES },
+  {
+    test: (p) => p === "/api/requests/assign-bulk",
+    methods: ["POST"],
+    roles: ["admin", "manager", "employee"],
+  },
   { test: (p) => re("/api/requests/:id/pdf").test(p), roles: ["admin", "manager", "employee"] },
   {
     test: (p) => re("/api/requests/:id/status-history").test(p),

@@ -8,6 +8,7 @@ import { PAGE_SIZE } from "@/config/constants";
 import { EmptyState } from "@/features/operations/components/shared/EmptyState";
 import { Icon } from "@/lib/icons";
 import {
+  REQUEST_PRIORITY_LABELS,
   REQUEST_STATUS_LABELS,
   REQUEST_STATUS_TONE,
   type RepairRequest,
@@ -24,6 +25,12 @@ interface RequestsTableProps {
   totalRequests: number;
   usersById: Map<string, string>;
   pdfRequestId: string | null;
+  /** Bulk-assign selection mode: shows a checkbox column when true. */
+  selectionMode?: boolean;
+  /** Ids of the currently selected requests (selection mode only). */
+  selectedIds?: ReadonlySet<string>;
+  /** Toggles a request in/out of the selection (selection mode only). */
+  onToggleSelect?: (request: RepairRequest) => void;
   onPage: (page: number) => void;
   onDetails: (request: RepairRequest) => void;
   /** Omitted for roles that cannot edit (technician). */
@@ -39,6 +46,9 @@ export function RequestsTable({
   totalRequests,
   usersById,
   pdfRequestId,
+  selectionMode = false,
+  selectedIds,
+  onToggleSelect,
   onPage,
   onDetails,
   onEdit,
@@ -50,6 +60,9 @@ export function RequestsTable({
         <table className="w-full text-right text-sm">
           <thead>
             <tr className="bg-surface-2 text-content-muted">
+              {selectionMode ? (
+                <th className="w-10 px-2.5 py-3" aria-label="تحديد" />
+              ) : null}
               {[
                 "رقم الطلب",
                 "العميل",
@@ -57,6 +70,7 @@ export function RequestsTable({
                 "الجهاز",
                 "الفني",
                 "الحالة",
+                "الأولوية",
                 "الإجراءات",
               ].map((header) => (
                 <th key={header} className="px-2.5 py-3 font-medium">
@@ -68,7 +82,7 @@ export function RequestsTable({
           <tbody>
             {isLoading ? (
               Array.from({ length: PAGE_SIZE }).map((_, index) => (
-                <SkeletonRow key={index} cols={7} />
+                <SkeletonRow key={index} cols={selectionMode ? 9 : 8} />
               ))
             ) : requests.length ? (
               requests.map((request) => (
@@ -76,6 +90,19 @@ export function RequestsTable({
                   key={request.id}
                   className="border-b border-border hover:bg-gold-soft"
                 >
+                  {selectionMode ? (
+                    <td className="w-10 px-2.5 py-4">
+                      {/* Selection is limited to "new" requests only. */}
+                      <input
+                        type="checkbox"
+                        aria-label={`تحديد الطلب ${request.requestNumber}`}
+                        className="h-4 w-4 cursor-pointer accent-[var(--gold)] disabled:cursor-not-allowed disabled:opacity-40"
+                        disabled={request.status !== "new"}
+                        checked={selectedIds?.has(request.id) ?? false}
+                        onChange={() => onToggleSelect?.(request)}
+                      />
+                    </td>
+                  ) : null}
                   <td className="px-2.5 py-4 font-bold text-gold" dir="ltr">
                     {request.requestNumber}
                   </td>
@@ -104,6 +131,11 @@ export function RequestsTable({
                   <td className="px-2.5 py-4">
                     <Badge tone={REQUEST_STATUS_TONE[request.status]} dot>
                       {REQUEST_STATUS_LABELS[request.status]}
+                    </Badge>
+                  </td>
+                  <td className="whitespace-nowrap px-2.5 py-4">
+                    <Badge tone={request.priority === "emergency" ? "danger" : "neutral"}>
+                      {REQUEST_PRIORITY_LABELS[request.priority]}
                     </Badge>
                   </td>
                   <td className="px-2.5 py-4">

@@ -5,6 +5,7 @@ import { queryKeys } from "@/hooks/query-keys";
 import { requestService } from "@/services/request.service";
 import type { RequestListParams } from "@/repositories/request.repository";
 import type {
+  BulkAssignInput,
   RepairRequestInput,
   RequestRecordsInput,
 } from "@/models/requests/request.model";
@@ -67,5 +68,10 @@ export function useRequestMutations() {
     },
   });
 
-  return { create, update, uploadRecords };
+  const assignBulk = useMutation({
+    mutationFn: (input: BulkAssignInput) => requestService.assignBulk(input),
+    onSuccess: invalidateList,
+  });
+
+  return { create, update, uploadRecords, assignBulk };
 }

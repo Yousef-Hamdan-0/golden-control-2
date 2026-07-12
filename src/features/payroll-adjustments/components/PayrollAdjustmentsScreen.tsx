@@ -138,7 +138,7 @@ export function PayrollAdjustmentsScreen() {
       iconClassName: "bg-danger-soft text-danger",
     },
     {
-      label: "مجموع الرواتب",
+      label: "مجموع السلف",
       value: totals.salary,
       icon: "wallet",
       iconClassName: "bg-info-soft text-info",
@@ -275,7 +275,7 @@ export function PayrollAdjustmentsScreen() {
             }}
           >
             <option value="all">كل التسويات</option>
-            <option value="salary">راتب</option>
+            <option value="salary">سلفة</option>
             <option value="bonus">مكافأة</option>
             <option value="deduction">خصم</option>
             <option value="overtime">عمل إضافي</option>

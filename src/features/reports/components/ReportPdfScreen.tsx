@@ -1,14 +1,16 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { Field } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Icon } from "@/lib/icons";
 import { cn } from "@/lib/utils/cn";
 import { requestAuthenticatedBlob } from "@/helpers/authenticated-api.helper";
+import { monthLabel, SYRIAC_MONTHS } from "@/lib/format/months";
 
 export type ReportType =
   | "orders"
@@ -50,14 +52,47 @@ const REPORTS_API_BASE =
 
 export const REPORT_TYPES = Object.keys(REPORT_DEFINITIONS) as ReportType[];
 
+const CURRENT_YEAR = new Date().getFullYear();
+const YEAR_OPTIONS = Array.from({ length: 6 }, (_, index) => CURRENT_YEAR - index);
+
+/** Inclusive month span, e.g. May→July = 2 (3 consecutive months). */
+function monthSpan(startYear: string, startMonth: string, endYear: string, endMonth: string) {
+  return (
+    (Number(endYear) * 12 + Number(endMonth)) - (Number(startYear) * 12 + Number(startMonth))
+  );
+}
+
+function lastDayOfMonth(year: string, month: string) {
+  return new Date(Number(year), Number(month), 0).getDate();
+}
+
 export function ReportPdfScreen({ type }: { type: ReportType }) {
   const report = REPORT_DEFINITIONS[type];
+  // The financial report caps the period at 3 consecutive months (API
+  // constraint), so it picks a start/end month instead of arbitrary days.
+  const isFinancial = type === "financial";
   const [showDateFilter, setShowDateFilter] = useState(false);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [startMonth, setStartMonth] = useState("");
+  const [startYear, setStartYear] = useState(() => String(CURRENT_YEAR));
+  const [endMonth, setEndMonth] = useState("");
+  const [endYear, setEndYear] = useState(() => String(CURRENT_YEAR));
   const [pdfUrl, setPdfUrl] = useState("");
   const [loadingAction, setLoadingAction] = useState<"view" | "download" | null>(null);
   const [error, setError] = useState("");
+
+  const monthRangeDates = useMemo(() => {
+    if (!startMonth || !startYear || !endMonth || !endYear) return null;
+    const from = `${startYear}-${startMonth.padStart(2, "0")}-01`;
+    const lastDayOfEndMonth = `${endYear}-${endMonth.padStart(2, "0")}-${String(lastDayOfMonth(endYear, endMonth)).padStart(2, "0")}`;
+    const today = new Date().toISOString().slice(0, 10);
+    // Never request a period ending in the future — picking the current month
+    // as the end previously sent its last calendar day (e.g. the 31st) even
+    // though the month isn't over yet, and the API rejected that range.
+    const to = lastDayOfEndMonth > today ? today : lastDayOfEndMonth;
+    return { from, to };
+  }, [endMonth, endYear, startMonth, startYear]);
 
   useEffect(
     () => () => {
@@ -67,12 +102,37 @@ export function ReportPdfScreen({ type }: { type: ReportType }) {
   );
 
   async function loadReport(action: "view" | "download") {
-    if (!from || !to) {
+    let effectiveFrom = from;
+    let effectiveTo = to;
+
+    if (isFinancial) {
+      if (!monthRangeDates) {
+        setError("يرجى اختيار شهر البداية وشهر النهاية.");
+        return;
+      }
+
+      const span = monthSpan(startYear, startMonth, endYear, endMonth);
+      if (span < 0) {
+        setError("يجب أن يكون شهر البداية قبل شهر النهاية أو مساويًا له.");
+        return;
+      }
+
+      if (span > 2) {
+        setError("لا يمكن أن تتجاوز الفترة 3 أشهر متتالية.");
+        return;
+      }
+
+      effectiveFrom = monthRangeDates.from;
+      effectiveTo = monthRangeDates.to;
+
+      if (effectiveFrom > effectiveTo) {
+        setError("لا يمكن اختيار فترة مستقبلية بالكامل.");
+        return;
+      }
+    } else if (!from || !to) {
       setError("يرجى اختيار تاريخ البداية وتاريخ النهاية.");
       return;
-    }
-
-    if (from > to) {
+    } else if (from > to) {
       setError("يجب أن يكون تاريخ البداية قبل تاريخ النهاية أو مساويًا له.");
       return;
     }
@@ -81,7 +141,7 @@ export function ReportPdfScreen({ type }: { type: ReportType }) {
     setError("");
 
     try {
-      const search = new URLSearchParams({ from, to });
+      const search = new URLSearchParams({ from: effectiveFrom, to: effectiveTo });
       const reportResponse = await requestAuthenticatedBlob(
         `${REPORTS_API_BASE}/${type}?${search.toString()}`,
         {
@@ -138,7 +198,9 @@ export function ReportPdfScreen({ type }: { type: ReportType }) {
             <div>
               <h2 className="font-heading text-base font-bold text-content">فترة التقرير</h2>
               <p className="mt-1 text-xs text-content-muted">
-                اضغط زر الفترة الزمنية لتحديد تاريخ البداية والنهاية.
+                {isFinancial
+                  ? "اضغط زر الفترة الزمنية لتحديد شهر البداية وشهر النهاية (بحد أقصى 3 أشهر متتالية)."
+                  : "اضغط زر الفترة الزمنية لتحديد تاريخ البداية والنهاية."}
               </p>
             </div>
             <button
@@ -161,24 +223,89 @@ export function ReportPdfScreen({ type }: { type: ReportType }) {
           </div>
 
           {showDateFilter ? (
-            <div className="grid gap-4 border-t border-border pt-5 sm:grid-cols-2">
-              <Field label="من تاريخ" htmlFor={`${type}-report-from`}>
-                <DatePicker
-                  id={`${type}-report-from`}
-                  value={from}
-                  max={to || undefined}
-                  onChange={(value) => setFrom(value)}
-                />
-              </Field>
-              <Field label="إلى تاريخ" htmlFor={`${type}-report-to`}>
-                <DatePicker
-                  id={`${type}-report-to`}
-                  value={to}
-                  min={from || undefined}
-                  onChange={(value) => setTo(value)}
-                />
-              </Field>
-            </div>
+            isFinancial ? (
+              <div className="grid gap-4 border-t border-border pt-5 sm:grid-cols-2">
+                <Field label="من شهر" htmlFor={`${type}-report-start-month`}>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Select
+                      id={`${type}-report-start-month`}
+                      aria-label="شهر البداية"
+                      value={startMonth}
+                      onChange={(event) => setStartMonth(event.target.value)}
+                    >
+                      <option value="" disabled>
+                        اختر الشهر
+                      </option>
+                      {SYRIAC_MONTHS.map((name, index) => (
+                        <option key={name} value={index + 1}>
+                          {monthLabel(index + 1)}
+                        </option>
+                      ))}
+                    </Select>
+                    <Select
+                      aria-label="سنة البداية"
+                      value={startYear}
+                      onChange={(event) => setStartYear(event.target.value)}
+                    >
+                      {YEAR_OPTIONS.map((year) => (
+                        <option key={year} value={year}>
+                          {year}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                </Field>
+                <Field label="إلى شهر" htmlFor={`${type}-report-end-month`}>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Select
+                      id={`${type}-report-end-month`}
+                      aria-label="شهر النهاية"
+                      value={endMonth}
+                      onChange={(event) => setEndMonth(event.target.value)}
+                    >
+                      <option value="" disabled>
+                        اختر الشهر
+                      </option>
+                      {SYRIAC_MONTHS.map((name, index) => (
+                        <option key={name} value={index + 1}>
+                          {monthLabel(index + 1)}
+                        </option>
+                      ))}
+                    </Select>
+                    <Select
+                      aria-label="سنة النهاية"
+                      value={endYear}
+                      onChange={(event) => setEndYear(event.target.value)}
+                    >
+                      {YEAR_OPTIONS.map((year) => (
+                        <option key={year} value={year}>
+                          {year}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                </Field>
+              </div>
+            ) : (
+              <div className="grid gap-4 border-t border-border pt-5 sm:grid-cols-2">
+                <Field label="من تاريخ" htmlFor={`${type}-report-from`}>
+                  <DatePicker
+                    id={`${type}-report-from`}
+                    value={from}
+                    max={to || undefined}
+                    onChange={(value) => setFrom(value)}
+                  />
+                </Field>
+                <Field label="إلى تاريخ" htmlFor={`${type}-report-to`}>
+                  <DatePicker
+                    id={`${type}-report-to`}
+                    value={to}
+                    min={from || undefined}
+                    onChange={(value) => setTo(value)}
+                  />
+                </Field>
+              </div>
+            )
           ) : null}
 
           {error ? (

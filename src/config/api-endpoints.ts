@@ -35,6 +35,7 @@ export const API_ROUTES = {
     statusHistory: (id: string) =>
       `/api/requests/${encodeURIComponent(id)}/status-history`,
     records: "/api/request/records",
+    assignBulk: "/api/requests/assign-bulk",
   },
   invoices: {
     root: "/api/invoices",
@@ -141,6 +142,7 @@ export const BACKEND_API_ENDPOINTS = {
     statusHistory: (id: string) =>
       createApiUrl(API_ROUTES.requests.statusHistory(id)),
     records: createApiUrl(API_ROUTES.requests.records),
+    assignBulk: createApiUrl(API_ROUTES.requests.assignBulk),
   },
   invoices: {
     root: createApiUrl(API_ROUTES.invoices.root),

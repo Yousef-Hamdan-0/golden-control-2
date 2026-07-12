@@ -4,7 +4,11 @@ import { launchPdfBrowser } from "@/lib/pdf/launch-browser";
 import { API_BASE_URL } from "@/config/api-endpoints";
 import { PAYMENT_METHOD_LABELS } from "@/features/operations/constants";
 import type { Invoice } from "@/features/operations/types";
-import { invoicePartTotal, remaining } from "@/features/operations/utils/invoice";
+import {
+  convertPaymentToInvoiceCurrency,
+  invoicePartTotal,
+  remaining,
+} from "@/features/operations/utils/invoice";
 import { formatMoney } from "@/lib/format/currency";
 import { localDisplayDateTime } from "@/lib/format/date";
 import {
@@ -275,6 +279,7 @@ function htmlShell(title: string, brand: DocumentBrand, body: string) {
     }
     .payments { min-height: 39mm; padding: 5mm; }
     .mini-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 3mm; }
+    .mini-table th { padding: 2mm; color: ${MUTED}; font-weight: 700; text-align: right; border-bottom: 1px solid ${BORDER}; }
     .mini-table td { padding: 3mm 2mm; border-top: 1px solid ${BORDER}; }
     ${INVOICE_FOOTER_CSS}
     .top-strip {
@@ -448,16 +453,31 @@ export async function renderInvoicePdf(invoice: Invoice, settings?: Settings | n
         <div class="panel payments">
           <div class="panel-title">سجل الدفعات المستلمة</div>
           <table class="mini-table">
+            <thead>
+              <tr>
+                <th>المبلغ المدفوع</th>
+                <th>المبلغ بعد التحويل</th>
+                <th>الوسيلة</th>
+                <th>وقت الإنشاء</th>
+              </tr>
+            </thead>
             <tbody>
               ${payments.length > 0
                 ? payments.map((payment) => `
                   <tr>
-                    <td><strong>${escapeHtml(formatMoney(payment.convertedAmount ?? payment.amount, invoice.currency))}</strong></td>
+                    <td>${escapeHtml(formatMoney(payment.amount, payment.currency))}</td>
+                    <td><strong>${escapeHtml(
+                      formatMoney(
+                        payment.convertedAmount ??
+                          convertPaymentToInvoiceCurrency(payment.amount, payment.currency, invoice.currency),
+                        invoice.currency,
+                      ),
+                    )}</strong></td>
                     <td>${escapeHtml(PAYMENT_METHOD_LABELS[payment.method] ?? payment.method)}</td>
                     <td class="ltr">${escapeHtml(displayDateTime(payment.paidAt))}</td>
                   </tr>
                 `).join("")
-                : `<tr><td colspan="3">لا توجد دفعات مسجلة.</td></tr>`}
+                : `<tr><td colspan="4">لا توجد دفعات مسجلة.</td></tr>`}
             </tbody>
           </table>
         </div>

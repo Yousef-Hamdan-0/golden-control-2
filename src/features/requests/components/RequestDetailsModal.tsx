@@ -49,9 +49,11 @@ export function RequestDetailsModal({
   technicianDisplayName,
   usersById,
   downloadingPdf,
+  printingPdf,
   onClose,
   onEdit,
   onDownloadPdf,
+  onPrintReport,
 }: {
   request: RepairRequest | null;
   isLoading: boolean;
@@ -62,11 +64,15 @@ export function RequestDetailsModal({
   technicianDisplayName?: string;
   usersById?: Map<string, string>;
   downloadingPdf: boolean;
+  /** True while the print copy is being fetched (same source as the download). */
+  printingPdf?: boolean;
   onClose: () => void;
   /** Omitted for roles that cannot edit (technician). */
   onEdit?: (request: RepairRequest) => void;
   /** Omitted for roles that cannot download the PDF (technician). */
   onDownloadPdf?: (request: RepairRequest) => void;
+  /** Omitted for roles that cannot print the report (technician). */
+  onPrintReport?: (request: RepairRequest) => void;
 }) {
   const toast = useToast();
   const queryClient = useQueryClient();
@@ -213,17 +219,30 @@ export function RequestDetailsModal({
 
             <RequestRecordsSection records={request.records} />
 
-            {onDownloadPdf ? (
-              <div className="flex justify-end border-t border-border pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={downloadingPdf}
-                  onClick={() => onDownloadPdf(request)}
-                >
-                  <Icon name="file" size={16} />
-                  {downloadingPdf ? "جاري التحميل..." : "تحميل PDF"}
-                </Button>
+            {onDownloadPdf || onPrintReport ? (
+              <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
+                {onPrintReport ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={printingPdf}
+                    onClick={() => onPrintReport(request)}
+                  >
+                    <Icon name="file" size={16} />
+                    {printingPdf ? "جاري التجهيز..." : "طباعة التقرير"}
+                  </Button>
+                ) : null}
+                {onDownloadPdf ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={downloadingPdf}
+                    onClick={() => onDownloadPdf(request)}
+                  >
+                    <Icon name="file" size={16} />
+                    {downloadingPdf ? "جاري التحميل..." : "تحميل PDF"}
+                  </Button>
+                ) : null}
               </div>
             ) : null}
           </>
