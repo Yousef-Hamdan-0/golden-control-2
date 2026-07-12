@@ -9,7 +9,6 @@ import { TablePagination } from "@/components/ui/TablePagination";
 import { useToast } from "@/components/ui/Toast";
 import { Icon } from "@/lib/icons";
 import { formatMoney } from "@/lib/format/currency";
-import { localDisplayDateTime } from "@/lib/format/date";
 import { PAGE_SIZE } from "@/config/constants";
 import { getApiErrorMessage } from "@/helpers/api.helper";
 import { invoiceService } from "@/services/invoice.service";
@@ -17,7 +16,6 @@ import type { Invoice, Order } from "../../types";
 import {
   PAYMENT_TONE,
   PAYMENT_LABELS,
-  PAYMENT_METHOD_LABELS,
   ORDER_STATUS_LABELS,
 } from "../../constants";
 import {
@@ -183,10 +181,10 @@ export function InvoiceDetailsModal({
           </div>
           {invoice.payments.length > 0 ? (
             <div className="overflow-x-auto">
-              <table className="min-w-[640px] w-full text-right text-sm">
+              <table className="min-w-[360px] w-full text-right text-sm">
                 <thead>
                   <tr className="bg-surface-2 text-content-muted">
-                    {["المبلغ المدفوع", "المبلغ بعد التحويل", "طريقة الدفع", "نوع العملة", "وقت الإنشاء"].map((header) => (
+                    {["المبلغ المدفوع", "المبلغ بعد التحويل"].map((header) => (
                       <th key={header} className="px-4 py-3 font-medium">
                         {header}
                       </th>
@@ -196,7 +194,7 @@ export function InvoiceDetailsModal({
                 <tbody>
                   {visiblePayments.map((payment) => (
                     <tr key={payment.id} className="border-t border-border">
-                      <td className="px-4 py-3 text-content-muted">
+                      <td className="px-4 py-3 font-bold text-content">
                         {formatMoney(payment.amount, payment.currency)}
                       </td>
                       <td className="px-4 py-3 font-bold text-gold">
@@ -204,15 +202,6 @@ export function InvoiceDetailsModal({
                           payment.convertedAmount ?? convertPaymentToInvoiceCurrency(payment.amount, payment.currency, invoice.currency),
                           invoice.currency,
                         )}
-                      </td>
-                      <td className="px-4 py-3 text-content-muted">
-                        {PAYMENT_METHOD_LABELS[payment.method]}
-                      </td>
-                      <td className="px-4 py-3 text-content-muted">
-                        {payment.currency === "SYP" ? "ليرة" : "دولار"}
-                      </td>
-                      <td className="px-4 py-3 text-content-muted">
-                        {localDisplayDateTime(payment.paidAt, "غير محدد")}
                       </td>
                     </tr>
                   ))}

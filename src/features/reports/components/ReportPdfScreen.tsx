@@ -11,6 +11,7 @@ import { Icon } from "@/lib/icons";
 import { cn } from "@/lib/utils/cn";
 import { requestAuthenticatedBlob } from "@/helpers/authenticated-api.helper";
 import { monthLabel, SYRIAC_MONTHS } from "@/lib/format/months";
+import { todayDateKey } from "@/lib/format/date";
 
 export type ReportType =
   | "orders"
@@ -86,7 +87,9 @@ export function ReportPdfScreen({ type }: { type: ReportType }) {
     if (!startMonth || !startYear || !endMonth || !endYear) return null;
     const from = `${startYear}-${startMonth.padStart(2, "0")}-01`;
     const lastDayOfEndMonth = `${endYear}-${endMonth.padStart(2, "0")}-${String(lastDayOfMonth(endYear, endMonth)).padStart(2, "0")}`;
-    const today = new Date().toISOString().slice(0, 10);
+    // Uses the app's fixed Asia/Damascus "today" (same helper as the rest of
+    // the app), not UTC — otherwise the cutoff shifts by a day near midnight.
+    const today = todayDateKey();
     // Never request a period ending in the future — picking the current month
     // as the end previously sent its last calendar day (e.g. the 31st) even
     // though the month isn't over yet, and the API rejected that range.

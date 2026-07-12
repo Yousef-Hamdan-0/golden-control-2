@@ -2,7 +2,6 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { launchPdfBrowser } from "@/lib/pdf/launch-browser";
 import { API_BASE_URL } from "@/config/api-endpoints";
-import { PAYMENT_METHOD_LABELS } from "@/features/operations/constants";
 import type { Invoice } from "@/features/operations/types";
 import {
   convertPaymentToInvoiceCurrency,
@@ -457,8 +456,6 @@ export async function renderInvoicePdf(invoice: Invoice, settings?: Settings | n
               <tr>
                 <th>المبلغ المدفوع</th>
                 <th>المبلغ بعد التحويل</th>
-                <th>الوسيلة</th>
-                <th>وقت الإنشاء</th>
               </tr>
             </thead>
             <tbody>
@@ -473,11 +470,9 @@ export async function renderInvoicePdf(invoice: Invoice, settings?: Settings | n
                         invoice.currency,
                       ),
                     )}</strong></td>
-                    <td>${escapeHtml(PAYMENT_METHOD_LABELS[payment.method] ?? payment.method)}</td>
-                    <td class="ltr">${escapeHtml(displayDateTime(payment.paidAt))}</td>
                   </tr>
                 `).join("")
-                : `<tr><td colspan="4">لا توجد دفعات مسجلة.</td></tr>`}
+                : `<tr><td colspan="2">لا توجد دفعات مسجلة.</td></tr>`}
             </tbody>
           </table>
         </div>

@@ -3,7 +3,6 @@ import { API_BASE_URL } from "@/config/api-endpoints";
 import { settingsService } from "@/services/settings.service";
 import { formatMoney } from "@/lib/format/currency";
 import { localDisplayDateTime } from "@/lib/format/date";
-import { PAYMENT_METHOD_LABELS } from "../constants";
 import { convertPaymentToInvoiceCurrency, invoicePartTotal, remaining } from "./invoice";
 import {
   INVOICE_FOOTER_CSS,
@@ -205,8 +204,6 @@ async function openInvoiceDocument(invoice: Invoice) {
               convertPaymentToInvoiceCurrency(payment.amount, payment.currency, invoice.currency),
             invoice.currency,
           )}</strong></td>
-          <td>${PAYMENT_METHOD_LABELS[payment.method] ?? payment.method}</td>
-          <td dir="ltr">${escapeHtml(localDisplayDateTime(payment.paidAt, "غير محدد"))}</td>
         </tr>
       `,
     )
@@ -290,8 +287,8 @@ async function openInvoiceDocument(invoice: Invoice) {
             <div class="payments">
               <strong>سجل الدفعات المستلمة</strong>
               <table>
-                <thead><tr><th>المبلغ المدفوع</th><th>المبلغ بعد التحويل</th><th>الوسيلة</th><th>وقت الإنشاء</th></tr></thead>
-                <tbody>${paymentsRows || `<tr><td colspan="4">لا توجد دفعات.</td></tr>`}</tbody>
+                <thead><tr><th>المبلغ المدفوع</th><th>المبلغ بعد التحويل</th></tr></thead>
+                <tbody>${paymentsRows || `<tr><td colspan="2">لا توجد دفعات.</td></tr>`}</tbody>
               </table>
             </div>
             ${invoiceTermsHtml(brand.terms)}
