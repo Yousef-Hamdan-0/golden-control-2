@@ -91,6 +91,7 @@ export const NAVIGATION: NavItem[] = [
     children: [
       { label: "المصروفات", href: "/finance/expenses" },
       { label: "تسويات الرواتب", href: "/finance/payroll-adjustments" },
+      { label: "المستحقات الشهرية", href: "/finance/monthly-dues" },
       { label: "المبيعات والأرباح", href: "/finance/sales-profits" },
     ],
   },

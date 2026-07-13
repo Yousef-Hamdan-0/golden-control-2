@@ -4,6 +4,7 @@ import {
   type ExpenseCategoryFilter,
 } from "@/features/expenses";
 import { PayrollAdjustmentsScreen } from "@/features/payroll-adjustments";
+import { MonthlyDuesScreen } from "@/features/monthly-dues";
 import { SalesProfitsScreen } from "@/features/operations/components/finance/SalesProfitsScreen";
 import { redirect } from "next/navigation";
 
@@ -23,6 +24,10 @@ export default async function FinancePage({
 
   if (slug?.[0] === "payroll-adjustments") {
     return <PayrollAdjustmentsScreen />;
+  }
+
+  if (slug?.[0] === "monthly-dues") {
+    return <MonthlyDuesScreen />;
   }
 
   if (
