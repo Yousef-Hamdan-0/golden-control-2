@@ -14,6 +14,7 @@ import type {
   FinancialSummaryParams,
 } from "@/repositories/finance.repository";
 import type { PayrollRecordListParams } from "@/repositories/payroll.repository";
+import type { MonthlyDuesParams } from "@/repositories/monthly-dues.repository";
 
 /**
  * Single source for every cache key. Precise keys = precise invalidation.
@@ -69,10 +70,16 @@ export const queryKeys = {
     },
     summary: (params: FinancialSummaryParams) => ["finance", "summary", params] as const,
     dailySummary: (date: string) => ["finance", "daily-summary", date] as const,
+    monthlyDues: {
+      all: ["finance", "monthly-dues"] as const,
+      list: (params: MonthlyDuesParams) => ["finance", "monthly-dues", "list", params] as const,
+    },
   },
   payroll: {
     all: ["payroll-records"] as const,
     list: (params: PayrollRecordListParams) => ["payroll-records", "list", params] as const,
+    listAll: (params: Omit<PayrollRecordListParams, "page" | "pageSize">) =>
+      ["payroll-records", "list-all", params] as const,
   },
   technicians: {
     all: ["technicians"] as const,

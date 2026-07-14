@@ -20,6 +20,9 @@ export interface PayrollRecordListParams {
   search?: string;
 }
 
+/** The backend rejects `limit` above 100, even though the schema allows more. */
+const LIST_ALL_PAGE_SIZE = 100;
+
 export interface PayrollRecordCreateParams {
   input: PayrollAdjustmentInput;
   month: string;
@@ -53,6 +56,24 @@ export const payrollRepository = {
     );
 
     return normalizePayrollRecordListResponse(payload, query);
+  },
+
+  async listAll(
+    params: Omit<PayrollRecordListParams, "page" | "pageSize"> = {},
+  ): Promise<PayrollAdjustment[]> {
+    const firstPage = await this.list({ ...params, page: 1, pageSize: LIST_ALL_PAGE_SIZE });
+    const totalPages = Math.max(1, Math.ceil(firstPage.total / firstPage.pageSize));
+
+    if (totalPages <= 1) return [...firstPage.items];
+
+    // The total page count is known, so fetch the remaining pages in parallel.
+    const restPages = await Promise.all(
+      Array.from({ length: totalPages - 1 }, (_, index) =>
+        this.list({ ...params, page: index + 2, pageSize: LIST_ALL_PAGE_SIZE }),
+      ),
+    );
+
+    return [...firstPage.items, ...restPages.flatMap((result) => result.items)];
   },
 
   async create({ input, month }: PayrollRecordCreateParams): Promise<PayrollAdjustment> {

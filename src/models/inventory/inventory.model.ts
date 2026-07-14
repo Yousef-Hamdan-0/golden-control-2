@@ -194,7 +194,16 @@ export function normalizeInventoryDailyList(payload: unknown, page: number, page
     : isRecord(data.pagination)
       ? data.pagination
       : {};
-  const items = arrayData(payload, "technicians", "items", "logs").map(normalizeInventoryDailyLog);
+  // A single malformed entry used to throw and fail the entire list — skip
+  // that entry instead so the rest of a real, mostly-valid response renders.
+  const items = arrayData(payload, "technicians", "items", "logs").flatMap((item) => {
+    try {
+      return [normalizeInventoryDailyLog(item)];
+    } catch (error) {
+      console.error("normalizeInventoryDailyList: skipping invalid entry —", error, item);
+      return [];
+    }
+  });
   const total = numberValue(
     isRecord(data) ? data.totalTechnicians : undefined,
     root.totalTechnicians,

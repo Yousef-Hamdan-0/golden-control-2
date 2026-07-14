@@ -65,6 +65,7 @@ export function DailyInventoryScreen() {
   const isError =
     dailyInventoryQuery.isError ||
     (canListTechnicians && availableTechniciansQuery.isError);
+  const loadError = dailyInventoryQuery.error ?? (canListTechnicians ? availableTechniciansQuery.error : null);
   const refetch = () => {
     void dailyInventoryQuery.refetch();
     void availableTechniciansQuery.refetch();
@@ -113,7 +114,7 @@ export function DailyInventoryScreen() {
         </div>
       ) : isError ? (
         <Card className="p-6 text-center text-sm text-danger">
-          تعذّر تحميل المخزون.{" "}
+          {getApiErrorMessage(loadError)}{" "}
           <button onClick={() => refetch()} className="underline">
             إعادة المحاولة
           </button>

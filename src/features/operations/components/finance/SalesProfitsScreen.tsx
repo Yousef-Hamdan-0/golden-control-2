@@ -13,6 +13,7 @@ import { useDollarExchangeRate } from "@/features/settings/hooks/use-settings";
 import { remaining } from "@/features/operations/utils/invoice";
 import { Icon, type IconName } from "@/lib/icons";
 import { formatMoney } from "@/lib/format/currency";
+import { todayDateKey } from "@/lib/format/date";
 import { monthLabel, SYRIAC_MONTHS } from "@/lib/format/months";
 import { cn } from "@/lib/utils/cn";
 import { SectionTitle } from "../shared/SectionTitle";
@@ -79,7 +80,8 @@ function todayKey() {
   return new Date().toISOString().slice(0, 10);
 }
 
-/** The financial report API caps the period at 3 months. */
+/** Invoices are filtered by an arbitrary date range (their own real API
+ * contract), so "last 3 months" here is a genuine rolling day-based window. */
 function lastThreeMonthsRange() {
   const start = new Date();
   start.setMonth(start.getMonth() - 3);
@@ -87,13 +89,16 @@ function lastThreeMonthsRange() {
   return { startDate: start.toISOString().slice(0, 10), endDate: todayKey() };
 }
 
-function dateRangeFromFilters(filters: DateParts) {
-  if (filters.day && filters.month && filters.year) {
-    const date = isoDate(filters.year, filters.month, filters.day);
-    return { startDate: date, endDate: date };
-  }
-
-  return lastThreeMonthsRange();
+/** The financial report API (GET /api/reports/financial) instead accepts a
+ * single year plus up to 3 month numbers within that year — not an arbitrary
+ * date range — so this rolling window is clamped to whichever months of the
+ * current year fall within the last 3. */
+function lastThreeMonthsInYear() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const currentMonth = today.getMonth() + 1;
+  const months = [currentMonth - 2, currentMonth - 1, currentMonth].filter((month) => month >= 1);
+  return { year, months };
 }
 
 function seriesForValue(value: number) {
@@ -210,21 +215,32 @@ function SelectFilter({
   );
 }
 
+/** Defaults the date filter to today (app-wide Asia/Damascus "today"), so the
+ * page loads with the current day's data already fetched with no user input. */
+function todayDateParts(): DateParts {
+  const [year, month, day] = todayDateKey().split("-");
+  return { day: String(Number(day)), month: String(Number(month)), year };
+}
+
 export function SalesProfitsScreen() {
   const toast = useToast();
-  const [filters, setFilters] = useState<DateParts>({ day: "", month: "", year: "" });
+  const [filters, setFilters] = useState<DateParts>(todayDateParts);
   const hasSpecificDate = Boolean(filters.day && filters.month && filters.year);
   // A full day/month/year selection uses the daily summary API
   // (GET /api/finance/summary?date=...); otherwise the range summary loads.
   const selectedDate = hasSpecificDate
     ? isoDate(filters.year, filters.month, filters.day)
     : "";
+  // Invoices (their own date-range API) and the financial summary (year +
+  // month-numbers API) need the same "last 3 months" window in two different
+  // shapes, so each gets its own params derived from the same filter state.
+  const invoiceRangeParams = useMemo(
+    () => (hasSpecificDate ? { startDate: "", endDate: "" } : lastThreeMonthsRange()),
+    [hasSpecificDate],
+  );
   const summaryParams = useMemo(
-    () =>
-      hasSpecificDate
-        ? { startDate: "", endDate: "" }
-        : dateRangeFromFilters(filters),
-    [filters, hasSpecificDate],
+    () => (hasSpecificDate ? { year: 0, months: [] } : lastThreeMonthsInYear()),
+    [hasSpecificDate],
   );
   const summaryQuery = useFinanceSummaryQuery(summaryParams);
   const dailySummaryQuery = useFinanceDailySummaryQuery(selectedDate);
@@ -233,7 +249,7 @@ export function SalesProfitsScreen() {
   // Range mode has no single API field for "paid"/"remaining"/invoice count
   // over a period, so they are aggregated for real from the invoices that
   // fall within the same period (same date range as the financial summary).
-  const rangeInvoicesQuery = useInvoicesAllQuery(summaryParams, !hasSpecificDate);
+  const rangeInvoicesQuery = useInvoicesAllQuery(invoiceRangeParams, !hasSpecificDate);
 
   useEffect(() => {
     if (summaryQuery.isError && summaryQuery.error) {
@@ -431,7 +447,7 @@ export function SalesProfitsScreen() {
             </div>
           </div>
 
-          <div className="grid w-full gap-3 sm:grid-cols-2 xl:w-auto xl:grid-cols-[130px_170px_130px_auto]">
+          <div className="grid w-full gap-3 sm:grid-cols-2 xl:w-auto xl:grid-cols-[130px_170px_130px]">
             <SelectFilter
               label="اليوم"
               value={filters.day}
@@ -462,28 +478,11 @@ export function SalesProfitsScreen() {
                 <option key={year} value={year}>{year}</option>
               ))}
             </SelectFilter>
-            <button
-              type="button"
-              disabled={!hasFilterSelection}
-              onClick={() => setFilters({ day: "", month: "", year: "" })}
-              className="h-11 self-end rounded-md border border-border bg-surface px-4 text-sm font-medium text-content transition hover:border-gold hover:text-gold disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              عرض الكل
-            </button>
           </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-4 text-xs text-content-muted">
+        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-4 text-xs text-content-muted">
           <span>العرض الحالي: <strong className="font-semibold text-content">{filterDescription}</strong></span>
-          <span>
-            {(hasSpecificDate
-              ? dailySummaryQuery.isLoading
-              : summaryQuery.isLoading || rangeInvoicesQuery.isLoading)
-              ? "جاري تحميل الملخص..."
-              : hasSpecificDate
-                ? "ملخص يومي من GET /api/finance/summary"
-                : "البيانات من API المالية"}
-          </span>
         </div>
       </Card>
 

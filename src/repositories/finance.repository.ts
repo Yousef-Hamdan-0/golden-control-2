@@ -20,9 +20,11 @@ export interface ExpenseListParams {
   year?: number;
 }
 
+/** GET /api/reports/financial — real backend contract: a single year plus up
+ * to 3 month numbers within that year (not an arbitrary date range). */
 export interface FinancialSummaryParams {
-  startDate: string;
-  endDate: string;
+  year: number;
+  months: number[];
 }
 
 export interface FinancialSummary {
@@ -76,14 +78,18 @@ function stringValue(...values: unknown[]) {
 
 function normalizeFinancialSummary(payload: unknown): FinancialSummary {
   const data = dataRecord(payload);
+  // The real response nests the totals under `data.summary` with a `...Syp`
+  // suffix (e.g. `totalRevenuesSyp`); the older flat/snake_case field names
+  // are kept as fallbacks in case the backend shape changes again.
+  const summary = isRecord(data.summary) ? data.summary : data;
   return {
-    totalRevenues: numberValue(data.totalRevenues, data.total_revenues),
-    fixedCosts: numberValue(data.fixedCosts, data.fixed_costs),
-    variableCosts: numberValue(data.variableCosts, data.variable_costs),
-    partsCosts: numberValue(data.partsCosts, data.parts_costs),
-    netProfit: numberValue(data.netProfit, data.net_profit),
-    periodStart: stringValue(data.periodStart, data.period_start),
-    periodEnd: stringValue(data.periodEnd, data.period_end),
+    totalRevenues: numberValue(summary.totalRevenuesSyp, summary.totalRevenues, summary.total_revenues),
+    fixedCosts: numberValue(summary.fixedCostsSyp, summary.fixedCosts, summary.fixed_costs),
+    variableCosts: numberValue(summary.variableExpensesSum, summary.variableCosts, summary.variable_costs),
+    partsCosts: numberValue(summary.partsCostsSyp, summary.partsCosts, summary.parts_costs),
+    netProfit: numberValue(summary.netProfitSyp, summary.netProfit, summary.net_profit),
+    periodStart: stringValue(summary.periodStart, summary.period_start),
+    periodEnd: stringValue(summary.periodEnd, summary.period_end),
   };
 }
 
@@ -108,11 +114,21 @@ function expenseListQuery(params: ExpenseListParams) {
   });
 }
 
-function dateRangeQuery(params: FinancialSummaryParams) {
+function yearMonthsQuery(params: FinancialSummaryParams) {
   return {
-    startDate: params.startDate.trim(),
-    endDate: params.endDate.trim(),
+    year: params.year,
+    // Backend caps the period at 3 months; de-dupe and drop invalid values.
+    months: [...new Set(params.months)]
+      .filter((month) => Number.isInteger(month) && month >= 1 && month <= 12)
+      .slice(0, 3),
   };
+}
+
+function yearMonthsSearchParams(params: FinancialSummaryParams) {
+  const query = yearMonthsQuery(params);
+  const searchParams = new URLSearchParams({ year: String(query.year) });
+  for (const month of query.months) searchParams.append("months", String(month));
+  return searchParams;
 }
 
 export const financeRepository = {
@@ -176,8 +192,7 @@ export const financeRepository = {
   },
 
   async getSummary(params: FinancialSummaryParams): Promise<FinancialSummary> {
-    const query = dateRangeQuery(params);
-    const searchParams = new URLSearchParams(query);
+    const searchParams = yearMonthsSearchParams(params);
     // The backend moved the range summary to the financial report endpoint;
     // /api/finance/summary now only serves the single-day summary (?date=).
     const payload = await requestAuthenticatedApi(
@@ -188,8 +203,7 @@ export const financeRepository = {
   },
 
   async downloadReportPdf(params: FinancialSummaryParams): Promise<AuthenticatedBlobResponse> {
-    const query = dateRangeQuery(params);
-    const searchParams = new URLSearchParams(query);
+    const searchParams = yearMonthsSearchParams(params);
     return requestAuthenticatedBlob(`${API_ENDPOINTS.finance.reportPdf}?${searchParams}`, {
       method: "GET",
       headers: { Accept: "application/pdf, application/json" },

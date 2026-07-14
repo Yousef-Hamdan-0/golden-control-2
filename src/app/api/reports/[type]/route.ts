@@ -118,6 +118,20 @@ function breakdownText(value: unknown, labels: Record<string, string>) {
     .join(" • ");
 }
 
+/** Carries the upstream backend's real status code (400/401/403/500...)
+ * through to the outer response, instead of the generic 502 this route used
+ * to always send — the client needs the real status to tell "bad date
+ * range" (400) apart from "server down" (502). */
+class UpstreamReportError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+  ) {
+    super(message);
+    this.name = "UpstreamReportError";
+  }
+}
+
 async function fetchJson(url: string, authorization: string) {
   const response = await fetch(url, {
     headers: {
@@ -128,7 +142,15 @@ async function fetchJson(url: string, authorization: string) {
   });
 
   if (!response.ok) {
-    throw new Error(`Backend report source failed with ${response.status}`);
+    // Surface the backend's own validation message (e.g. a rejected
+    // month/year combination) instead of a generic status-only error, so the
+    // UI can show the real reason instead of a blind "تعذر جلب التقرير".
+    const body = await response.json().catch(() => null);
+    const message = isRecord(body) && typeof body.message === "string" ? body.message : null;
+    throw new UpstreamReportError(
+      message ?? `Backend report source failed with ${response.status}`,
+      response.status,
+    );
   }
 
   return response.json() as Promise<unknown>;
@@ -140,6 +162,28 @@ async function fetchReportData(url: string, from: string, to: string, authorizat
   return dataRecord(payload);
 }
 
+/**
+ * GET /api/reports/financial's real contract is `year` + `months` (up to 3
+ * month numbers within that single year) — not a `startDate`/`endDate` range
+ * like the other report types. The screen still only picks a single-year
+ * month range (`from`/`to` day strings both fall in the same year), so the
+ * year/months are derived from that here rather than changing the screen's
+ * wire format for every report type.
+ */
+async function fetchFinancialReportData(from: string, to: string, authorization: string) {
+  const [fromYear, fromMonth] = from.split("-").map(Number);
+  const [toYear, toMonth] = to.split("-").map(Number);
+  const year = fromYear;
+  const lastMonth = toYear === fromYear ? toMonth : 12;
+  const months: number[] = [];
+  for (let month = fromMonth; month <= lastMonth; month += 1) months.push(month);
+
+  const search = new URLSearchParams({ year: String(year) });
+  for (const month of months) search.append("months", String(month));
+  const payload = await fetchJson(`${BACKEND_API_ENDPOINTS.reports.financial}?${search}`, authorization);
+  return dataRecord(payload);
+}
+
 // GET /api/reports/requests
 async function fetchRequestsReport(from: string, to: string, authorization: string): Promise<ReportContent> {
   const data = await fetchReportData(BACKEND_API_ENDPOINTS.reports.requests, from, to, authorization);
@@ -148,9 +192,8 @@ async function fetchRequestsReport(from: string, to: string, authorization: stri
 
   const summaryItems: SummaryItem[] = [
     { label: "إجمالي الطلبات", value: String(num(summary.totalRequests)) },
-    { label: "الطلبات المكتملة", value: String(num(summary.completedRequests)) },
-    { label: "الطلبات الملغاة", value: String(num(summary.cancelledRequests)) },
     { label: "مرتبطة بفاتورة", value: String(num(summary.withInvoice)) },
+    { label: "الطلبات المكررة", value: String(num(summary.repeated)) },
   ];
   const byStatus = breakdownText(summary.byStatus, REQUEST_STATUS_LABELS);
   const byType = breakdownText(summary.byType, REQUEST_TYPE_LABELS);
@@ -216,7 +259,8 @@ async function fetchTechniciansReport(from: string, to: string, authorization: s
       "الطلبات المسندة",
       "المكتملة",
       "قيد التنفيذ",
-      "الملغاة",
+      "غير المكتملة",
+      "المفقودة",
       "نسبة الإنجاز",
     ],
     rows: technicians.map((technician) => [
@@ -226,7 +270,8 @@ async function fetchTechniciansReport(from: string, to: string, authorization: s
       String(num(technician.assigned)),
       String(num(technician.completed)),
       String(num(technician.inProgress)),
-      String(num(technician.cancelled)),
+      String(num(technician.inCompleted)),
+      String(num(technician.lost)),
       `${num(technician.completionRate)}%`,
     ]),
     summary: [
@@ -299,20 +344,24 @@ async function fetchInventoryMovementsReport(from: string, to: string, authoriza
 
 // GET /api/reports/financial
 async function fetchFinancialReport(from: string, to: string, authorization: string): Promise<ReportContent> {
-  const data = await fetchReportData(BACKEND_API_ENDPOINTS.reports.financial, from, to, authorization);
+  const data = await fetchFinancialReportData(from, to, authorization);
+  // The real response nests the totals under `data.summary` with a `...Syp`
+  // suffix (e.g. `totalRevenuesSyp`); the older flat field names are kept as
+  // fallbacks in case the backend shape changes again.
+  const summary = isRecord(data.summary) ? data.summary : data;
 
   return {
     headers: ["البند", "القيمة"],
     rows: [
-      ["إجمالي الإيرادات", money(data.totalRevenues)],
-      ["التكاليف الثابتة", money(data.fixedCosts)],
-      ["التكاليف المتغيرة", money(data.variableCosts)],
-      ["تكاليف القطع", money(data.partsCosts)],
-      ["صافي الربح", money(data.netProfit)],
+      ["إجمالي الإيرادات", money(summary.totalRevenuesSyp ?? summary.totalRevenues)],
+      ["التكاليف الثابتة", money(summary.fixedCostsSyp ?? summary.fixedCosts)],
+      ["التكاليف المتغيرة", money(summary.variableExpensesSum ?? summary.variableCosts)],
+      ["تكاليف القطع", money(summary.partsCostsSyp ?? summary.partsCosts)],
+      ["صافي الربح", money(summary.netProfitSyp ?? summary.netProfit)],
     ],
-    summary: [{ label: "صافي الربح", value: money(data.netProfit) }],
-    periodStart: str(data.periodStart),
-    periodEnd: str(data.periodEnd),
+    summary: [{ label: "صافي الربح", value: money(summary.netProfitSyp ?? summary.netProfit) }],
+    periodStart: str(summary.periodStart),
+    periodEnd: str(summary.periodEnd),
   };
 }
 
@@ -540,10 +589,17 @@ export async function GET(request: Request, { params }: RouteContext) {
         "Content-Disposition": `attachment; filename="${REPORT_FILE_NAMES[type]}"`,
       },
     });
-  } catch {
+  } catch (error) {
+    // Previously swallowed silently (generic message, no trace), which made
+    // real backend rejections (e.g. an invalid month/year combination)
+    // indistinguishable from a genuine connectivity failure.
+    console.error(`GET /api/reports/${type} failed —`, error);
     return NextResponse.json(
-      { success: false, message: "تعذر جلب التقرير من الخادم." },
-      { status: 502 },
+      {
+        success: false,
+        message: error instanceof Error ? error.message : "تعذر جلب التقرير من الخادم.",
+      },
+      { status: error instanceof UpstreamReportError ? error.status : 502 },
     );
   }
 }

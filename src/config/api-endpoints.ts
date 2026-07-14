@@ -57,6 +57,9 @@ export const API_ROUTES = {
     expenseById: (id: string) => `/api/finance/expenses/${encodeURIComponent(id)}`,
     summary: "/api/finance/summary",
     reportPdf: "/api/finance/reports/pdf",
+    monthlyDues: "/api/finance/monthly-dues",
+    monthlyDuesArrest: (id: string) =>
+      `/api/finance/monthly-dues/${encodeURIComponent(id)}/arrest`,
   },
   inventory: {
     daily: "/api/inventory/daily",
@@ -163,6 +166,8 @@ export const BACKEND_API_ENDPOINTS = {
     expenseById: (id: string) => createApiUrl(API_ROUTES.finance.expenseById(id)),
     summary: createApiUrl(API_ROUTES.finance.summary),
     reportPdf: createApiUrl(API_ROUTES.finance.reportPdf),
+    monthlyDues: createApiUrl(API_ROUTES.finance.monthlyDues),
+    monthlyDuesArrest: (id: string) => createApiUrl(API_ROUTES.finance.monthlyDuesArrest(id)),
   },
   inventory: {
     daily: createApiUrl(API_ROUTES.inventory.daily),

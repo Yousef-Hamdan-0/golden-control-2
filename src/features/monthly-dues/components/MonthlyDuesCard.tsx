@@ -1,12 +1,13 @@
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { UserAvatar } from "@/features/users/components/UserAvatar";
 import { PAYROLL_ADJUSTMENT_LABELS } from "@/features/payroll-adjustments/models/payroll-adjustment.model";
 import type { PayrollAdjustmentType } from "@/features/payroll-adjustments/models/payroll-adjustment.model";
-import { isPositiveAdjustment, type MonthlyUserDue } from "@/features/monthly-dues/models/monthly-dues.model";
+import { isPositiveAdjustment, type MonthlyDueUser } from "@/features/monthly-dues/models/monthly-dues.model";
 import { formatMoney } from "@/lib/format/currency";
+import { localDisplayDateTime } from "@/lib/format/date";
 import { Icon } from "@/lib/icons";
-import { ROLE_LABELS_AR } from "@/models/auth/user.model";
 
 const ADJUSTMENT_TONES: Record<PayrollAdjustmentType, BadgeTone> = {
   salary: "gold",
@@ -16,46 +17,54 @@ const ADJUSTMENT_TONES: Record<PayrollAdjustmentType, BadgeTone> = {
   commission: "success",
 };
 
-export function MonthlyDuesCard({ due }: { due: MonthlyUserDue }) {
-  const { user, settlements, totalDue } = due;
+export function MonthlyDuesCard({
+  due,
+  onArrest,
+  isArresting = false,
+}: {
+  due: MonthlyDueUser;
+  onArrest?: (monthlyDuesId: string) => void;
+  isArresting?: boolean;
+}) {
+  const { payrolls, monthlyDue, isArrested, arrestedDate } = due;
 
   return (
     <Card className="overflow-hidden">
       <CardHeader className="flex flex-wrap items-center gap-3">
-        <UserAvatar name={user.fullName} imageUrl={user.imageUrl} size="md" />
+        <UserAvatar name={due.fullName} imageUrl={due.imageUrl} size="md" />
         <div className="min-w-0 flex-1">
           <h3 className="truncate font-heading text-base font-bold text-content">
-            {user.fullName}
+            {due.fullName}
           </h3>
           <p className="text-xs text-content-muted" dir="ltr">
-            {user.userNumber || user.id}
+            {due.userNumber || due.userId}
           </p>
         </div>
-        <Badge tone="gold">{ROLE_LABELS_AR[user.role]}</Badge>
+        <Badge tone="gold">{due.roleName}</Badge>
       </CardHeader>
 
       <div className="grid grid-cols-2 gap-px bg-border">
         <div className="bg-surface px-4 py-3">
           <p className="text-xs text-content-muted">المسمى الوظيفي</p>
           <p className="mt-1 truncate text-sm font-medium text-content">
-            {user.jobTitle || "غير محدد"}
+            {due.jobTitle || "غير محدد"}
           </p>
         </div>
         <div className="bg-surface px-4 py-3">
           <p className="text-xs text-content-muted">الراتب الأساسي</p>
           <p className="mt-1 text-sm font-medium text-content" dir="ltr">
-            {formatMoney(user.salary, "SYP")}
+            {formatMoney(due.salary, "SYP")}
           </p>
         </div>
       </div>
 
       <div className="border-t border-border px-4 py-3">
         <p className="mb-2 text-xs font-medium text-content-muted">تسويات الراتب عن هذا الشهر</p>
-        {settlements.length ? (
+        {payrolls.length ? (
           <ul className="space-y-2">
-            {settlements.map((settlement) => (
+            {payrolls.map((settlement, index) => (
               <li
-                key={settlement.id}
+                key={settlement.id || `${due.monthlyDuesId}-${index}`}
                 className="flex flex-wrap items-center justify-between gap-2 rounded-sm bg-surface-2 px-3 py-2"
               >
                 <div className="flex min-w-0 items-center gap-2">
@@ -89,8 +98,33 @@ export function MonthlyDuesCard({ due }: { due: MonthlyUserDue }) {
           <p className="text-sm font-semibold text-content">إجمالي المستحق</p>
         </div>
         <p className="font-heading text-lg font-bold text-content" dir="ltr">
-          {formatMoney(totalDue, "SYP")}
+          {formatMoney(monthlyDue, "SYP")}
         </p>
+      </div>
+
+      <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-3">
+        {isArrested ? (
+          <Badge tone="success" dot>
+            تم التسليم{arrestedDate ? ` بتاريخ ${localDisplayDateTime(arrestedDate)}` : ""}
+          </Badge>
+        ) : (
+          <>
+            <Badge tone="neutral" dot>
+              لم يتم التسليم بعد
+            </Badge>
+            {onArrest ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={isArresting}
+                onClick={() => onArrest(due.monthlyDuesId)}
+              >
+                {isArresting ? "جاري التسليم..." : "تسليم المستحقات"}
+              </Button>
+            ) : null}
+          </>
+        )}
       </div>
     </Card>
   );

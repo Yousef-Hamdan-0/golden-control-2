@@ -6,20 +6,19 @@ import { Card } from "@/components/ui/Card";
 import { MonthYearFilter } from "@/components/ui/MonthYearFilter";
 import { useToast } from "@/components/ui/Toast";
 import { MonthlyDuesCard } from "@/features/monthly-dues/components/MonthlyDuesCard";
-import { computeMonthlyDues, sumMonthlyDues } from "@/features/monthly-dues/models/monthly-dues.model";
+import { sumMonthlyDues } from "@/features/monthly-dues/models/monthly-dues.model";
+import {
+  useMonthlyDuesArrestMutation,
+  useMonthlyDuesQuery,
+} from "@/features/monthly-dues/hooks/use-monthly-dues";
 import { formatPayrollMonth } from "@/features/payroll-adjustments/models/payroll-adjustment.model";
-import { usePayrollRecordsQuery } from "@/features/payroll-adjustments/hooks/use-payroll-records";
-import { useUsersQuery } from "@/features/users/hooks/use-users-query";
 import { getApiErrorMessage } from "@/helpers/api.helper";
 import { formatMoney } from "@/lib/format/currency";
 import { todayDateKey } from "@/lib/format/date";
 import { Icon } from "@/lib/icons";
-import type { User } from "@/models/auth/user.model";
-import type { PayrollAdjustment } from "@/features/payroll-adjustments/models/payroll-adjustment.model";
+import type { MonthlyDueUser } from "@/features/monthly-dues/models/monthly-dues.model";
 
-const EMPTY_USERS: readonly User[] = [];
-const EMPTY_SETTLEMENTS: readonly PayrollAdjustment[] = [];
-const MAX_PAGE_SIZE = 1000;
+const EMPTY_DUES: readonly MonthlyDueUser[] = [];
 
 export function MonthlyDuesScreen() {
   const toast = useToast();
@@ -33,37 +32,29 @@ export function MonthlyDuesScreen() {
   const monthValue = filterMonth ? Number(filterMonth) : undefined;
   const hasSelectedMonth = Boolean(yearValue && monthValue);
 
-  const usersQuery = useUsersQuery({ role: "all", status: "all", page: 1, pageSize: MAX_PAGE_SIZE });
-  const payrollQuery = usePayrollRecordsQuery({
-    page: 1,
-    pageSize: MAX_PAGE_SIZE,
-    type: "all",
-    year: yearValue,
-    month: monthValue,
-  });
-
-  useEffect(() => {
-    if (usersQuery.error) {
-      toast.error("تعذر جلب المستخدمين", getApiErrorMessage(usersQuery.error));
-    }
-  }, [usersQuery.error, toast]);
-
-  useEffect(() => {
-    if (payrollQuery.error) {
-      toast.error("تعذر جلب تسويات الرواتب", getApiErrorMessage(payrollQuery.error));
-    }
-  }, [payrollQuery.error, toast]);
-
-  const users = usersQuery.data?.items ?? EMPTY_USERS;
-  const settlements = payrollQuery.data?.items ?? EMPTY_SETTLEMENTS;
-  const isLoading = usersQuery.isLoading || payrollQuery.isLoading;
-  const loadError = usersQuery.error || payrollQuery.error;
-
-  const monthlyDues = useMemo(
-    () => (hasSelectedMonth ? computeMonthlyDues(users, settlements) : []),
-    [hasSelectedMonth, users, settlements],
+  const duesQuery = useMonthlyDuesQuery(
+    hasSelectedMonth ? { year: yearValue!, month: monthValue! } : null,
   );
+  const arrestMutation = useMonthlyDuesArrestMutation();
+
+  useEffect(() => {
+    if (duesQuery.error) {
+      toast.error("تعذر جلب المستحقات الشهرية", getApiErrorMessage(duesQuery.error));
+    }
+  }, [duesQuery.error, toast]);
+
+  const monthlyDues = duesQuery.data?.users ?? EMPTY_DUES;
+  const isLoading = duesQuery.isLoading;
+  const loadError = duesQuery.error;
+
   const totalDues = useMemo(() => sumMonthlyDues(monthlyDues), [monthlyDues]);
+
+  const handleArrest = (monthlyDuesId: string) => {
+    arrestMutation.mutate(monthlyDuesId, {
+      onSuccess: () => toast.success("تم تسليم المستحقات", "تم تحديث حالة التسليم بنجاح."),
+      onError: (error) => toast.error("تعذر تسليم المستحقات", getApiErrorMessage(error)),
+    });
+  };
 
   return (
     <div className="space-y-6" dir="rtl">
@@ -108,7 +99,12 @@ export function MonthlyDuesScreen() {
       ) : monthlyDues.length ? (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {monthlyDues.map((due) => (
-            <MonthlyDuesCard key={due.user.id} due={due} />
+            <MonthlyDuesCard
+              key={due.userId}
+              due={due}
+              onArrest={handleArrest}
+              isArresting={arrestMutation.isPending && arrestMutation.variables === due.monthlyDuesId}
+            />
           ))}
         </div>
       ) : (

@@ -28,7 +28,7 @@ export function useFinanceSummaryQuery(params: FinancialSummaryParams) {
   return useQuery({
     queryKey: queryKeys.finance.summary(params),
     queryFn: () => financeService.getSummary(params),
-    enabled: Boolean(params.startDate && params.endDate),
+    enabled: Boolean(params.year && params.months.length > 0),
   });
 }
 

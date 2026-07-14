@@ -15,6 +15,15 @@ export function usePayrollRecordsQuery(params: PayrollRecordListParams = {}) {
   });
 }
 
+export function usePayrollRecordsAllQuery(
+  params: Omit<PayrollRecordListParams, "page" | "pageSize"> = {},
+) {
+  return useQuery({
+    queryKey: queryKeys.payroll.listAll(params),
+    queryFn: () => payrollService.listAll(params),
+  });
+}
+
 export function usePayrollRecordMutations() {
   const qc = useQueryClient();
   const invalidate = () => qc.invalidateQueries({ queryKey: queryKeys.payroll.all });

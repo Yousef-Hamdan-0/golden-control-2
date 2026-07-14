@@ -134,8 +134,15 @@ export function InvoicesScreen() {
     setPage(1);
   }, [currencyParam, typeParam]);
 
-  const total = kpiInvoices.reduce((sum, invoice) => sum + invoice.total, 0);
-  const paid = kpiInvoices.reduce((sum, invoice) => sum + invoice.paid, 0);
+  // With a single currency selected, the API already filters kpiInvoices to
+  // that one currency, so summing the raw amounts is correct. With "all"
+  // currencies, invoices mix SYP and USD, so USD amounts are converted to SYP
+  // (same live-rate conversion pattern as SalesProfitsScreen) before summing —
+  // otherwise adding raw SYP + USD figures together produces a meaningless total.
+  const amountInCards = (invoice: Invoice, amount: number) =>
+    currency === "all" && invoice.currency === "USD" ? amount * dollarExchangeRate : amount;
+  const total = kpiInvoices.reduce((sum, invoice) => sum + amountInCards(invoice, invoice.total), 0);
+  const paid = kpiInvoices.reduce((sum, invoice) => sum + amountInCards(invoice, invoice.paid), 0);
   const completedInvoices = kpiInvoices.filter((invoice) => invoice.status === "paid").length;
   const incompletedInvoices = kpiInvoices.filter((invoice) => invoice.status !== "paid").length;
   // The invoices list is already filtered to a single currency via the API

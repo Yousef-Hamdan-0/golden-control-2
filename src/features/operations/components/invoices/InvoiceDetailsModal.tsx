@@ -25,7 +25,6 @@ import {
   remaining,
   convertPaymentToInvoiceCurrency,
 } from "../../utils/invoice";
-import { printInvoice } from "../../utils/pdf";
 import { DetailItem } from "../shared/DetailItem";
 import { EmptyState } from "../shared/EmptyState";
 
@@ -45,6 +44,7 @@ export function InvoiceDetailsModal({
   const toast = useToast();
   const [paymentsPage, setPaymentsPage] = useState(1);
   const [downloading, setDownloading] = useState(false);
+  const [printing, setPrinting] = useState(false);
   const paymentPages = Math.max(1, Math.ceil(invoice.payments.length / PAGE_SIZE));
   const currentPaymentsPage = Math.min(paymentsPage, paymentPages);
   const visiblePayments = invoice.payments.slice(
@@ -71,6 +71,28 @@ export function InvoiceDetailsModal({
       toast.error("تعذر تنزيل PDF", getApiErrorMessage(error));
     } finally {
       setDownloading(false);
+    }
+  }
+
+  // Prints the exact same server-generated PDF used by "تحميل PDF" (same
+  // pattern as the request receipt's print button), so the printed copy and
+  // the downloaded file are guaranteed to be byte-identical.
+  async function printInvoicePdf() {
+    setPrinting(true);
+    try {
+      const { blob } = await invoiceService.downloadPdf(invoice.id);
+      const url = URL.createObjectURL(blob);
+      const printWindow = window.open(url, "_blank");
+      if (printWindow) {
+        printWindow.addEventListener("load", () => printWindow.print());
+      } else {
+        toast.error("تعذر فتح الفاتورة", "يرجى السماح بالنوافذ المنبثقة لهذا الموقع.");
+      }
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (error) {
+      toast.error("تعذر طباعة الفاتورة", getApiErrorMessage(error));
+    } finally {
+      setPrinting(false);
     }
   }
 
@@ -221,9 +243,9 @@ export function InvoiceDetailsModal({
         </Card>
 
         <div className="flex flex-wrap items-center justify-end gap-3 border-t border-border pt-4">
-          <Button type="button" variant="outline" onClick={() => printInvoice(invoice)}>
+          <Button type="button" variant="outline" disabled={printing} onClick={printInvoicePdf}>
             <Icon name="file" size={18} />
-            طباعة الفاتورة
+            {printing ? "جاري التجهيز..." : "طباعة الفاتورة"}
           </Button>
           <Button
             type="button"

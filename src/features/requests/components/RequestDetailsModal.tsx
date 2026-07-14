@@ -229,7 +229,7 @@ export function RequestDetailsModal({
                     onClick={() => onPrintReport(request)}
                   >
                     <Icon name="file" size={16} />
-                    {printingPdf ? "جاري التجهيز..." : "طباعة التقرير"}
+                    {printingPdf ? "جاري التجهيز..." : "طباعة وصل الطلب"}
                   </Button>
                 ) : null}
                 {onDownloadPdf ? (

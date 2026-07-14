@@ -98,10 +98,22 @@ async function localAssetDataUri(fileName: string) {
 }
 
 async function remoteAssetDataUri(url: string) {
-  // A hanging logo fetch must not stall PDF generation past the client's
-  // download timeout; fall back to the bundled logo instead.
-  const response = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(5_000) });
-  if (!response.ok) throw new Error("Logo fetch failed");
+  // Some hosts reject/hang on requests with no User-Agent (bot filtering on
+  // static-asset hosts/CDNs), which a real browser always sends but Node's
+  // server-side fetch (used here by Puppeteer) does not by default — this is
+  // the concrete reason the uploaded logo could load fine in the browser-print
+  // path yet fail only in the server-rendered PDF. A hanging fetch also must
+  // not stall PDF generation past the client's download timeout, so it still
+  // falls back to the bundled logo instead.
+  const response = await fetch(url, {
+    cache: "no-store",
+    signal: AbortSignal.timeout(10_000),
+    headers: {
+      "User-Agent": "Mozilla/5.0 (compatible; GoldenControlPdfRenderer/1.0)",
+      Accept: "image/*",
+    },
+  });
+  if (!response.ok) throw new Error(`Logo fetch failed with status ${response.status}`);
   const mime = response.headers.get("content-type") ?? mimeFromPath(url);
   const buffer = Buffer.from(await response.arrayBuffer());
   return `data:${mime};base64,${buffer.toString("base64")}`;
@@ -112,8 +124,11 @@ async function logoDataUri(settings?: Settings | null) {
   if (settingsLogoUrl) {
     try {
       return await remoteAssetDataUri(settingsLogoUrl);
-    } catch {
-      // Keep documents printable even if the uploaded logo is temporarily unavailable.
+    } catch (error) {
+      // Keep documents printable even if the uploaded logo is temporarily
+      // unavailable, but log it — silently swapping in the generic bundled
+      // logo with no trace was the exact reason this bug was hard to diagnose.
+      console.error("official-documents: falling back to bundled logo —", error);
     }
   }
   return localAssetDataUri("al-khubara-logo-transparent.png");
@@ -207,15 +222,14 @@ function htmlShell(title: string, brand: DocumentBrand, body: string) {
     .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 9mm; }
     .details { padding: 5mm; min-height: 35mm; }
     .row {
-      display: grid;
-      grid-template-columns: 31mm 1fr;
-      gap: 3mm;
+      display: flex;
       align-items: baseline;
+      gap: 2mm;
       min-height: 6.8mm;
       font-size: 12px;
     }
-    .label { color: ${MUTED}; white-space: nowrap; }
-    .value { font-weight: 700; overflow-wrap: anywhere; }
+    .label { color: ${MUTED}; white-space: nowrap; flex: 0 0 auto; }
+    .value { font-weight: 700; overflow-wrap: anywhere; min-width: 0; }
     .ltr { direction: ltr; unicode-bidi: isolate; text-align: left; }
     .phone-number { direction: ltr; unicode-bidi: isolate; text-align: right; }
     .center { text-align: center; }
@@ -278,7 +292,7 @@ function htmlShell(title: string, brand: DocumentBrand, body: string) {
     }
     .payments { min-height: 39mm; padding: 5mm; }
     .mini-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 3mm; }
-    .mini-table th { padding: 2mm; color: ${MUTED}; font-weight: 700; text-align: right; border-bottom: 1px solid ${BORDER}; }
+    .mini-table th { padding: 2mm; background: ${GOLD}; color: #ffffff; font-weight: 700; text-align: right; border-bottom: 1px solid ${BORDER}; }
     .mini-table td { padding: 3mm 2mm; border-top: 1px solid ${BORDER}; }
     ${INVOICE_FOOTER_CSS}
     .top-strip {

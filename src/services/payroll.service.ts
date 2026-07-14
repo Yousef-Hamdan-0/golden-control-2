@@ -11,6 +11,10 @@ export const payrollService = {
     return payrollRepository.list(params);
   },
 
+  listAll(params: Omit<PayrollRecordListParams, "page" | "pageSize"> = {}) {
+    return payrollRepository.listAll(params);
+  },
+
   create(params: PayrollRecordCreateParams) {
     return payrollRepository.create(params);
   },

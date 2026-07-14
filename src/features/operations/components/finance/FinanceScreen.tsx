@@ -31,15 +31,15 @@ export function FinanceScreen({ section }: { section?: string[] }) {
   const title = financeTitle(section);
   const isReport = section?.[0] === "reports";
   const [page, setPage] = useState(1);
-  // The financial report API caps the period at 3 months.
+  // The financial report API (GET /api/reports/financial) accepts a single
+  // year plus up to 3 month numbers within that year — not an arbitrary date
+  // range — so "last 3 months" is clamped to the current year's months.
   const summaryRange = (() => {
-    const start = new Date();
-    start.setMonth(start.getMonth() - 3);
-    start.setDate(start.getDate() + 1);
-    return {
-      startDate: start.toISOString().slice(0, 10),
-      endDate: new Date().toISOString().slice(0, 10),
-    };
+    const today = new Date();
+    const year = today.getFullYear();
+    const currentMonth = today.getMonth() + 1;
+    const months = [currentMonth - 2, currentMonth - 1, currentMonth].filter((month) => month >= 1);
+    return { year, months };
   })();
   const summaryQuery = useFinanceSummaryQuery(summaryRange);
   const summary = summaryQuery.data;

@@ -76,7 +76,7 @@ function normalizedRole(value: string | { name: string }): Role {
   return parsed.data;
 }
 
-function mediaUrl(path?: string | null): string | undefined {
+export function mediaUrl(path?: string | null): string | undefined {
   if (!path) return undefined;
   if (/^(?:https?:|data:|blob:)/i.test(path)) return path;
   return `${API_BASE_URL}/${path.replace(/^\/+/, "")}`;
@@ -168,7 +168,17 @@ export function normalizeUserListResponse(
     (isRecord(root.pagination) && root.pagination) ||
     (isRecord(root.meta) && root.meta) ||
     {};
-  const items = rawItems.map(normalizeUser);
+  // One malformed record (unexpected role casing, missing id, ...) used to
+  // throw and fail the entire list — skip that record instead so the rest
+  // of a real, mostly-valid API response still renders.
+  const items = rawItems.flatMap((item) => {
+    try {
+      return [normalizeUser(item)];
+    } catch (error) {
+      console.error("normalizeUserListResponse: skipping invalid user record —", error, item);
+      return [];
+    }
+  });
 
   return {
     items,
