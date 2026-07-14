@@ -154,10 +154,6 @@ export function AuthBrandPanel() {
           />
         </div>
       </div>
-
-      <p className="absolute bottom-8 font-heading text-[14px] font-bold text-[var(--gold-active)]">
-        {BRAND_NAME}
-      </p>
     </section>
   );
 }
