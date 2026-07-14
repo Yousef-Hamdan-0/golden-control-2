@@ -12,7 +12,6 @@ export const DailyInventorySchema = z.object({
   id: z.string(),
   technicianId: z.string(),
   technicianName: z.string(),
-  technicianPhone: z.string(),
   createdAt: z.string(), // ISO
   tools: z.string(), // free-text "الأدوات"
   notes: z.string().optional(), // "ملاحظات"

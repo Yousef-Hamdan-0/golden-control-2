@@ -9,6 +9,7 @@ import { useToast } from "@/components/ui/Toast";
 import { getApiErrorMessage } from "@/helpers/api.helper";
 import { queryKeys } from "@/hooks/query-keys";
 import { Icon } from "@/lib/icons";
+import { useRole } from "@/features/auth/hooks/use-role";
 import type { Invoice, InvoicePayment } from "@/features/operations/types";
 import { createInvoiceDraftFromRequest } from "@/features/operations/utils/invoice";
 import { InvoiceDetailsModal } from "@/features/operations/components/invoices/InvoiceDetailsModal";
@@ -76,6 +77,10 @@ export function RequestDetailsModal({
 }) {
   const toast = useToast();
   const queryClient = useQueryClient();
+  const { role } = useRole();
+  // Voice recordings are hidden entirely from manager/employee — center
+  // managers and customer-service staff shouldn't have access to them.
+  const canViewRecords = role !== "manager" && role !== "employee";
   const [showInvoiceForm, setShowInvoiceForm] = useState(false);
   const [invoiceNotice, setInvoiceNotice] = useState<string | null>(null);
   const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null);
@@ -163,7 +168,11 @@ export function RequestDetailsModal({
     <>
       <Modal
         title="تفاصيل الطلب"
-        description="بيانات العميل، الأجهزة، الحالة، سجل الحالة، الفواتير، والتسجيلات الصوتية."
+        description={
+          canViewRecords
+            ? "بيانات العميل، الأجهزة، الحالة، سجل الحالة، الفواتير، والتسجيلات الصوتية."
+            : "بيانات العميل، الأجهزة، الحالة، سجل الحالة، والفواتير."
+        }
         onClose={onClose}
         widthClassName="max-w-5xl"
       >
@@ -217,7 +226,7 @@ export function RequestDetailsModal({
               onAddPayment={setPaymentInvoice}
             />
 
-            <RequestRecordsSection records={request.records} />
+            {canViewRecords ? <RequestRecordsSection records={request.records} /> : null}
 
             {onDownloadPdf || onPrintReport ? (
               <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-4">

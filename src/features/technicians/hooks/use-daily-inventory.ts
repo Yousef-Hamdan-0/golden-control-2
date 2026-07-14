@@ -15,7 +15,6 @@ function toDailyInventory(log: InventoryDailyLog): DailyInventory {
     id: log.id,
     technicianId: log.technicianId,
     technicianName: log.technicianName,
-    technicianPhone: log.technicianPhone,
     createdAt: log.createdAt,
     tools: log.toolsGiven,
     notes: log.notes,

@@ -9,7 +9,6 @@ export interface InventoryDailyLog {
   id: string;
   technicianId: string;
   technicianName: string;
-  technicianPhone: string;
   toolsGiven: string;
   notes: string;
   createdAt: string;
@@ -159,7 +158,7 @@ function normalizeUsedPart(payload: unknown, index: number): InventoryDailyUsedP
   return {
     id: stringValue(raw.id, raw.partId, raw.part_id, part.id, `part-${index + 1}`),
     name: stringValue(raw.name, raw.partName, raw.part_name, nestedName(part), `قطعة ${index + 1}`),
-    quantity: numberValue(raw.quantity, raw.qty),
+    quantity: numberValue(raw.totalQuantity, raw.quantity, raw.qty),
   };
 }
 
@@ -178,7 +177,6 @@ export function normalizeInventoryDailyLog(payload: unknown): InventoryDailyLog 
       payload.technician_name,
       "فني غير محدد",
     ),
-    technicianPhone: stringValue(technician.phone, payload.technicianPhone, payload.technician_phone),
     toolsGiven: stringValue(payload.toolsGiven, payload.tools_given, payload.tools),
     notes: stringValue(payload.notes),
     createdAt: dateValue(payload.createdAt, payload.created_at),

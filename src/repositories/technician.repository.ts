@@ -34,7 +34,6 @@ export const technicianRepository = {
       id: `INV-${Math.floor(2000 + Math.random() * 8000)}`,
       technicianId: input.technicianId,
       technicianName: tech?.fullName ?? "فني",
-      technicianPhone: tech?.phone ?? "",
       createdAt: new Date().toISOString(),
       tools: input.tools,
       notes: input.notes,

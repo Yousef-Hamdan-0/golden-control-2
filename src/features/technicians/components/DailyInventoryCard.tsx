@@ -60,9 +60,6 @@ export function DailyInventoryCard({
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="text-sm font-bold text-content">{entry.technicianName}</div>
-            <div className="mt-0.5 flex items-center gap-1 text-xs text-content-muted">
-              <span dir="ltr">{entry.technicianPhone}</span>
-            </div>
           </div>
           {onDelete ? (
             <button
