@@ -141,8 +141,24 @@ export function InvoicesScreen() {
   // otherwise adding raw SYP + USD figures together produces a meaningless total.
   const amountInCards = (invoice: Invoice, amount: number) =>
     currency === "all" && invoice.currency === "USD" ? amount * dollarExchangeRate : amount;
-  const total = kpiInvoices.reduce((sum, invoice) => sum + amountInCards(invoice, invoice.total), 0);
-  const paid = kpiInvoices.reduce((sum, invoice) => sum + amountInCards(invoice, invoice.paid), 0);
+  // Refunded invoices count toward both the "paid" and "remaining" cards —
+  // their full total, not the (post-refund) paid amount, since a refund
+  // still counts as settled revenue for "المدفوع" while also needing
+  // follow-up for "المتبقي".
+  const paid = kpiInvoices.reduce(
+    (sum, invoice) =>
+      sum + amountInCards(invoice, invoice.status === "refunded" ? invoice.total : invoice.paid),
+    0,
+  );
+  const remainingTotal = kpiInvoices.reduce(
+    (sum, invoice) =>
+      sum +
+      amountInCards(
+        invoice,
+        invoice.status === "refunded" ? invoice.total : invoice.total - invoice.paid,
+      ),
+    0,
+  );
   const completedInvoices = kpiInvoices.filter((invoice) => invoice.status === "paid").length;
   const incompletedInvoices = kpiInvoices.filter((invoice) => invoice.status !== "paid").length;
   // The invoices list is already filtered to a single currency via the API
@@ -284,7 +300,7 @@ export function InvoicesScreen() {
           { label: "عدد الفواتير المكتملة", value: String(completedInvoices), icon: "file" },
           { label: "عدد الفواتير غير المكتملة", value: String(incompletedInvoices), icon: "alert", tone: "gold" },
           { label: "المدفوع", value: formatMoney(paid, cardsCurrency), icon: "wallet", tone: "success" },
-          { label: "المتبقي", value: formatMoney(total - paid, cardsCurrency), icon: "clock", tone: "gold" },
+          { label: "المتبقي", value: formatMoney(remainingTotal, cardsCurrency), icon: "clock", tone: "gold" },
         ]}
       />
       <FilterCard className="lg:grid-cols-[minmax(320px,2fr)_repeat(4,minmax(120px,1fr))_auto]">

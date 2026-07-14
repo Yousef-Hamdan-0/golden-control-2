@@ -36,10 +36,15 @@ const ROUTE_ROLES: { prefix: string; roles: Role[] }[] = [
   { prefix: "/inventory/movement", roles: ["admin"] },
   { prefix: "/inventory", roles: ["admin", "manager", "employee"] },
   { prefix: "/invoices", roles: ["admin", "manager", "employee"] },
+  // Manager gets full (Admin-equivalent) access scoped to payroll
+  // adjustments + monthly dues only; the rest of Finance stays admin-only.
+  { prefix: "/finance/payroll-adjustments", roles: ["admin", "manager"] },
+  { prefix: "/finance/monthly-dues", roles: ["admin", "manager"] },
   { prefix: "/finance", roles: ["admin"] },
   { prefix: "/reports", roles: ["admin"] },
-  // Settings view is open to signed-in staff; editing is enforced server-side.
-  { prefix: "/settings/exchange-rate", roles: ["admin"] },
+  // Screen is open to admin/manager/employee; editing is enforced
+  // server-side (only admin may PATCH /api/settings — see API_RULES below).
+  { prefix: "/settings/exchange-rate", roles: ["admin", "manager", "employee"] },
   { prefix: "/settings", roles: ["admin", "manager", "employee"] },
 ];
 
@@ -133,9 +138,13 @@ const API_RULES: ApiRule[] = [
   { test: (p) => re("/api/invoices/:id/pdf").test(p), roles: ALL_ROLES },
   { test: (p) => re("/api/invoices/:id").test(p), roles: ALL_ROLES },
 
-  // Finance & payroll — admin only
+  // Finance & payroll — admin only, except payroll adjustments + monthly
+  // dues, which Manager gets the same full access to as Admin (view, edit,
+  // arrest/deliver...). The rest of Finance (expenses, sales/profits, PDF
+  // reports) stays admin-only.
+  { test: (p) => p.startsWith("/api/finance/monthly-dues"), roles: ["admin", "manager"] },
   { test: (p) => p.startsWith("/api/finance"), roles: ["admin"] },
-  { test: (p) => p.startsWith("/api/payroll-records"), roles: ["admin"] },
+  { test: (p) => p.startsWith("/api/payroll-records"), roles: ["admin", "manager"] },
 
   // Payments — all roles
   { test: (p) => p.startsWith("/api/payments"), roles: ALL_ROLES },

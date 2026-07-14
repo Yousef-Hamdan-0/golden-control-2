@@ -7,6 +7,7 @@ import { Field, Input } from "@/components/ui/Input";
 import { Spinner } from "@/components/ui/Spinner";
 import { useToast } from "@/components/ui/Toast";
 import { useSettingsMutations, useSettingsQuery } from "@/features/settings/hooks/use-settings";
+import { useRole } from "@/features/auth/hooks/use-role";
 import { getApiErrorMessage } from "@/helpers/api.helper";
 import { Icon } from "@/lib/icons";
 import { SettingsInputSchema, settingsToInput } from "@/models/settings/settings.model";
@@ -16,6 +17,11 @@ export function ExchangeRateSettingsScreen() {
   const toast = useToast();
   const settingsQuery = useSettingsQuery();
   const { update } = useSettingsMutations();
+  const { role } = useRole();
+  // Manager/employee can open this screen but only view the rate — editing
+  // stays admin-only (also enforced server-side: PATCH /api/settings is
+  // blocked for their role by src/middleware.ts + permissions.ts).
+  const canEdit = role === "admin";
   const [exchangeRate, setExchangeRate] = useState("");
   const [rateError, setRateError] = useState<string>();
 
@@ -85,48 +91,62 @@ export function ExchangeRateSettingsScreen() {
     <div className="space-y-6">
       <SectionTitle
         title="سعر الصرف"
-        subtitle="تحديد سعر صرف الدولار مقابل الليرة السورية لاستخدامه في الدفعات والتحويلات المالية."
+        subtitle={
+          canEdit
+            ? "تحديد سعر صرف الدولار مقابل الليرة السورية لاستخدامه في الدفعات والتحويلات المالية."
+            : "سعر صرف الدولار مقابل الليرة السورية المستخدم حالياً في الدفعات والتحويلات المالية (للعرض فقط)."
+        }
       />
       <Card className="overflow-hidden">
-        <CardHeader>
-          <h3 className="text-right font-heading text-lg font-bold text-content">
-            تحديث سعر الصرف
-          </h3>
-        </CardHeader>
-        <form
-          className="grid gap-4 p-4 md:grid-cols-[minmax(240px,1fr)_auto]"
-          onSubmit={updateExchangeRate}
-        >
-          <Field label="سعر صرف الدولار مقابل الليرة السورية" error={rateError}>
-            <Input
-              value={exchangeRate}
-              onChange={(event) => {
-                update.reset();
-                setRateError(undefined);
-                setExchangeRate(event.target.value);
-              }}
-              placeholder="مثال: 14500"
-              dir="ltr"
-              inputMode="decimal"
-              aria-invalid={Boolean(rateError)}
-            />
-          </Field>
-          <div className="flex items-end">
-            <Button
-              type="submit"
-              className="w-full md:w-auto"
-              disabled={update.isPending || !settingsQuery.data}
+        {canEdit ? (
+          <>
+            <CardHeader>
+              <h3 className="text-right font-heading text-lg font-bold text-content">
+                تحديث سعر الصرف
+              </h3>
+            </CardHeader>
+            <form
+              className="grid gap-4 p-4 md:grid-cols-[minmax(240px,1fr)_auto]"
+              onSubmit={updateExchangeRate}
             >
-              {update.isPending ? <Spinner className="h-4 w-4" /> : <Icon name="exchange" size={18} />}
-              {update.isPending ? "جارٍ التحديث..." : "تحديث سعر الصرف"}
-            </Button>
-          </div>
-          {update.error ? (
-            <div className="rounded-md border border-danger/30 bg-danger-soft p-3 text-sm text-danger md:col-span-2">
-              {getApiErrorMessage(update.error)}
-            </div>
-          ) : null}
-        </form>
+              <Field label="سعر صرف الدولار مقابل الليرة السورية" error={rateError}>
+                <Input
+                  value={exchangeRate}
+                  onChange={(event) => {
+                    update.reset();
+                    setRateError(undefined);
+                    setExchangeRate(event.target.value);
+                  }}
+                  placeholder="مثال: 14500"
+                  dir="ltr"
+                  inputMode="decimal"
+                  aria-invalid={Boolean(rateError)}
+                />
+              </Field>
+              <div className="flex items-end">
+                <Button
+                  type="submit"
+                  className="w-full md:w-auto"
+                  disabled={update.isPending || !settingsQuery.data}
+                >
+                  {update.isPending ? <Spinner className="h-4 w-4" /> : <Icon name="exchange" size={18} />}
+                  {update.isPending ? "جارٍ التحديث..." : "تحديث سعر الصرف"}
+                </Button>
+              </div>
+              {update.error ? (
+                <div className="rounded-md border border-danger/30 bg-danger-soft p-3 text-sm text-danger md:col-span-2">
+                  {getApiErrorMessage(update.error)}
+                </div>
+              ) : null}
+            </form>
+          </>
+        ) : (
+          <CardHeader>
+            <h3 className="text-right font-heading text-lg font-bold text-content">
+              سعر الصرف الحالي
+            </h3>
+          </CardHeader>
+        )}
         <div className="border-t border-border bg-surface-2 p-4 text-right">
           <p className="text-xs text-content-muted">السعر الحالي</p>
           <p className="mt-1 font-heading text-xl font-bold text-content" dir="ltr">

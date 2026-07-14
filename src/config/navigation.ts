@@ -87,12 +87,22 @@ export const NAVIGATION: NavItem[] = [
   {
     label: "الإدارة المالية",
     icon: "wallet",
-    roles: ["admin"],
+    // Manager only gets payroll adjustments + monthly dues (filtered via the
+    // children's own `roles` below); the rest of Finance stays admin-only.
+    roles: ["admin", "manager"],
     children: [
-      { label: "المصروفات", href: "/finance/expenses" },
-      { label: "تسويات الرواتب", href: "/finance/payroll-adjustments" },
-      { label: "المستحقات الشهرية", href: "/finance/monthly-dues" },
-      { label: "المبيعات والأرباح", href: "/finance/sales-profits" },
+      { label: "المصروفات", href: "/finance/expenses", roles: ["admin"] },
+      {
+        label: "تسويات الرواتب",
+        href: "/finance/payroll-adjustments",
+        roles: ["admin", "manager"],
+      },
+      {
+        label: "المستحقات الشهرية",
+        href: "/finance/monthly-dues",
+        roles: ["admin", "manager"],
+      },
+      { label: "المبيعات والأرباح", href: "/finance/sales-profits", roles: ["admin"] },
     ],
   },
   {
@@ -109,8 +119,14 @@ export const NAVIGATION: NavItem[] = [
 ];
 
 export const NAV_FOOTER: NavItem[] = [
-  // Exchange rate is an edit-only screen (PATCH /settings) → admin only.
-  { label: "سعر الصرف", href: "/settings/exchange-rate", icon: "exchange", roles: ["admin"] },
+  // Manager/employee see this screen read-only — editing (PATCH /settings)
+  // stays admin-only, enforced server-side in src/lib/auth/permissions.ts.
+  {
+    label: "سعر الصرف",
+    href: "/settings/exchange-rate",
+    icon: "exchange",
+    roles: ["admin", "manager", "employee"],
+  },
   // Settings view link is visible to everyone; editing is blocked server-side
   // (PATCH /settings) for non-admins.
   { label: "الإعدادات", href: "/settings/center", icon: "gear" },
