@@ -5,9 +5,15 @@ import { UserAvatar } from "@/features/users/components/UserAvatar";
 import { PAYROLL_ADJUSTMENT_LABELS } from "@/features/payroll-adjustments/models/payroll-adjustment.model";
 import type { PayrollAdjustmentType } from "@/features/payroll-adjustments/models/payroll-adjustment.model";
 import { isPositiveAdjustment, type MonthlyDueUser } from "@/features/monthly-dues/models/monthly-dues.model";
+import { ROLE_LABELS_AR } from "@/models/auth/user.model";
 import { formatMoney } from "@/lib/format/currency";
 import { localDisplayDateTime } from "@/lib/format/date";
 import { Icon } from "@/lib/icons";
+
+function roleLabelAr(roleName: string): string {
+  const key = roleName.trim().toLowerCase();
+  return (ROLE_LABELS_AR as Record<string, string>)[key] ?? roleName;
+}
 
 const ADJUSTMENT_TONES: Record<PayrollAdjustmentType, BadgeTone> = {
   salary: "gold",
@@ -40,7 +46,9 @@ export function MonthlyDuesCard({
             {due.userNumber || due.userId}
           </p>
         </div>
-        <Badge tone="gold">{due.roleName}</Badge>
+        <Badge tone="gold" className="bg-gold text-white">
+          {roleLabelAr(due.roleName)}
+        </Badge>
       </CardHeader>
 
       <div className="grid grid-cols-2 gap-px bg-border">
@@ -90,14 +98,14 @@ export function MonthlyDuesCard({
         )}
       </div>
 
-      <div className="flex items-center justify-between border-t border-border bg-surface-2 px-4 py-3">
+      <div className="flex items-center justify-between border-t border-border bg-white px-4 py-3">
         <div className="flex items-center gap-2">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-gold-soft text-gold">
             <Icon name="wallet" size={18} />
           </span>
-          <p className="text-sm font-semibold text-content">إجمالي المستحق</p>
+          <p className="text-sm font-semibold text-gray-900">إجمالي المستحق</p>
         </div>
-        <p className="font-heading text-lg font-bold text-content" dir="ltr">
+        <p className="font-heading text-lg font-bold text-gray-900" dir="ltr">
           {formatMoney(monthlyDue, "SYP")}
         </p>
       </div>
