@@ -13,7 +13,7 @@ export const config = {
  * is enforced in src/app/api/requests/[id]/route.ts (middleware cannot rewrite
  * a request body).
  */
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const role = roleFromBearer(request.headers.get("authorization"));
 
   // No decodable role (login, or an absent/opaque token) → defer to the backend.

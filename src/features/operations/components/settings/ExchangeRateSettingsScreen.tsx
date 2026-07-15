@@ -20,7 +20,7 @@ export function ExchangeRateSettingsScreen() {
   const { role } = useRole();
   // Manager/employee can open this screen but only view the rate — editing
   // stays admin-only (also enforced server-side: PATCH /api/settings is
-  // blocked for their role by src/middleware.ts + permissions.ts).
+  // blocked for their role by src/proxy.ts + permissions.ts).
   const canEdit = role === "admin";
   const [exchangeRate, setExchangeRate] = useState("");
   const [rateError, setRateError] = useState<string>();

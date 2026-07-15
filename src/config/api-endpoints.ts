@@ -2,10 +2,10 @@
  * Central API registry.
  * Change the base URL in `.env.local`, and keep every backend path in this file.
  */
-export const API_BASE_URL = (
-  process.env.NEXT_PUBLIC_API_URL ??
-  "https://al-khbaraa-backend-productions.up.railway.app"
-).replace(/\/+$/, "");
+export const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(
+  /\/+$/,
+  "",
+);
 
 export const API_ROUTES = {
   auth: {
@@ -14,7 +14,6 @@ export const API_ROUTES = {
     logout: "/api/auth/logout",
   },
   dashboard: {
-    stats: "/api/dashboard/stats",
     technicianPerformance: "/api/dashboard/technician-performance",
     financialReport: (format: string) =>
       `/api/dashboard/financial-report?${new URLSearchParams({ format })}`,
