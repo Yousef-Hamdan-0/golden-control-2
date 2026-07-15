@@ -14,6 +14,7 @@ export const API_ROUTES = {
     logout: "/api/auth/logout",
   },
   dashboard: {
+    stats: "/api/dashboard/stats",
     technicianPerformance: "/api/dashboard/technician-performance",
     financialReport: (format: string) =>
       `/api/dashboard/financial-report?${new URLSearchParams({ format })}`,
