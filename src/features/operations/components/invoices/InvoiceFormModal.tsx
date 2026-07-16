@@ -313,6 +313,11 @@ export function InvoiceFormModal({
               </Button>
             </div>
             <div className="space-y-3 p-4">
+              {draft.parts.length === 0 ? (
+                <p className="text-sm text-content-muted">
+                  لا توجد قطع غيار مستخدمة في هذه الفاتورة.
+                </p>
+              ) : null}
               {draft.parts.map((part, index) => (
                 <div key={`${part.id}-${index}`} className="rounded-md border border-border bg-surface p-3">
                   <div className="grid gap-3 lg:grid-cols-[minmax(260px,1fr)_150px_150px_150px_auto] lg:items-end">
@@ -395,7 +400,6 @@ export function InvoiceFormModal({
                       size="sm"
                       className="h-10 px-3"
                       onClick={() => removePart(index)}
-                      disabled={draft.parts.length <= 1}
                     >
                       <Icon name="trash" size={16} />
                     </Button>
