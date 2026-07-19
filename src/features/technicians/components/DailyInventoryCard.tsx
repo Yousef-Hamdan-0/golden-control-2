@@ -9,9 +9,9 @@ import type { DailyInventory } from "@/models/technician/daily-inventory.model";
 
 function formatCreated(iso: string): string {
   if (!iso.includes("T") && !iso.includes(" ")) return localDateKey(iso, "غير محدد").replaceAll("-", "/");
-  const d = new Date(iso.includes("T") ? iso : iso.replace(" ", "T"));
-  if (Number.isNaN(d.getTime())) return localDateKey(iso, "غير محدد").replaceAll("-", "/");
-  const [datePart, timePart = "00:00"] = localDateTimeKey(d).split(" ");
+  const dateTime = localDateTimeKey(iso, "");
+  if (!dateTime) return localDateKey(iso, "غير محدد").replaceAll("-", "/");
+  const [datePart, timePart = "00:00"] = dateTime.split(" ");
   const date = datePart.replaceAll("-", "/");
   const [hour = "0", minute = "00"] = timePart.split(":");
   const h = Number(hour);

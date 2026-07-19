@@ -576,6 +576,7 @@ function dataFromResponse(payload: unknown): unknown {
           ...data.request,
           invoices: data.request.invoices ?? data.invoices,
           invoice: data.request.invoice ?? data.invoice,
+          records: data.request.records ?? data.records ?? data.audioRecords ?? data.voiceRecords,
         }
       : data.request;
   }
@@ -585,6 +586,8 @@ function dataFromResponse(payload: unknown): unknown {
           ...data.repairRequest,
           invoices: data.repairRequest.invoices ?? data.invoices,
           invoice: data.repairRequest.invoice ?? data.invoice,
+          records:
+            data.repairRequest.records ?? data.records ?? data.audioRecords ?? data.voiceRecords,
         }
       : data.repairRequest;
   }

@@ -31,10 +31,22 @@ function dateTimeParts(date: Date) {
   }).formatToParts(date);
 }
 
+/**
+ * TEMP compensation: the backend stores `timestamp without time zone` columns
+ * holding already-local (Asia/Damascus) values, but `pg` reads them back as if
+ * they were UTC and the API serializes them with a trailing `Z`. Every zoned
+ * timestamp we receive is therefore 3 hours ahead of the real local time.
+ * Remove this once the backend fixes the root cause (e.g.
+ * `pg.types.setTypeParser(1114, ...)` or migrating the columns to `timestamptz`).
+ */
+const BACKEND_UTC_OFFSET_COMPENSATION_MS = 3 * 60 * 60 * 1000;
+
 function parseDate(value: string) {
   const normalized = value.includes("T") ? value : value.replace(" ", "T");
   const date = new Date(normalized);
-  return Number.isNaN(date.getTime()) ? null : date;
+  if (Number.isNaN(date.getTime())) return null;
+  if (!TIME_ZONE_PATTERN.test(value.trim())) return date;
+  return new Date(date.getTime() - BACKEND_UTC_OFFSET_COMPENSATION_MS);
 }
 
 export function localDateKey(value: string | Date | null | undefined, fallback = "") {
