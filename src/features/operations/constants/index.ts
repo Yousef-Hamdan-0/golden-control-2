@@ -62,6 +62,8 @@ export const INVENTORY_MOVEMENT_LABELS: Record<
   supply: { label: "توريد", tone: "success" },
   withdraw: { label: "صرف", tone: "gold" },
   adjustment: { label: "تسوية", tone: "info" },
+  sale: { label: "بيع", tone: "gold" },
+  return: { label: "إرجاع", tone: "info" },
 };
 
 export const USD_TO_SYP_RATE = 14500;

@@ -3,7 +3,7 @@ import { ApiError } from "@/helpers/api.helper";
 
 type JsonRecord = Record<string, unknown>;
 
-export type InventoryMovementType = "supply" | "withdraw" | "adjustment";
+export type InventoryMovementType = "supply" | "withdraw" | "adjustment" | "sale" | "return";
 
 export interface InventoryDailyLog {
   id: string;
@@ -275,6 +275,8 @@ function normalizeMovementType(value: unknown): InventoryMovementType {
   const raw = stringValue(value).toLowerCase();
   if (raw === "withdraw" || raw === "withdrawal" || raw === "out") return "withdraw";
   if (raw === "adjustment" || raw === "adjust") return "adjustment";
+  if (raw === "sale" || raw === "sold") return "sale";
+  if (raw === "return" || raw === "returned") return "return";
   return "supply";
 }
 

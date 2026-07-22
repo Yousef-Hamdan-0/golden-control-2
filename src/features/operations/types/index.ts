@@ -102,7 +102,7 @@ export interface InventoryMovement {
   id: string;
   partId: string;
   partName: string;
-  type: "supply" | "withdraw" | "adjustment";
+  type: "supply" | "withdraw" | "adjustment" | "sale" | "return";
   quantity: number;
   owner: string;
   createdAt: string;
