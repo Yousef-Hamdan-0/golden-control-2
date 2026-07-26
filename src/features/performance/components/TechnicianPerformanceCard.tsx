@@ -143,7 +143,7 @@ export function TechnicianPerformanceCard({
               }) : (
                 <tr>
                   <td colSpan={6} className="px-4 py-8 text-center text-content-muted">
-                    لا توجد تفاصيل خط زمني مرسلة من الـ API لهذا الفني.
+                    لا توجد بيانات طلبات لهذا الفني
                   </td>
                 </tr>
               )}
