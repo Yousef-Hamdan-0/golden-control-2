@@ -96,6 +96,9 @@ export type InventoryMovementInput = z.input<
   typeof InventoryMovementInputSchema
 >;
 
+/** أنواع الحركات التي يمكن تسجيلها يدوياً (حركات البيع والإرجاع تُنشأ تلقائياً). */
+export type ManualInventoryMovementType = InventoryMovementInput["movementType"];
+
 function isRecord(value: unknown): value is JsonRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
