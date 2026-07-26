@@ -23,8 +23,13 @@ const STATUS_DETAILS: Record<
   active: { label: "نشط", tone: "gold" },
 };
 
-function formatHours(hours: number | null) {
-  return hours === null ? "—" : `${hours} ساعة`;
+function formatDuration(minutes: number | null) {
+  if (minutes === null) return "—";
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  if (hours === 0) return `${mins} دقيقة`;
+  if (mins === 0) return `${hours} ساعة`;
+  return `${hours} ساعة و${mins} دقيقة`;
 }
 
 export function TechnicianPerformanceCard({
@@ -122,10 +127,10 @@ export function TechnicianPerformanceCard({
                       </Badge>
                     </td>
                     <td className="px-4 py-3 text-content-muted">
-                      {formatHours(order.maintenanceHours)}
+                      {formatDuration(order.maintenanceHours)}
                     </td>
                     <td className="px-4 py-3 text-content-muted">
-                      {formatHours(order.completionHours)}
+                      {formatDuration(order.completionHours)}
                     </td>
                     <td className="px-4 py-3 text-content-muted" dir="ltr">
                       {localDisplayDateTime(order.startTime)}
