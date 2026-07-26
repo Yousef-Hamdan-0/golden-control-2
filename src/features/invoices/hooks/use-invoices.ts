@@ -54,6 +54,17 @@ export function useInvoiceMutations() {
     onSuccess: invalidateInvoices,
   });
 
+  const update = useMutation({
+    mutationFn: ({ id, input }: { id: string; input: Invoice }) =>
+      invoiceService.update(id, input),
+    onSuccess: async (_data, vars) => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: queryKeys.invoices.detail(vars.id) }),
+        invalidateInvoices(),
+      ]);
+    },
+  });
+
   const recordPayment = useMutation({
     mutationFn: (input: PaymentPayloadInput) => invoiceService.recordPayment(input),
     onSuccess: async (_data, vars) => {
@@ -85,5 +96,5 @@ export function useInvoiceMutations() {
     },
   });
 
-  return { create, recordPayment, refund };
+  return { create, update, recordPayment, refund };
 }

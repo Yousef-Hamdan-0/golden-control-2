@@ -38,6 +38,7 @@ export function InvoiceFormModal({
   submitting = false,
   submitError,
   lockRequest = false,
+  lockPayment = false,
   dollarExchangeRate = USD_TO_SYP_RATE,
 }: {
   invoice: Invoice;
@@ -47,6 +48,7 @@ export function InvoiceFormModal({
   submitting?: boolean;
   submitError?: string;
   lockRequest?: boolean;
+  lockPayment?: boolean;
   dollarExchangeRate?: number;
 }) {
   const [draft, setDraft] = useState<Invoice>(invoice);
@@ -166,11 +168,17 @@ export function InvoiceFormModal({
       currency: part.currency ?? draft.currency,
     }));
     const total = Math.max(0, Number(draft.total) || 0);
-    const paid = Math.min(total, Math.max(0, Number(draft.paid) || 0));
-    const nextStatus: PaymentStatus =
-      paid >= total && total > 0 ? "paid" : paid > 0 ? "partial" : draft.status === "paid" ? "partial" : draft.status;
-    const payments =
-      !isCreate && draft.payments.length > 0
+    const paid = lockPayment ? invoice.paid : Math.min(total, Math.max(0, Number(draft.paid) || 0));
+    const nextStatus: PaymentStatus = lockPayment
+      ? invoice.status
+      : paid >= total && total > 0
+        ? "paid"
+        : paid > 0
+          ? "partial"
+          : draft.status === "paid"
+            ? "partial"
+            : draft.status;
+    const payments = lockPayment ? invoice.payments : !isCreate && draft.payments.length > 0
         ? draft.payments
         : paid > 0
           ? [
@@ -184,6 +192,7 @@ export function InvoiceFormModal({
               },
             ]
           : [];
+    const paymentMethod = lockPayment ? invoice.paymentMethod : draft.paymentMethod;
 
     return {
       ...draft,
@@ -197,6 +206,7 @@ export function InvoiceFormModal({
       total,
       paid,
       status: nextStatus,
+      paymentMethod,
       requestNumber: draft.requestNumber,
       issuedAt: draft.issuedAt || todayDateKey(),
       warrantyDuration: draft.warrantyDuration || "غير محددة",
@@ -280,29 +290,31 @@ export function InvoiceFormModal({
             )}
           </div>
 
-          <div className="space-y-3">
-            <h3 className="font-heading text-base font-bold text-gold">حالة الفاتورة</h3>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {([
-                ["paid", "مدفوعة بالكامل"],
-                ["partial", "مدفوعة جزئياً"],
-              ] as Array<[PaymentStatus, string]>).map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => patchPaymentStatus(value)}
-                  className={cn(
-                    "rounded-md border px-4 py-3 text-center font-heading text-base font-bold transition",
-                    draft.status === value
-                      ? "border-gold bg-gold-soft text-gold-active"
-                      : "border-border bg-surface text-content-muted hover:bg-gold-soft hover:text-gold",
-                  )}
-                >
-                  {label}
-                </button>
-              ))}
+          {!lockPayment && (
+            <div className="space-y-3">
+              <h3 className="font-heading text-base font-bold text-gold">حالة الفاتورة</h3>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {([
+                  ["paid", "مدفوعة بالكامل"],
+                  ["partial", "مدفوعة جزئياً"],
+                ] as Array<[PaymentStatus, string]>).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => patchPaymentStatus(value)}
+                    className={cn(
+                      "rounded-md border px-4 py-3 text-center font-heading text-base font-bold transition",
+                      draft.status === value
+                        ? "border-gold bg-gold-soft text-gold-active"
+                        : "border-border bg-surface text-content-muted hover:bg-gold-soft hover:text-gold",
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           <Card className="overflow-hidden shadow-none">
             <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
@@ -438,7 +450,7 @@ export function InvoiceFormModal({
                     min={0}
                     placeholder="0.00"
                     dir="ltr"
-                    disabled={submitting}
+                    disabled={submitting || lockPayment}
                   />
                 </Field>
               </div>
@@ -466,9 +478,11 @@ export function InvoiceFormModal({
                   <button
                     key={value}
                     type="button"
+                    disabled={lockPayment}
                     onClick={() => patchDraft({ paymentMethod: value })}
                     className={cn(
                       "rounded-md border px-4 py-3 font-heading font-bold transition",
+                      lockPayment && "cursor-not-allowed opacity-40",
                       draft.paymentMethod === value
                         ? "border-gold bg-gold-soft text-gold-active"
                         : "border-border bg-surface text-content-muted hover:bg-gold-soft hover:text-gold",

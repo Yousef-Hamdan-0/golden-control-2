@@ -38,6 +38,7 @@ import { FilterCard } from "../shared/FilterCard";
 import { DateFilterModal } from "../shared/DateFilterModal";
 import { EmptyState } from "../shared/EmptyState";
 import { InvoiceDetailsModal } from "./InvoiceDetailsModal";
+import { InvoiceFormModal } from "./InvoiceFormModal";
 import { AddPaymentModal } from "./AddPaymentModal";
 
 const EMPTY_INVOICES: Invoice[] = [];
@@ -72,7 +73,8 @@ export function InvoicesScreen() {
   const [paymentInvoice, setPaymentInvoice] = useState<Invoice | null>(null);
   const [page, setPage] = useState(1);
   const [refundInvoice, setRefundInvoice] = useState<Invoice | null>(null);
-  const { recordPayment, refund } = useInvoiceMutations();
+  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
+  const { update, recordPayment, refund } = useInvoiceMutations();
   const { role } = useRole();
   const isAdmin = role === "admin";
   const dollarExchangeRate = useDollarExchangeRate();
@@ -235,6 +237,25 @@ export function InvoicesScreen() {
     router.replace(queryString ? `/invoices?${queryString}` : "/invoices");
   }
 
+  function canEditInvoice(invoice: Invoice) {
+    return invoice.status !== "refunded" && !invoice.returned;
+  }
+
+  function saveInvoiceEdit(input: Invoice) {
+    if (!editingInvoice) return;
+    const displayNumber = invoiceDisplayNumber(editingInvoice);
+    update.mutate(
+      { id: editingInvoice.id, input },
+      {
+        onSuccess: () => {
+          setEditingInvoice(null);
+          toast.success("تم تعديل الفاتورة", `تم حفظ تعديلات الفاتورة ${displayNumber} بنجاح.`);
+        },
+        onError: (error) => toast.error("تعذر تعديل الفاتورة", getApiErrorMessage(error)),
+      },
+    );
+  }
+
   function canAddPayment(invoice: Invoice) {
     return invoice.status !== "paid" && invoice.status !== "refunded" && !invoice.returned;
   }
@@ -292,6 +313,18 @@ export function InvoicesScreen() {
           onSave={savePayment}
           submitting={recordPayment.isPending}
           submitError={recordPayment.error ? getApiErrorMessage(recordPayment.error) : undefined}
+          dollarExchangeRate={dollarExchangeRate}
+        />
+      ) : null}
+      {editingInvoice ? (
+        <InvoiceFormModal
+          invoice={editingInvoice}
+          mode="edit"
+          lockPayment
+          onClose={() => setEditingInvoice(null)}
+          onSave={saveInvoiceEdit}
+          submitting={update.isPending}
+          submitError={update.error ? getApiErrorMessage(update.error) : undefined}
           dollarExchangeRate={dollarExchangeRate}
         />
       ) : null}
@@ -436,6 +469,16 @@ export function InvoicesScreen() {
                         className="rounded-sm p-1.5 text-content-muted hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         <Icon name="plus" size={18} />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`تعديل ${invoiceDisplayNumber(invoice)}`}
+                        title="تعديل الفاتورة"
+                        disabled={!isAdmin || !canEditInvoice(invoice)}
+                        onClick={() => setEditingInvoice(invoice)}
+                        className="rounded-sm p-1.5 text-content-muted hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <Icon name="pencil" size={18} />
                       </button>
                     </div>
                   </td>

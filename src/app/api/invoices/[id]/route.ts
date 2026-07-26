@@ -9,3 +9,8 @@ export async function GET(request: Request, { params }: RouteContext) {
   const { id } = await params;
   return proxyInvoiceRequest(request, BACKEND_API_ENDPOINTS.invoices.byId(id));
 }
+
+export async function PATCH(request: Request, { params }: RouteContext) {
+  const { id } = await params;
+  return proxyInvoiceRequest(request, BACKEND_API_ENDPOINTS.invoices.byId(id));
+}

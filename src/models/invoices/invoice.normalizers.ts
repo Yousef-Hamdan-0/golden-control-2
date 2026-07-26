@@ -843,6 +843,33 @@ export class InvoicePayloadModel {
   }
 }
 
+export class InvoiceUpdatePayloadModel {
+  constructor(private readonly input: Invoice) {}
+
+  toJSON() {
+    const totalAmount = Math.max(0, Number(this.input.total) || 0);
+    if (totalAmount <= 0) throw new ApiError("المبلغ الكلي مطلوب.");
+
+    return {
+      totalAmount,
+      warrantyPeriod: this.input.warrantyDuration ?? "",
+      notes: this.input.notes ?? "",
+      locationURL: this.input.locationURL ?? "",
+      needsCenterMaintenance: this.input.centerPullItems ?? "",
+      items: this.input.parts.map((part) => {
+        const sparePartId = part.sparePartId?.trim();
+        if (!sparePartId) throw new ApiError("يجب اختيار قطعة غيار لكل بند في الفاتورة.");
+
+        return {
+          sparePartId,
+          quantity: Math.max(1, Number(part.quantity) || 1),
+          unitPrice: Math.max(0, Number(part.unitPrice) || 0),
+        };
+      }),
+    };
+  }
+}
+
 export class PaymentPayloadModel {
   constructor(private readonly input: PaymentPayloadInput) {}
 

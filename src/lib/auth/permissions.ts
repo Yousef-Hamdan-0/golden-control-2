@@ -136,6 +136,7 @@ const API_RULES: ApiRule[] = [
   { test: (p) => p === "/api/invoices", methods: ["GET"], roles: ["admin", "manager", "employee"] },
   { test: (p) => p === "/api/invoices", methods: ["POST"], roles: ALL_ROLES },
   { test: (p) => re("/api/invoices/:id/pdf").test(p), roles: ALL_ROLES },
+  { test: (p) => re("/api/invoices/:id").test(p), methods: ["PATCH"], roles: ["admin"] },
   { test: (p) => re("/api/invoices/:id").test(p), roles: ALL_ROLES },
 
   // Finance & payroll — admin only, except payroll adjustments + monthly

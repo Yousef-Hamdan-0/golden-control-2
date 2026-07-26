@@ -7,6 +7,7 @@ import {
 } from "@/helpers/authenticated-api.helper";
 import {
   InvoicePayloadModel,
+  InvoiceUpdatePayloadModel,
   PaymentPayloadModel,
   normalizeInvoiceListResponse,
   normalizeInvoiceResponse,
@@ -118,6 +119,16 @@ export const invoiceRepository = {
     const body = new InvoicePayloadModel(input).toJSON();
     const payload = await requestAuthenticatedApi(API_ENDPOINTS.invoices.root, {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    return normalizeInvoiceResponse(payload);
+  },
+
+  async update(id: string, input: Invoice): Promise<Invoice> {
+    const body = new InvoiceUpdatePayloadModel(input).toJSON();
+    const payload = await requestAuthenticatedApi(API_ENDPOINTS.invoices.byId(id), {
+      method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
