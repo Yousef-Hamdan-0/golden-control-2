@@ -9,7 +9,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Select } from "@/components/ui/Select";
 import { Icon } from "@/lib/icons";
 import { cn } from "@/lib/utils/cn";
-import type { InventoryMovementType, InventoryPart } from "@/models/inventory/inventory.model";
+import type { InventoryPart } from "@/models/inventory/inventory.model";
 import { INVENTORY_MOVEMENT_LABELS } from "../../constants";
 
 export function QuantityAdjustmentModal({
@@ -19,7 +19,7 @@ export function QuantityAdjustmentModal({
 }: {
   items: InventoryPart[];
   onClose: () => void;
-  onSave: (partId: string, movementType: InventoryMovementType, quantity: number) => void;
+  onSave: (partId: string, movementType: "supply" | "adjustment", quantity: number) => void;
 }) {
   const [partId, setPartId] = useState(items[0]?.id ?? "");
   const [movementType, setMovementType] = useState<"supply" | "adjustment">("supply");

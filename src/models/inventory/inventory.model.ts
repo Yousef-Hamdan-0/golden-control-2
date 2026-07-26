@@ -3,7 +3,11 @@ import { ApiError } from "@/helpers/api.helper";
 
 type JsonRecord = Record<string, unknown>;
 
-export type InventoryMovementType = "supply" | "withdraw" | "adjustment" | "sale" | "return";
+export type InventoryMovementType =
+  | "supply"
+  | "adjustment"
+  | "sale"
+  | "return";
 
 export interface InventoryDailyLog {
   id: string;
@@ -61,26 +65,36 @@ export const InventoryDailyCreateSchema = z.object({
   notes: z.string().trim().optional().default(""),
 });
 
-export type InventoryDailyCreateInput = z.input<typeof InventoryDailyCreateSchema>;
+export type InventoryDailyCreateInput = z.input<
+  typeof InventoryDailyCreateSchema
+>;
 
 export const InventoryPartInputSchema = z.object({
   name: z.string().trim().min(1, "اسم القطعة مطلوب"),
   sku: z.string().trim().optional().default(""),
   shelfLocation: z.string().trim().optional().default(""),
-  costSyp: z.coerce.number().nonnegative("قيمة القطعة بالليرة غير صالحة").default(0),
-  costUsd: z.coerce.number().nonnegative("قيمة القطعة بالدولار غير صالحة").default(0),
+  costSyp: z.coerce
+    .number()
+    .nonnegative("قيمة القطعة بالليرة غير صالحة")
+    .default(0),
+  costUsd: z.coerce
+    .number()
+    .nonnegative("قيمة القطعة بالدولار غير صالحة")
+    .default(0),
 });
 
 export type InventoryPartInput = z.input<typeof InventoryPartInputSchema>;
 
 export const InventoryMovementInputSchema = z.object({
   partId: z.string().trim().min(1, "اختيار القطعة مطلوب"),
-  movementType: z.enum(["supply", "withdraw", "adjustment"]),
+  movementType: z.enum(["supply", "adjustment", "sale", "return"]),
   quantity: z.coerce.number().int("الكمية يجب أن تكون رقماً صحيحاً"),
   reference: z.string().trim().optional().default(""),
 });
 
-export type InventoryMovementInput = z.input<typeof InventoryMovementInputSchema>;
+export type InventoryMovementInput = z.input<
+  typeof InventoryMovementInputSchema
+>;
 
 function isRecord(value: unknown): value is JsonRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -152,18 +166,36 @@ function publicCodeValue(...values: unknown[]) {
   return "";
 }
 
-function normalizeUsedPart(payload: unknown, index: number): InventoryDailyUsedPart {
+function normalizeUsedPart(
+  payload: unknown,
+  index: number,
+): InventoryDailyUsedPart {
   const raw = isRecord(payload) ? payload : {};
   const part = isRecord(raw.part) ? raw.part : {};
   return {
-    id: stringValue(raw.id, raw.partId, raw.part_id, part.id, `part-${index + 1}`),
-    name: stringValue(raw.name, raw.partName, raw.part_name, nestedName(part), `قطعة ${index + 1}`),
+    id: stringValue(
+      raw.id,
+      raw.partId,
+      raw.part_id,
+      part.id,
+      `part-${index + 1}`,
+    ),
+    name: stringValue(
+      raw.name,
+      raw.partName,
+      raw.part_name,
+      nestedName(part),
+      `قطعة ${index + 1}`,
+    ),
     quantity: numberValue(raw.totalQuantity, raw.quantity, raw.qty),
   };
 }
 
-export function normalizeInventoryDailyLog(payload: unknown): InventoryDailyLog {
-  if (!isRecord(payload)) throw new ApiError("استجابة المخزون اليومي غير صالحة.");
+export function normalizeInventoryDailyLog(
+  payload: unknown,
+): InventoryDailyLog {
+  if (!isRecord(payload))
+    throw new ApiError("استجابة المخزون اليومي غير صالحة.");
   const technician = isRecord(payload.technician) ? payload.technician : {};
   const dailyUsage = isRecord(payload.dailyUsage) ? payload.dailyUsage : {};
   const rawParts = Array.isArray(dailyUsage.parts) ? dailyUsage.parts : [];
@@ -177,14 +209,22 @@ export function normalizeInventoryDailyLog(payload: unknown): InventoryDailyLog 
       payload.technician_name,
       "فني غير محدد",
     ),
-    toolsGiven: stringValue(payload.toolsGiven, payload.tools_given, payload.tools),
+    toolsGiven: stringValue(
+      payload.toolsGiven,
+      payload.tools_given,
+      payload.tools,
+    ),
     notes: stringValue(payload.notes),
     createdAt: dateValue(payload.createdAt, payload.created_at),
     usedParts: rawParts.map(normalizeUsedPart),
   };
 }
 
-export function normalizeInventoryDailyList(payload: unknown, page: number, pageSize: number) {
+export function normalizeInventoryDailyList(
+  payload: unknown,
+  page: number,
+  pageSize: number,
+) {
   const root = isRecord(payload) ? payload : {};
   const data = dataRecord(payload);
   const pagination = isRecord(root.pagination)
@@ -194,14 +234,20 @@ export function normalizeInventoryDailyList(payload: unknown, page: number, page
       : {};
   // A single malformed entry used to throw and fail the entire list — skip
   // that entry instead so the rest of a real, mostly-valid response renders.
-  const items = arrayData(payload, "technicians", "items", "logs").flatMap((item) => {
-    try {
-      return [normalizeInventoryDailyLog(item)];
-    } catch (error) {
-      console.error("normalizeInventoryDailyList: skipping invalid entry —", error, item);
-      return [];
-    }
-  });
+  const items = arrayData(payload, "technicians", "items", "logs").flatMap(
+    (item) => {
+      try {
+        return [normalizeInventoryDailyLog(item)];
+      } catch (error) {
+        console.error(
+          "normalizeInventoryDailyList: skipping invalid entry —",
+          error,
+          item,
+        );
+        return [];
+      }
+    },
+  );
   const total = numberValue(
     isRecord(data) ? data.totalTechnicians : undefined,
     root.totalTechnicians,
@@ -231,7 +277,12 @@ export function normalizeInventoryPart(payload: unknown): InventoryPart {
 
   return {
     id,
-    sparePartNumber: stringValue(payload.sparePartNumber, payload.spare_part_number, payload.partNumber, id),
+    sparePartNumber: stringValue(
+      payload.sparePartNumber,
+      payload.spare_part_number,
+      payload.partNumber,
+      id,
+    ),
     name: stringValue(payload.name, "قطعة غير محددة"),
     sku: stringValue(payload.sku),
     shelfLocation: stringValue(payload.shelfLocation, payload.shelf_location),
@@ -259,30 +310,46 @@ export function normalizeInventoryPartList(
     : isRecord(data.pagination)
       ? data.pagination
       : {};
-  const items = arrayData(payload, "parts", "items", "data").map(normalizeInventoryPart);
+  const items = arrayData(payload, "parts", "items", "data").map(
+    normalizeInventoryPart,
+  );
 
   return {
     items,
     total: numberValue(pagination.total, root.total, data.total, items.length),
-    page: numberValue(pagination.page, data.page, root.page, fallback.page) || fallback.page,
+    page:
+      numberValue(pagination.page, data.page, root.page, fallback.page) ||
+      fallback.page,
     pageSize:
-      numberValue(pagination.limit, pagination.pageSize, data.limit, root.limit, fallback.pageSize) ||
-      fallback.pageSize,
+      numberValue(
+        pagination.limit,
+        pagination.pageSize,
+        data.limit,
+        root.limit,
+        fallback.pageSize,
+      ) || fallback.pageSize,
   };
 }
 
 function normalizeMovementType(value: unknown): InventoryMovementType {
   const raw = stringValue(value).toLowerCase();
-  if (raw === "withdraw" || raw === "withdrawal" || raw === "out") return "withdraw";
+
   if (raw === "adjustment" || raw === "adjust") return "adjustment";
   if (raw === "sale" || raw === "sold") return "sale";
   if (raw === "return" || raw === "returned") return "return";
   return "supply";
 }
 
-export function normalizeInventoryMovement(payload: unknown, index: number): InventoryMovementLog {
+export function normalizeInventoryMovement(
+  payload: unknown,
+  index: number,
+): InventoryMovementLog {
   const raw = isRecord(payload) ? payload : {};
-  const part = isRecord(raw.part) ? raw.part : isRecord(raw.sparePart) ? raw.sparePart : {};
+  const part = isRecord(raw.part)
+    ? raw.part
+    : isRecord(raw.sparePart)
+      ? raw.sparePart
+      : {};
   const id = stringValue(raw.id, raw._id, `movement-${index + 1}`);
   const movementNumber = publicCodeValue(
     raw.movementNumber,
@@ -319,7 +386,13 @@ export function normalizeInventoryMovement(payload: unknown, index: number): Inv
   return {
     id,
     movementNumber,
-    partId: stringValue(raw.partId, raw.part_id, raw.sparePartId, raw.spare_part_id, part.id),
+    partId: stringValue(
+      raw.partId,
+      raw.part_id,
+      raw.sparePartId,
+      raw.spare_part_id,
+      part.id,
+    ),
     partNumber: stringValue(
       raw.sparePartNumber,
       raw.spare_part_number,
@@ -342,7 +415,9 @@ export function normalizeInventoryMovement(payload: unknown, index: number): Inv
       nestedName(part),
       part.sparePartNumber,
     ),
-    movementType: normalizeMovementType(raw.movementType ?? raw.movement_type ?? raw.type),
+    movementType: normalizeMovementType(
+      raw.movementType ?? raw.movement_type ?? raw.type,
+    ),
     quantity: numberValue(raw.quantity, raw.qty),
     owner:
       publicCodeValue(
@@ -366,7 +441,9 @@ export function normalizeInventoryMovement(payload: unknown, index: number): Inv
 }
 
 export function normalizeInventoryMovementList(payload: unknown) {
-  return arrayData(payload, "movements", "items", "data").map(normalizeInventoryMovement);
+  return arrayData(payload, "movements", "items", "data").map(
+    normalizeInventoryMovement,
+  );
 }
 
 export class InventoryDailyPayloadModel {
@@ -406,7 +483,8 @@ export class InventoryMovementPayloadModel {
     return {
       partId: parsed.partId,
       // The backend expects "adjust" for the quantity-adjustment movement.
-      movementType: parsed.movementType === "adjustment" ? "adjust" : parsed.movementType,
+      movementType:
+        parsed.movementType === "adjustment" ? "adjust" : parsed.movementType,
       quantity: parsed.quantity,
       reference: parsed.reference ?? "",
     };
