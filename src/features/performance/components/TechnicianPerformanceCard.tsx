@@ -1,6 +1,7 @@
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { formatMoney } from "@/lib/format/currency";
+import { localDisplayDateTime } from "@/lib/format/date";
 import { Icon } from "@/lib/icons";
 import {
   summarizeOrders,
@@ -127,10 +128,10 @@ export function TechnicianPerformanceCard({
                       {formatHours(order.completionHours)}
                     </td>
                     <td className="px-4 py-3 text-content-muted" dir="ltr">
-                      {order.startTime}
+                      {localDisplayDateTime(order.startTime)}
                     </td>
                     <td className="px-4 py-3 text-content-muted" dir="ltr">
-                      {order.endTime ?? "مستمر"}
+                      {order.endTime ? localDisplayDateTime(order.endTime) : "مستمر"}
                     </td>
                   </tr>
                 );
