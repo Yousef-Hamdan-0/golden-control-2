@@ -168,7 +168,7 @@ export function InvoiceFormModal({
       currency: part.currency ?? draft.currency,
     }));
     const total = Math.max(0, Number(draft.total) || 0);
-    const paid = lockPayment ? invoice.paid : Math.min(total, Math.max(0, Number(draft.paid) || 0));
+    const paid = Math.min(total, Math.max(0, Number(draft.paid) || 0));
     const nextStatus: PaymentStatus = lockPayment
       ? invoice.status
       : paid >= total && total > 0
@@ -450,7 +450,7 @@ export function InvoiceFormModal({
                     min={0}
                     placeholder="0.00"
                     dir="ltr"
-                    disabled={submitting || lockPayment}
+                    disabled={submitting}
                   />
                 </Field>
               </div>

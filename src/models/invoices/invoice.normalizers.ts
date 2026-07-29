@@ -850,8 +850,11 @@ export class InvoiceUpdatePayloadModel {
     const totalAmount = Math.max(0, Number(this.input.total) || 0);
     if (totalAmount <= 0) throw new ApiError("المبلغ الكلي مطلوب.");
 
+    const paidAmount = Math.max(0, Number(this.input.paid) || 0);
+
     return {
       totalAmount,
+      paidAmount,
       warrantyPeriod: this.input.warrantyDuration ?? "",
       notes: this.input.notes ?? "",
       locationURL: this.input.locationURL ?? "",
@@ -861,6 +864,7 @@ export class InvoiceUpdatePayloadModel {
         if (!sparePartId) throw new ApiError("يجب اختيار قطعة غيار لكل بند في الفاتورة.");
 
         return {
+          id: part.id,
           sparePartId,
           quantity: Math.max(1, Number(part.quantity) || 1),
           unitPrice: Math.max(0, Number(part.unitPrice) || 0),
