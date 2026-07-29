@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/Textarea";
 import { Icon } from "@/lib/icons";
 import { formatMoney } from "@/lib/format/currency";
 import type { Currency } from "@/lib/format/currency";
-import { todayDateKey } from "@/lib/format/date";
+import { todayDateKey, localDisplayDateTime } from "@/lib/format/date";
 import { cn } from "@/lib/utils/cn";
 import { PAGE_SIZE } from "@/config/constants";
 import { useInventoryAllPartsQuery } from "@/features/inventory/hooks/use-inventory";
@@ -284,7 +284,7 @@ export function InvoiceFormModal({
                 </div>
                 <div>
                   <div className="text-content-muted">تاريخ الإصدار</div>
-                  <div className="mt-1 font-bold text-content">{draft.issuedAt}</div>
+                  <div className="mt-1 font-bold text-content">{localDisplayDateTime(draft.issuedAt)}</div>
                 </div>
               </div>
             )}
