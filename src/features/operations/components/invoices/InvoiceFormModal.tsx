@@ -220,7 +220,7 @@ export function InvoiceFormModal({
   return (
     <>
       <Modal
-        title={isCreate ? "إنشاء فاتورة" : `تعديل الفاتورة ${invoice.id}`}
+        title={isCreate ? "إنشاء فاتورة" : `تعديل الفاتورة ${invoice.invoiceNumber || invoice.id}`}
         description={isCreate ? "إنشاء فاتورة مرتبطة بالطلب مع القطع، المبالغ، الدفع، والكفالة." : "تعديل بيانات الفاتورة والقطع والدفعات الأساسية."}
         onClose={onClose}
         widthClassName="max-w-6xl"
@@ -319,10 +319,12 @@ export function InvoiceFormModal({
           <Card className="overflow-hidden shadow-none">
             <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
               <h3 className="font-heading text-base font-bold text-gold">قطع الغيار المستخدمة</h3>
-              <Button type="button" variant="outline" size="sm" onClick={addPart}>
-                <Icon name="plus" size={16} />
-                إضافة قطعة
-              </Button>
+              {isCreate && (
+                <Button type="button" variant="outline" size="sm" onClick={addPart}>
+                  <Icon name="plus" size={16} />
+                  إضافة قطعة
+                </Button>
+              )}
             </div>
             <div className="space-y-3 p-4">
               {draft.parts.length === 0 ? (
@@ -406,15 +408,17 @@ export function InvoiceFormModal({
                         {formatMoney(invoicePartTotal(part), draft.currency)}
                       </div>
                     </div>
-                    <Button
-                      type="button"
-                      variant="danger"
-                      size="sm"
-                      className="h-10 px-3"
-                      onClick={() => removePart(index)}
-                    >
-                      <Icon name="trash" size={16} />
-                    </Button>
+                    {isCreate && (
+                      <Button
+                        type="button"
+                        variant="danger"
+                        size="sm"
+                        className="h-10 px-3"
+                        onClick={() => removePart(index)}
+                      >
+                        <Icon name="trash" size={16} />
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -468,53 +472,58 @@ export function InvoiceFormModal({
             ) : null}
           </Card>
 
+          {isCreate && (
+            <div className="space-y-4">
+              <Field label="نوع الدفع">
+                <div className="grid grid-cols-2 gap-2">
+                  {([
+                    ["cash", "كاش"],
+                    ["sham-cash", "شام كاش"],
+                  ] as Array<[PaymentMethod, string]>).map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      disabled={submitting}
+                      onClick={() => patchDraft({ paymentMethod: value })}
+                      className={cn(
+                        "rounded-md border px-4 py-3 font-heading font-bold transition",
+                        draft.paymentMethod === value
+                          ? "border-gold bg-gold-soft text-gold-active"
+                          : "border-border bg-surface text-content-muted hover:bg-gold-soft hover:text-gold",
+                      )}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </Field>
+              <Field label="نوع العملة">
+                <div className="grid grid-cols-2 gap-2">
+                  {([
+                    ["USD", "دولار"],
+                    ["SYP", "ليرة سورية"],
+                  ] as Array<[Currency, string]>).map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      disabled={submitting}
+                      onClick={() => patchDraft({ currency: value })}
+                      className={cn(
+                        "rounded-md border px-4 py-3 font-heading font-bold transition",
+                        draft.currency === value
+                          ? "border-gold bg-gold-soft text-gold-active"
+                          : "border-border bg-surface text-content-muted hover:bg-gold-soft hover:text-gold",
+                      )}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </Field>
+            </div>
+          )}
+
           <div className="space-y-4">
-            <Field label="نوع الدفع">
-              <div className="grid grid-cols-2 gap-2">
-                {([
-                  ["cash", "كاش"],
-                  ["sham-cash", "شام كاش"],
-                ] as Array<[PaymentMethod, string]>).map(([value, label]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    disabled={lockPayment}
-                    onClick={() => patchDraft({ paymentMethod: value })}
-                    className={cn(
-                      "rounded-md border px-4 py-3 font-heading font-bold transition",
-                      lockPayment && "cursor-not-allowed opacity-40",
-                      draft.paymentMethod === value
-                        ? "border-gold bg-gold-soft text-gold-active"
-                        : "border-border bg-surface text-content-muted hover:bg-gold-soft hover:text-gold",
-                    )}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </Field>
-            <Field label="نوع العملة">
-              <div className="grid grid-cols-2 gap-2">
-                {([
-                  ["USD", "دولار"],
-                  ["SYP", "ليرة سورية"],
-                ] as Array<[Currency, string]>).map(([value, label]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => patchDraft({ currency: value })}
-                    className={cn(
-                      "rounded-md border px-4 py-3 font-heading font-bold transition",
-                      draft.currency === value
-                        ? "border-gold bg-gold-soft text-gold-active"
-                        : "border-border bg-surface text-content-muted hover:bg-gold-soft hover:text-gold",
-                    )}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </Field>
             <Field label="مدة الكفالة">
               <Input value={draft.warrantyDuration ?? ""} onChange={(event) => patchDraft({ warrantyDuration: event.target.value })} placeholder="مثال: 6 أشهر" />
             </Field>

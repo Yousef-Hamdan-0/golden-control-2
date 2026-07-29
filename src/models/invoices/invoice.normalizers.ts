@@ -860,12 +860,10 @@ export class InvoiceUpdatePayloadModel {
       locationURL: this.input.locationURL ?? "",
       needsCenterMaintenance: this.input.centerPullItems ?? "",
       items: this.input.parts.map((part) => {
-        const sparePartId = part.sparePartId?.trim();
-        if (!sparePartId) throw new ApiError("يجب اختيار قطعة غيار لكل بند في الفاتورة.");
+        if (!part.sparePartId?.trim()) throw new ApiError("يجب اختيار قطعة غيار لكل بند في الفاتورة.");
 
         return {
           id: part.id,
-          sparePartId,
           quantity: Math.max(1, Number(part.quantity) || 1),
           unitPrice: Math.max(0, Number(part.unitPrice) || 0),
         };
