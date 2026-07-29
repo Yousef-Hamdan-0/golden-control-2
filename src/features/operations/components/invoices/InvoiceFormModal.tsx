@@ -338,7 +338,7 @@ export function InvoiceFormModal({
                     <Field label="قطعة الغيار">
                       <Select
                         value={part.sparePartId ?? ""}
-                        disabled={submitting || partsQuery.isLoading}
+                        disabled={submitting || partsQuery.isLoading || !isCreate}
                         onChange={(event) => {
                           const sparePart = availableSpareParts.find((item) => item.id === event.target.value);
                           patchPart(index, {
@@ -386,6 +386,7 @@ export function InvoiceFormModal({
                         step="0.01"
                         dir="ltr"
                         className="h-10"
+                        disabled={!isCreate}
                         placeholder={draft.currency === "USD" ? "USD" : "SYP"}
                       />
                     </Field>
@@ -394,6 +395,7 @@ export function InvoiceFormModal({
                       <CounterInput
                         value={part.quantity}
                         min={1}
+                        disabled={!isCreate}
                         max={
                           availableSpareParts.find(
                             (sparePart) => sparePart.id === part.sparePartId,
