@@ -386,7 +386,6 @@ export function InvoiceFormModal({
                         step="0.01"
                         dir="ltr"
                         className="h-10"
-                        disabled={!isCreate}
                         placeholder={draft.currency === "USD" ? "USD" : "SYP"}
                       />
                     </Field>
@@ -395,7 +394,6 @@ export function InvoiceFormModal({
                       <CounterInput
                         value={part.quantity}
                         min={1}
-                        disabled={!isCreate}
                         max={
                           availableSpareParts.find(
                             (sparePart) => sparePart.id === part.sparePartId,
