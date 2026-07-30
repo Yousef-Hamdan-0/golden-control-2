@@ -857,7 +857,6 @@ export class InvoiceUpdatePayloadModel {
       paidAmount,
       warrantyPeriod: this.input.warrantyDuration ?? "",
       notes: this.input.notes ?? "",
-      locationURL: this.input.locationURL ?? "",
       needsCenterMaintenance: this.input.centerPullItems ?? "",
       items: this.input.parts.map((part) => {
         if (!part.sparePartId?.trim()) throw new ApiError("يجب اختيار قطعة غيار لكل بند في الفاتورة.");
