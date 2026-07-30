@@ -549,7 +549,7 @@ export function InvoiceFormModal({
       {pendingInvoice ? (
         <ConfirmToast
           title={isCreate ? "تأكيد إنشاء الفاتورة" : "تأكيد تعديل الفاتورة"}
-          message={isCreate ? `هل تريد إنشاء الفاتورة ${pendingInvoice.id} ومعاينتها؟` : `هل تريد حفظ التعديلات على الفاتورة ${pendingInvoice.id}؟`}
+          message={isCreate ? `هل تريد إنشاء الفاتورة ${pendingInvoice.invoiceNumber || pendingInvoice.id} ومعاينتها؟` : `هل تريد حفظ التعديلات على الفاتورة ${pendingInvoice.invoiceNumber || pendingInvoice.id}؟`}
           tone="gold"
           confirmLabel={isCreate ? "إنشاء الفاتورة" : "تأكيد التعديل"}
           onCancel={() => setPendingInvoice(null)}
