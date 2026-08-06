@@ -11,6 +11,7 @@ import {
 
 interface TechnicianPerformanceCardProps {
   technician: TechnicianDailyPerformance;
+  onShowDetails: (requestId: string) => void;
 }
 
 const STATUS_DETAILS: Record<
@@ -34,6 +35,7 @@ function formatDuration(minutes: number | null) {
 
 export function TechnicianPerformanceCard({
   technician,
+  onShowDetails,
 }: TechnicianPerformanceCardProps) {
   const summary = technician.summary ?? summarizeOrders(technician.orders);
   const breakdown = [
@@ -95,7 +97,7 @@ export function TechnicianPerformanceCard({
           <h4 className="text-sm font-semibold text-content">تفاصيل الخط الزمني للطلبات</h4>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[780px] text-right text-sm">
+          <table className="w-full min-w-[880px] text-right text-sm">
             <thead>
               <tr className="bg-surface-2 text-content-muted">
                 {[
@@ -105,6 +107,7 @@ export function TechnicianPerformanceCard({
                   "ساعات الإنجاز",
                   "وقت البدء",
                   "وقت الانتهاء",
+                  "إجراءات",
                 ].map((header) => (
                   <th key={header} scope="col" className="px-4 py-3 font-medium">
                     {header}
@@ -138,11 +141,28 @@ export function TechnicianPerformanceCard({
                     <td className="px-4 py-3 text-content-muted" dir="ltr">
                       {order.endTime ? localDisplayDateTime(order.endTime) : "مستمر"}
                     </td>
+                    <td className="px-4 py-3">
+                      {order.requestId ? (
+                        <div className="flex items-center gap-1" dir="rtl">
+                          <button
+                            type="button"
+                            aria-label={`تفاصيل الطلب ${order.id}`}
+                            title="تفاصيل الطلب"
+                            onClick={() => onShowDetails(order.requestId)}
+                            className="rounded-sm p-1.5 text-content-muted hover:bg-surface-2"
+                          >
+                            <Icon name="eye" size={18} />
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-content-muted">—</span>
+                      )}
+                    </td>
                   </tr>
                 );
               }) : (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-content-muted">
+                  <td colSpan={7} className="px-4 py-8 text-center text-content-muted">
                     لا توجد بيانات طلبات لهذا الفني
                   </td>
                 </tr>

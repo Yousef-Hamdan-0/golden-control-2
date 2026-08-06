@@ -52,6 +52,8 @@ export function AddPaymentModal({
         currency,
         method,
         paidAt: new Date().toISOString(),
+        isCollected: false,
+        collectedAt: null,
       },
       convertedAmount,
     );

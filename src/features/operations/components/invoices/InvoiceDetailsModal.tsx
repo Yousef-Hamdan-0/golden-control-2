@@ -9,6 +9,8 @@ import { TablePagination } from "@/components/ui/TablePagination";
 import { useToast } from "@/components/ui/Toast";
 import { Icon } from "@/lib/icons";
 import { formatMoney } from "@/lib/format/currency";
+import { localDisplayDateTime } from "@/lib/format/date";
+import { useInvoiceMutations } from "@/features/invoices/hooks/use-invoices";
 import { PAGE_SIZE } from "@/config/constants";
 import { getApiErrorMessage } from "@/helpers/api.helper";
 import { invoiceService } from "@/services/invoice.service";
@@ -42,7 +44,9 @@ export function InvoiceDetailsModal({
   onReturnInvoice?: (invoice: Invoice) => void;
 }) {
   const toast = useToast();
+  const { collectPayment } = useInvoiceMutations();
   const [paymentsPage, setPaymentsPage] = useState(1);
+  const [pendingPaymentId, setPendingPaymentId] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [printing, setPrinting] = useState(false);
   const paymentPages = Math.max(1, Math.ceil(invoice.payments.length / PAGE_SIZE));
@@ -52,6 +56,31 @@ export function InvoiceDetailsModal({
     currentPaymentsPage * PAGE_SIZE,
   );
   const canAddPayment = invoice.status !== "paid" && !invoice.returned;
+
+  // No optimistic update: the row flips only after the server confirms, so a
+  // failed request can never leave a payment looking collected.
+  function setCollected(paymentId: string, isCollected: boolean) {
+    if (pendingPaymentId) return;
+    setPendingPaymentId(paymentId);
+    collectPayment.mutate(
+      { paymentId, isCollected, invoiceId: invoice.id },
+      {
+        onSuccess: () =>
+          toast.success(
+            isCollected ? "تم تسجيل التحصيل" : "تم التراجع عن التحصيل",
+            isCollected
+              ? "تم تسجيل قبض الدفعة من الفني."
+              : "تمت إعادة الدفعة إلى حالة غير محصّلة.",
+          ),
+        onError: (error) =>
+          toast.error(
+            isCollected ? "تعذر تسجيل التحصيل" : "تعذر التراجع",
+            getApiErrorMessage(error),
+          ),
+        onSettled: () => setPendingPaymentId(null),
+      },
+    );
+  }
 
   // Download the invoice as a real PDF file directly (server-rendered, same
   // layout as the printed copy including the warranty box and part names).
@@ -206,7 +235,7 @@ export function InvoiceDetailsModal({
               <table className="min-w-[360px] w-full text-right text-sm">
                 <thead>
                   <tr className="bg-surface-2 text-content-muted">
-                    {["المبلغ المدفوع", "المبلغ بعد التحويل"].map((header) => (
+                    {["المبلغ المدفوع", "المبلغ بعد التحويل", "تحصيل الفني"].map((header) => (
                       <th key={header} className="px-4 py-3 font-medium">
                         {header}
                       </th>
@@ -223,6 +252,38 @@ export function InvoiceDetailsModal({
                         {formatMoney(
                           payment.convertedAmount ?? convertPaymentToInvoiceCurrency(payment.amount, payment.currency, invoice.currency),
                           invoice.currency,
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {payment.isCollected ? (
+                          <div className="flex flex-wrap items-center gap-2" dir="rtl">
+                            <Badge tone="success" dot>
+                              تم تحصيل الدفعة من الفني
+                            </Badge>
+                            <span className="text-xs text-content-muted" dir="ltr">
+                              {localDisplayDateTime(payment.collectedAt, "—")}
+                            </span>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              disabled={pendingPaymentId === payment.id}
+                              onClick={() => setCollected(payment.id, false)}
+                            >
+                              {pendingPaymentId === payment.id ? "جاري الحفظ..." : "تراجع"}
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            type="button"
+                            size="sm"
+                            disabled={pendingPaymentId === payment.id}
+                            onClick={() => setCollected(payment.id, true)}
+                          >
+                            {pendingPaymentId === payment.id
+                              ? "جاري الحفظ..."
+                              : "تم قبض الدفعة من الفني"}
+                          </Button>
                         )}
                       </td>
                     </tr>

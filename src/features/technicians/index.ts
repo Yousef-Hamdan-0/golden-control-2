@@ -1,2 +1,1 @@
-export { DailyInventoryScreen } from "@/features/technicians/components/DailyInventoryScreen";
-export { DailyInventoryForm } from "@/features/technicians/components/DailyInventoryForm";
+export { TechnicianCustodyScreen } from "@/features/technicians/components/TechnicianCustodyScreen";

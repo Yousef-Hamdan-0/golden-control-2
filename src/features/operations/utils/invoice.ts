@@ -120,6 +120,8 @@ export function normalizeInvoice(invoice: Partial<Invoice>): Invoice {
           method: payment.method === "sham-cash" ? "sham-cash" as const : "cash" as const,
           dollarExchangeRate: Math.max(0, Number(payment.dollarExchangeRate) || 0) || undefined,
           paidAt: payment.paidAt || invoice.issuedAt || todayDateKey(),
+          isCollected: Boolean(payment.isCollected),
+          collectedAt: payment.collectedAt ?? null,
         }))
       : [],
   };
@@ -171,6 +173,8 @@ export function createInvoiceDraftFromOrder(order: Order, invoices: Invoice[]): 
               currency: "SYP",
               method: "cash",
               paidAt: todayDateKey(),
+              isCollected: false,
+              collectedAt: null,
             },
           ]
         : [],

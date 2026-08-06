@@ -117,6 +117,10 @@ export interface InvoicePayment {
   method: PaymentMethod;
   dollarExchangeRate?: number;
   paidAt: string;
+  /** True once the technician handed this payment over to the center. */
+  isCollected: boolean;
+  /** Server-side collection timestamp; never derived from the device clock. */
+  collectedAt: string | null;
 }
 
 export interface InvoicePart {

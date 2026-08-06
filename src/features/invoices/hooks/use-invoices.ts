@@ -96,5 +96,19 @@ export function useInvoiceMutations() {
     },
   });
 
-  return { create, update, recordPayment, refund };
+  const collectPayment = useMutation({
+    mutationFn: ({
+      paymentId,
+      isCollected,
+    }: {
+      paymentId: string;
+      isCollected: boolean;
+      invoiceId: string;
+    }) => invoiceService.setPaymentCollected(paymentId, isCollected),
+    onSuccess: async (_data, vars) => {
+      await qc.invalidateQueries({ queryKey: queryKeys.invoices.detail(vars.invoiceId) });
+    },
+  });
+
+  return { create, update, recordPayment, refund, collectPayment };
 }

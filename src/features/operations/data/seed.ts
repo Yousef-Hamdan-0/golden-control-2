@@ -273,7 +273,7 @@ export const INVOICES: Invoice[] = [
       { id: "PRT-102", name: "حساس حرارة NTC", quantity: 2, unitPrice: 55000 },
     ],
     payments: [
-      { id: "PAY-721", amount: 450000, convertedAmount: 450000, currency: "SYP", method: "cash", paidAt: "2026-06-11" },
+      { id: "PAY-721", amount: 450000, convertedAmount: 450000, currency: "SYP", method: "cash", paidAt: "2026-06-11", isCollected: false, collectedAt: null },
     ],
   },
   {
@@ -300,8 +300,8 @@ export const INVOICES: Invoice[] = [
       { id: "LAB-001", name: "أجور صيانة", quantity: 1, unitPrice: 260000 },
     ],
     payments: [
-      { id: "PAY-720", amount: 300000, convertedAmount: 300000, currency: "SYP", method: "sham-cash", paidAt: "2026-06-10" },
-      { id: "PAY-719", amount: 380000, convertedAmount: 380000, currency: "SYP", method: "sham-cash", paidAt: "2026-06-10" },
+      { id: "PAY-720", amount: 300000, convertedAmount: 300000, currency: "SYP", method: "sham-cash", paidAt: "2026-06-10", isCollected: false, collectedAt: null },
+      { id: "PAY-719", amount: 380000, convertedAmount: 380000, currency: "SYP", method: "sham-cash", paidAt: "2026-06-10", isCollected: false, collectedAt: null },
     ],
   },
   {
@@ -328,7 +328,7 @@ export const INVOICES: Invoice[] = [
       { id: "LAB-002", name: "أجور فحص", quantity: 1, unitPrice: 83 },
     ],
     payments: [
-      { id: "PAY-718", amount: 60, convertedAmount: 60, currency: "USD", method: "cash", paidAt: "2026-06-10" },
+      { id: "PAY-718", amount: 60, convertedAmount: 60, currency: "USD", method: "cash", paidAt: "2026-06-10", isCollected: false, collectedAt: null },
     ],
   },
   {

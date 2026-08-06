@@ -25,8 +25,11 @@ export const queryKeys = {
   dashboard: {
     all: ["dashboard"] as const,
     stats: () => ["dashboard", "stats"] as const,
-    technicianPerformance: () =>
-      ["dashboard", "technician-performance"] as const,
+    technicianPerformance: (params?: {
+      year: number;
+      month: number;
+      day?: number;
+    }) => ["dashboard", "technician-performance", params ?? null] as const,
   },
   users: {
     all: ["users"] as const,
@@ -84,6 +87,12 @@ export const queryKeys = {
   technicians: {
     all: ["technicians"] as const,
     inventory: (page: number) => ["technicians", "inventory", page] as const,
+    custody: (technicianId: string) =>
+      ["technicians", "custody", technicianId] as const,
+    walletMovements: (technicianId: string, page: number) =>
+      ["technicians", "custody", technicianId, "wallet-movements", page] as const,
+    partMovements: (technicianId: string, page: number) =>
+      ["technicians", "custody", technicianId, "part-movements", page] as const,
   },
   inventory: {
     all: ["inventory"] as const,

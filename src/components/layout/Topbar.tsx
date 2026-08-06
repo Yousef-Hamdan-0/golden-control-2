@@ -25,7 +25,7 @@ function routeTitle(pathname: string, fallback: string): string {
   if (pathname.startsWith("/settings/exchange-rate")) return "سعر الصرف";
   if (pathname.startsWith("/settings/center")) return "الإعدادات";
   if (pathname.startsWith("/customers")) return "إدارة العملاء";
-  if (pathname.startsWith("/technicians/inventory")) return "المخزون اليومي";
+  if (pathname.startsWith("/technicians/inventory")) return "عهدة الفني";
   if (pathname.startsWith("/technicians/performance")) return "الأداء";
   if (pathname.startsWith("/orders")) return "إدارة الطلبات";
   if (pathname.startsWith("/inventory")) return "إدارة المخزون";

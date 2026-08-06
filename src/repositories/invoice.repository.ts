@@ -19,9 +19,15 @@ import {
   type PaymentListParams,
   type PaymentPayloadInput,
 } from "@/models/invoices/invoice.model";
+import {
+  mockPaymentCollection,
+  mockSetPaymentCollected,
+  type PaymentCollectionResult,
+} from "@/mocks/pending-endpoints.mock";
 import type { Invoice, InvoicePayment } from "@/features/operations/types";
 
 export type { InvoiceListParams, PaymentListParams, PaymentPayloadInput };
+export type { PaymentCollectionResult };
 
 type InvoiceListAllParams = Omit<InvoiceListParams, "page">;
 
@@ -112,7 +118,28 @@ export const invoiceRepository = {
     const payload = await requestAuthenticatedApi(API_ENDPOINTS.invoices.byId(id), {
       method: "GET",
     });
-    return normalizeInvoiceResponse(payload);
+    const invoice = normalizeInvoiceResponse(payload);
+
+    // TODO: API — بانتظار حقلي `isCollected` و`collectedAt` ضمن payments[] في
+    // GET /api/invoices/{id}. احذف هذا الإسقاط عند إرجاع الخادم لهما.
+    return {
+      ...invoice,
+      payments: invoice.payments.map((payment) => {
+        const collection = mockPaymentCollection(payment.id);
+        return collection
+          ? { ...payment, isCollected: collection.isCollected, collectedAt: collection.collectedAt }
+          : payment;
+      }),
+    };
+  },
+
+  // TODO: API — بانتظار Endpoint: PATCH /api/payments/{id}/collection
+  // Request: { isCollected: boolean } → Response: { id, isCollected, collectedAt }
+  async setPaymentCollected(
+    paymentId: string,
+    isCollected: boolean,
+  ): Promise<PaymentCollectionResult> {
+    return mockSetPaymentCollected(paymentId, isCollected);
   },
 
   async create(input: Invoice): Promise<Invoice> {

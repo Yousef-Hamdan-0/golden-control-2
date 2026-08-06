@@ -42,7 +42,7 @@ export const NAVIGATION: NavItem[] = [
     icon: "wrench",
     children: [
       {
-        label: "المخزون اليومي",
+        label: "عهدة الفني",
         href: "/technicians/inventory",
         roles: ["admin", "manager", "employee"],
       },

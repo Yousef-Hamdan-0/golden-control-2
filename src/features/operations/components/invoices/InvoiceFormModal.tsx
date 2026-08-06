@@ -189,6 +189,8 @@ export function InvoiceFormModal({
                 currency: draft.currency,
                 method: draft.paymentMethod,
                 paidAt: draft.issuedAt || todayDateKey(),
+                isCollected: false,
+                collectedAt: null,
               },
             ]
           : [];

@@ -1,5 +1,9 @@
-import { DailyInventoryScreen } from "@/features/technicians";
+import { TechnicianCustodyScreen } from "@/features/technicians";
 
-export default function DailyInventoryPage() {
-  return <DailyInventoryScreen />;
+export const metadata = {
+  title: "عهدة الفني | مركز الصيانة الذهبي",
+};
+
+export default function TechnicianCustodyPage() {
+  return <TechnicianCustodyScreen />;
 }

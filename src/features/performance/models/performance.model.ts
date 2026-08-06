@@ -16,7 +16,10 @@ export interface OrderRevenue {
 }
 
 export interface TechnicianOrderPerformance {
+  /** Display number (رقم الطلب) — not necessarily fetchable. */
   id: string;
+  /** Fetchable request id, or "" when the payload carries only a display number. */
+  requestId: string;
   status: PerformanceOrderStatus;
   maintenanceHours: number;
   completionHours: number | null;
@@ -116,6 +119,7 @@ function timelineOrder(
       record.label,
       index + 1,
     ),
+    requestId: stringValue(record.requestId, record.request_id, record.id),
     status,
     maintenanceHours: numberValue(
       record.maintenanceHours,

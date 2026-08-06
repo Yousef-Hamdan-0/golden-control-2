@@ -42,4 +42,8 @@ export const invoiceService = {
   listPayments(invoiceId: string, params: PaymentListParams = {}) {
     return invoiceRepository.listPayments(invoiceId, params);
   },
+
+  setPaymentCollected(paymentId: string, isCollected: boolean) {
+    return invoiceRepository.setPaymentCollected(paymentId, isCollected);
+  },
 };

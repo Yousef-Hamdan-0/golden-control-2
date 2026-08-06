@@ -1,5 +1,6 @@
 import {
   dashboardRepository,
+  type TechnicianPerformanceParams,
 } from "@/repositories/dashboard.repository";
 import type { AuthenticatedBlobResponse } from "@/helpers/authenticated-api.helper";
 import type {
@@ -12,8 +13,10 @@ export const dashboardService = {
     return dashboardRepository.stats();
   },
 
-  technicianPerformance(): Promise<DashboardTechnicianPerformance> {
-    return dashboardRepository.technicianPerformance();
+  technicianPerformance(
+    params?: TechnicianPerformanceParams,
+  ): Promise<DashboardTechnicianPerformance> {
+    return dashboardRepository.technicianPerformance(params);
   },
 
   downloadFinancialReport(format: string): Promise<AuthenticatedBlobResponse> {

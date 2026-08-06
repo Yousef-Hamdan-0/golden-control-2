@@ -1,21 +1,52 @@
 "use client";
 
+import { useState } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { useDashboardTechnicianPerformanceQuery } from "@/features/dashboard/hooks/use-dashboard";
 import { PerformanceKpiCards } from "@/features/performance/components/PerformanceKpiCards";
+import {
+  PerformanceDateFilter,
+  type PerformanceDateValue,
+} from "@/features/performance/components/PerformanceDateFilter";
 import { TechnicianPerformanceCard } from "@/features/performance/components/TechnicianPerformanceCard";
 import {
   performanceSummaryFromDashboard,
   techniciansFromDashboardPerformance,
 } from "@/features/performance/models/performance.model";
+import { RequestDetailsModal } from "@/features/requests/components/RequestDetailsModal";
+import {
+  useRequestQuery,
+  useRequestStatusHistoryQuery,
+} from "@/features/requests/hooks/use-requests";
 import { getApiErrorMessage } from "@/helpers/api.helper";
+import { todayDateKey } from "@/lib/format/date";
+
+function today(): PerformanceDateValue {
+  const [year, month, day] = todayDateKey().split("-").map(Number);
+  return { year, month, day };
+}
 
 export function DailyPerformanceScreen() {
-  const performanceQuery = useDashboardTechnicianPerformanceQuery();
+  const [date, setDate] = useState<PerformanceDateValue>(today);
+  const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
+
+  const performanceQuery = useDashboardTechnicianPerformanceQuery({
+    year: date.year,
+    month: date.month,
+    day: date.day || undefined,
+  });
   const performance = performanceQuery.data;
   const technicians = techniciansFromDashboardPerformance(performance);
   const summary = performanceSummaryFromDashboard(performance);
+
+  const detailsQuery = useRequestQuery(selectedRequestId);
+  const statusHistoryQuery = useRequestStatusHistoryQuery(selectedRequestId, true);
+  const detailsRequest = detailsQuery.data ?? null;
+  const embeddedStatusHistory = detailsRequest?.statusHistory ?? [];
+  const visibleStatusHistory = statusHistoryQuery.data?.length
+    ? statusHistoryQuery.data
+    : embeddedStatusHistory;
 
   return (
     <div className="space-y-6" dir="rtl">
@@ -23,6 +54,13 @@ export function DailyPerformanceScreen() {
         title="لوحة الأداء اليومي"
         subtitle="متابعة إنجاز الطلبات، أوقات الصيانة، والإيرادات اليومية لكل فني."
       />
+
+      <Card className="p-4 sm:p-5">
+        <PerformanceDateFilter value={date} onChange={setDate} />
+        <p className="mt-3 text-xs text-content-muted">
+          فلترة التاريخ بانتظار دعم الخادم؛ قد تُعرض بيانات اليوم الحالي حتى تفعيلها.
+        </p>
+      </Card>
 
       {performanceQuery.isError ? (
         <Card className="border-danger/30 bg-danger-soft p-4 text-sm text-danger">
@@ -42,7 +80,7 @@ export function DailyPerformanceScreen() {
               أداء الفنيين
             </h2>
             <p className="mt-1 text-sm text-content-muted">
-              تفاصيل الطلبات المنفذة خلال اليوم حسب الفني المسؤول.
+              تفاصيل الطلبات المنفذة خلال الفترة المختارة حسب الفني المسؤول.
             </p>
           </div>
           <span className="text-sm text-content-muted">
@@ -65,7 +103,10 @@ export function DailyPerformanceScreen() {
                   <span className="h-px flex-1 bg-border" />
                 </div>
               )}
-              <TechnicianPerformanceCard technician={technician} />
+              <TechnicianPerformanceCard
+                technician={technician}
+                onShowDetails={setSelectedRequestId}
+              />
             </div>
             ))
           ) : (
@@ -75,6 +116,27 @@ export function DailyPerformanceScreen() {
           )}
         </div>
       </section>
+
+      {selectedRequestId ? (
+        <RequestDetailsModal
+          request={detailsRequest}
+          isLoading={detailsQuery.isLoading}
+          errorMessage={
+            detailsQuery.error ? getApiErrorMessage(detailsQuery.error) : undefined
+          }
+          statusHistory={visibleStatusHistory}
+          statusHistoryLoading={
+            statusHistoryQuery.isLoading && embeddedStatusHistory.length === 0
+          }
+          statusHistoryError={
+            statusHistoryQuery.error && embeddedStatusHistory.length === 0
+              ? getApiErrorMessage(statusHistoryQuery.error)
+              : undefined
+          }
+          downloadingPdf={false}
+          onClose={() => setSelectedRequestId(null)}
+        />
+      ) : null}
     </div>
   );
 }

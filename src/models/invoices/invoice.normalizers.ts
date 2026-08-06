@@ -383,6 +383,12 @@ export function normalizeInvoicePayment(payload: unknown, index = 0): InvoicePay
       raw.createdAt,
       raw.created_at,
     ),
+    isCollected: booleanValue(
+      raw.isCollected ?? raw.iscollected ?? raw.is_collected ?? raw.collected,
+    ),
+    collectedAt:
+      stringValue(raw.collectedAt, raw.collected_at, raw.collectionDate, raw.collection_date) ||
+      null,
   };
 }
 
