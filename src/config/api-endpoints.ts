@@ -45,6 +45,7 @@ export const API_ROUTES = {
   },
   payments: {
     root: "/api/payments",
+    byId: (id: string) => `/api/payments/${encodeURIComponent(id)}`,
     byInvoice: (invoiceId: string) =>
       `/api/payments/invoice/${encodeURIComponent(invoiceId)}`,
   },
@@ -64,6 +65,14 @@ export const API_ROUTES = {
   inventory: {
     daily: "/api/inventory/daily",
     dailyById: (id: string) => `/api/inventory/daily/${encodeURIComponent(id)}`,
+    technicians: "/api/inventory/technician",
+    technicianById: (id: string) =>
+      `/api/inventory/technician/${encodeURIComponent(id)}`,
+    technicianWalletMovement: "/api/inventory/technician/wallet/movement",
+    technicianWalletMovements: (technicianInventoryId: string) =>
+      `/api/inventory/technician/${encodeURIComponent(technicianInventoryId)}/wallet-movements`,
+    technicianSoldItems: (technicianId: string) =>
+      `/api/inventory/technician/technician/${encodeURIComponent(technicianId)}/sold-items`,
     parts: "/api/inventory/parts",
     partById: (id: string) => `/api/inventory/parts/${encodeURIComponent(id)}`,
     movements: "/api/inventory/movements",
@@ -172,6 +181,18 @@ export const BACKEND_API_ENDPOINTS = {
   inventory: {
     daily: createApiUrl(API_ROUTES.inventory.daily),
     dailyById: (id: string) => createApiUrl(API_ROUTES.inventory.dailyById(id)),
+    technicians: createApiUrl(API_ROUTES.inventory.technicians),
+    technicianById: (id: string) =>
+      createApiUrl(API_ROUTES.inventory.technicianById(id)),
+    technicianWalletMovement: createApiUrl(
+      API_ROUTES.inventory.technicianWalletMovement,
+    ),
+    technicianWalletMovements: (technicianInventoryId: string) =>
+      createApiUrl(
+        API_ROUTES.inventory.technicianWalletMovements(technicianInventoryId),
+      ),
+    technicianSoldItems: (technicianId: string) =>
+      createApiUrl(API_ROUTES.inventory.technicianSoldItems(technicianId)),
     parts: createApiUrl(API_ROUTES.inventory.parts),
     partById: (id: string) => createApiUrl(API_ROUTES.inventory.partById(id)),
     movements: createApiUrl(API_ROUTES.inventory.movements),

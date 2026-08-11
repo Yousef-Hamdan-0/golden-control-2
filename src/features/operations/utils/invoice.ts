@@ -1,7 +1,7 @@
 import type { Invoice, InvoicePart, InvoicePayment, Order, PaymentStatus, PaymentCurrency } from "../types";
 import type { Currency } from "@/lib/format/currency";
 import type { RepairRequest } from "@/models/requests/request.model";
-import { todayDateKey } from "@/lib/format/date";
+import { localDateTimeKey, todayDateKey } from "@/lib/format/date";
 import { USD_TO_SYP_RATE } from "../constants";
 import { TECHNICIAN_PHONE_BY_NAME } from "../data/seed";
 import { INVOICES } from "../data/seed";
@@ -147,7 +147,7 @@ export function createInvoiceDraftFromOrder(order: Order, invoices: Invoice[]): 
     paymentMethod: "cash",
     total: order.total,
     paid,
-    issuedAt: todayDateKey(),
+    issuedAt: localDateTimeKey(new Date()),
     warrantyDuration: "",
     locationURL: order.locationUrl ?? "",
     centerPullItems: order.status === "incompleted" ? order.device : "",
@@ -203,7 +203,7 @@ export function createInvoiceDraftFromRequest(request: RepairRequest): Invoice {
     paymentMethod: "cash",
     total: 0,
     paid: 0,
-    issuedAt: todayDateKey(),
+    issuedAt: localDateTimeKey(new Date()),
     warrantyDuration: "",
     locationURL: request.customer.locationLink,
     centerPullItems: request.status === "pulltocenter" ? deviceSummary || request.faultDescription : "",

@@ -106,7 +106,10 @@ export function useInvoiceMutations() {
       invoiceId: string;
     }) => invoiceService.setPaymentCollected(paymentId, isCollected),
     onSuccess: async (_data, vars) => {
-      await qc.invalidateQueries({ queryKey: queryKeys.invoices.detail(vars.invoiceId) });
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: queryKeys.invoices.detail(vars.invoiceId) }),
+        qc.invalidateQueries({ queryKey: queryKeys.invoices.payments(vars.invoiceId, {}) }),
+      ]);
     },
   });
 

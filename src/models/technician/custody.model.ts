@@ -29,6 +29,7 @@ export interface TechnicianCustodyPart {
  * invented name.
  */
 export interface TechnicianCustody {
+  inventoryId?: string;
   technicianId: string;
   walletBalance: number;
   tools: string;

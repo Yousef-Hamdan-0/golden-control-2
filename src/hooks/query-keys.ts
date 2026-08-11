@@ -86,6 +86,7 @@ export const queryKeys = {
   },
   technicians: {
     all: ["technicians"] as const,
+    custodies: () => ["technicians", "custody"] as const,
     inventory: (page: number) => ["technicians", "inventory", page] as const,
     custody: (technicianId: string) =>
       ["technicians", "custody", technicianId] as const,

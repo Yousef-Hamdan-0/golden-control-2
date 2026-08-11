@@ -8,8 +8,16 @@ import type {
 } from "@/models/technician/custody.model";
 
 export const technicianCustodyService = {
+  list() {
+    return technicianCustodyRepository.list();
+  },
+
   get(technicianId: string) {
     return technicianCustodyRepository.get(technicianId);
+  },
+
+  remove(inventoryId: string) {
+    return technicianCustodyRepository.remove(inventoryId);
   },
 
   listWalletMovements(technicianId: string, params: MovementListParams = {}) {

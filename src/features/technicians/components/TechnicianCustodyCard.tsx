@@ -35,6 +35,17 @@ const EMPTY_CUSTODY: Omit<TechnicianCustody, "technicianId"> = {
   parts: [],
 };
 
+function custodyTableError(error: unknown) {
+  const message = getApiErrorMessage(error);
+  if (
+    message.includes("Invalid `this.prisma") ||
+    message.includes("technician_inventory.walletAmount")
+  ) {
+    return "تعذر تحميل بيانات عهدة الفني حالياً. يرجى المحاولة لاحقاً.";
+  }
+  return message;
+}
+
 export function TechnicianCustodyCard({ technician }: { technician: User }) {
   const toast = useToast();
   const { updateWallet, updateParts, updateTools } = useTechnicianCustodyMutations();
@@ -66,7 +77,7 @@ export function TechnicianCustodyCard({ technician }: { technician: User }) {
             </h3>
             <p className="text-xs text-content-muted">
               رقم الفني:{" "}
-              <span dir="ltr">{technician.userNumber || technician.id}</span>
+              <span dir="ltr">{technician.userNumber || "غير محدد"}</span>
             </p>
             {technician.phone ? (
               <p className="text-xs text-content-muted" dir="ltr">
@@ -77,7 +88,7 @@ export function TechnicianCustodyCard({ technician }: { technician: User }) {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button type="button" size="sm" onClick={() => setOpenModal("wallet")}>
-            تحديث المحفظة
+           إضافة حركة للمحفظة
           </Button>
           <Button type="button" size="sm" variant="outline" onClick={() => setOpenModal("parts")}>
             تحديث القطع
@@ -116,7 +127,7 @@ export function TechnicianCustodyCard({ technician }: { technician: User }) {
               ) : walletQuery.isError ? (
                 <tr>
                   <td colSpan={4} className="px-4 py-6 text-center text-danger">
-                    {getApiErrorMessage(walletQuery.error)}
+                    {custodyTableError(walletQuery.error)}
                   </td>
                 </tr>
               ) : walletMovements.length ? (
@@ -217,7 +228,7 @@ export function TechnicianCustodyCard({ technician }: { technician: User }) {
               ) : partMovementsQuery.isError ? (
                 <tr>
                   <td colSpan={4} className="px-4 py-6 text-center text-danger">
-                    {getApiErrorMessage(partMovementsQuery.error)}
+                    {custodyTableError(partMovementsQuery.error)}
                   </td>
                 </tr>
               ) : partMovements.length ? (
@@ -267,10 +278,10 @@ export function TechnicianCustodyCard({ technician }: { technician: User }) {
               {
                 onSuccess: () => {
                   setOpenModal(null);
-                  toast.success("تم تحديث المحفظة", "تم تسجيل الحركة وتحديث الرصيد.");
+                  toast.success("تم ضافة حركة للمحفظة", "تم تسجيل الحركة وتحديث الرصيد.");
                 },
                 onError: (error) =>
-                  toast.error("تعذر تحديث المحفظة", getApiErrorMessage(error)),
+                  toast.error("تعذر ضافة حركة للمحفظة", getApiErrorMessage(error)),
               },
             )
           }

@@ -47,7 +47,7 @@ export function UpdateWalletModal({
 
   return (
     <Modal
-      title="تحديث المحفظة"
+      title="إضافة حركة للمحفظة"
       description={`الرصيد الحالي: ${formatMoney(custody.walletBalance, "SYP")}`}
       onClose={onClose}
       widthClassName="max-w-lg"

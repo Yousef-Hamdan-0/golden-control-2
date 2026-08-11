@@ -10,9 +10,11 @@ import type {
 
 export function useTechnicianCustodyQuery(technicianId: string) {
   return useQuery({
-    queryKey: queryKeys.technicians.custody(technicianId),
-    queryFn: () => technicianCustodyService.get(technicianId),
+    queryKey: queryKeys.technicians.custodies(),
+    queryFn: () => technicianCustodyService.list(),
     enabled: Boolean(technicianId),
+    select: (inventories) =>
+      inventories.find((inventory) => inventory.technicianId === technicianId),
   });
 }
 
