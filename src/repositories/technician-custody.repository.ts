@@ -84,6 +84,7 @@ function soldItemsPage(
     const sparePart = nestedRecord(item.sparePart);
     const request = nestedRecord(item.request);
     const invoice = nestedRecord(item.invoice);
+    const consumption = nestedRecord(item.consumption);
     return {
       id: stringValue(item.id, `sold-item-${params.page}-${index + 1}`),
       partId: stringValue(
@@ -103,6 +104,19 @@ function soldItemsPage(
       ),
       quantity: numberValue(item.quantity, item.qty, item.soldQuantity, item.sold_quantity),
       reason: stringValue(
+        item.reference,
+        item.invoiceNumber,
+        item.invoice_number,
+        invoice.reference,
+        invoice.invoiceNumber,
+        invoice.invoice_number,
+        item.consumptionNumber,
+        item.consumption_number,
+        consumption.reference,
+        consumption.consumptionNumber,
+        consumption.consumption_number,
+        consumption.number,
+        consumption.code,
         item.requestNumber,
         item.request_number,
         request.requestNumber,

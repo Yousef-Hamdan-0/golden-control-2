@@ -59,24 +59,16 @@ export function InvoiceDetailsModal({
 
   // No optimistic update: the row flips only after the server confirms, so a
   // failed request can never leave a payment looking collected.
-  function setCollected(paymentId: string, isCollected: boolean) {
+  function setCollected(paymentId: string) {
     if (pendingPaymentId) return;
     setPendingPaymentId(paymentId);
     collectPayment.mutate(
-      { paymentId, isCollected, invoiceId: invoice.id },
+      { paymentId, isCollected: true, invoiceId: invoice.id },
       {
         onSuccess: () =>
-          toast.success(
-            isCollected ? "تم تسجيل التحصيل" : "تم التراجع عن التحصيل",
-            isCollected
-              ? "تم تسجيل قبض الدفعة من الفني."
-              : "تمت إعادة الدفعة إلى حالة غير محصّلة.",
-          ),
+          toast.success("تم تسجيل التحصيل", "تم تسجيل قبض الدفعة من الفني."),
         onError: (error) =>
-          toast.error(
-            isCollected ? "تعذر تسجيل التحصيل" : "تعذر التراجع",
-            getApiErrorMessage(error),
-          ),
+          toast.error("تعذر تسجيل التحصيل", getApiErrorMessage(error)),
         onSettled: () => setPendingPaymentId(null),
       },
     );
@@ -260,25 +252,16 @@ export function InvoiceDetailsModal({
                             <Badge tone="success" dot>
                               تم تحصيل الدفعة من الفني
                             </Badge>
-                            <span className="text-xs text-content-muted" dir="ltr">
+                            <span className="text-sm text-content-muted" dir="ltr">
                               {localDisplayDateTime(payment.collectedAt, "—")}
                             </span>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              disabled={pendingPaymentId === payment.id}
-                              onClick={() => setCollected(payment.id, false)}
-                            >
-                              {pendingPaymentId === payment.id ? "جاري الحفظ..." : "تراجع"}
-                            </Button>
                           </div>
                         ) : (
                           <Button
                             type="button"
                             size="sm"
                             disabled={pendingPaymentId === payment.id}
-                            onClick={() => setCollected(payment.id, true)}
+                            onClick={() => setCollected(payment.id)}
                           >
                             {pendingPaymentId === payment.id
                               ? "جاري الحفظ..."
