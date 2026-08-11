@@ -148,7 +148,7 @@ function walletMovementsPage(payload: unknown): PagedResult<WalletMovement> {
       id: stringValue(movement.id, `wallet-movement-${index + 1}`),
       amount: numberValue(movement.amount),
       type: apiType === "deduction" ? "withdraw" as const : "supply" as const,
-      reason: stringValue(movement.notes, movement.reason, "—"),
+      reason: stringValue(movement.notes, movement.note, movement.reason, "—"),
       createdAt: stringValue(
         movement.createdAt,
         movement.created_at,
