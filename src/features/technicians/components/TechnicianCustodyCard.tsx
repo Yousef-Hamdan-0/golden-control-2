@@ -101,7 +101,9 @@ export function TechnicianCustodyCard({ technician }: { technician: User }) {
 
       <section className="border-t border-border p-4 sm:p-5">
         <h4 className="font-heading text-base font-bold text-content">المخزون المالي</h4>
-        <p className="mt-1 text-xs text-content-muted">محفظة الفني</p>
+        <p className="mt-1 inline-flex rounded-sm bg-gold-active px-3 py-1.5 text-sm font-bold text-white">
+          محفظة الفني
+        </p>
         <p className="mt-2 font-heading text-2xl font-bold text-gold">
           {formatMoney(custody.walletBalance, "SYP")}
         </p>
@@ -172,7 +174,9 @@ export function TechnicianCustodyCard({ technician }: { technician: User }) {
       <section className="border-t border-border p-4 sm:p-5">
         <h4 className="font-heading text-base font-bold text-content">مخزون الأدوات والقطع</h4>
 
-        <p className="mt-3 text-xs text-content-muted">الأدوات</p>
+        <p className="mt-3 inline-flex rounded-sm bg-gold-active px-3 py-1.5 text-sm font-bold text-white">
+          الأدوات
+        </p>
         <p className="mt-1 whitespace-pre-line text-sm text-content">
           {custody.tools.trim() || "لا توجد أدوات مسجّلة."}
         </p>
@@ -209,7 +213,9 @@ export function TechnicianCustodyCard({ technician }: { technician: User }) {
           </table>
         </div>
 
-        <p className="mt-5 text-xs text-content-muted">حركات القطع</p>
+        <p className="mt-5 inline-flex rounded-sm bg-gold-active px-3 py-1.5 text-sm font-bold text-white">
+          حركات القطع
+        </p>
         <div className="mt-2 overflow-x-auto">
           <table className="w-full min-w-[620px] text-right text-sm">
             <thead>

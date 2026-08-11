@@ -101,67 +101,47 @@ function normalizePerformanceStatus(value: unknown): PerformanceOrderStatus {
 function timelineOrder(
   item: DashboardTechnicianTimelineItem,
   index: number,
+  maintenanceMinutes: number,
+  completionMinutes: number,
 ): TechnicianOrderPerformance {
   const record = item as TimelineRecord;
   const status = normalizePerformanceStatus(
     record.status ?? record.requestStatus ?? record.request_status,
   );
-
+  const startTime = stringValue(
+    record.startTime,
+    record.start_time,
+    record.startedAt,
+    record.started_at,
+    record.createdAt,
+    record.created_at,
+    "—",
+  );
+  const endTime = status === "active"
+    ? null
+    : nullableString(
+        record.endTime,
+        record.end_time,
+        record.completedAt,
+        record.completed_at,
+        record.finishedAt,
+        record.finished_at,
+      );
   return {
     id: stringValue(
       record.requestNumber,
       record.request_number,
       record.orderNumber,
       record.order_number,
-      record.id,
-      record.requestId,
-      record.request_id,
       record.label,
       index + 1,
     ),
     requestId: stringValue(record.requestId, record.request_id, record.id),
     status,
-    maintenanceHours: numberValue(
-      record.maintenanceHours,
-      record.maintenance_hours,
-      record.repairHours,
-      record.repair_hours,
-      record.durationHours,
-      record.duration_hours,
-      record.value,
-    ),
-    completionHours:
-      status === "active"
-        ? null
-        : numberValue(
-            record.completionHours,
-            record.completion_hours,
-            record.completedHours,
-            record.completed_hours,
-            record.durationHours,
-            record.duration_hours,
-            record.value,
-          ),
-    startTime: stringValue(
-      record.startTime,
-      record.start_time,
-      record.startedAt,
-      record.started_at,
-      record.createdAt,
-      record.created_at,
-      "—",
-    ),
-    endTime:
-      status === "active"
-        ? null
-        : nullableString(
-            record.endTime,
-            record.end_time,
-            record.completedAt,
-            record.completed_at,
-            record.finishedAt,
-            record.finished_at,
-          ),
+    maintenanceHours: Math.max(0, Math.round(maintenanceMinutes)),
+    completionHours: Math.max(0, Math.round(completionMinutes)),
+    startTime,
+    endTime,
     revenue: {
       syp: numberValue(
         record.revenueSyp,
@@ -193,9 +173,11 @@ function technicianFromDashboard(
     technician.pulltocenterCount;
 
   return {
-    id: technician.userNumber || technician.technicianId,
+    id: technician.userNumber || "غير محدد",
     name: technician.technicianName || "فني غير محدد",
-    orders: technician.timeline.map(timelineOrder),
+    orders: technician.timeline.map((item, index) =>
+      timelineOrder(item, index, technician.activeCount, technician.completedCount),
+    ),
     summary: {
       totalOrders,
       completedOrders: technician.completedCount,
