@@ -164,6 +164,7 @@ export const BACKEND_API_ENDPOINTS = {
   },
   payments: {
     root: createApiUrl(API_ROUTES.payments.root),
+    byId: (id: string) => createApiUrl(API_ROUTES.payments.byId(id)),
     byInvoice: (invoiceId: string) => createApiUrl(API_ROUTES.payments.byInvoice(invoiceId)),
   },
   payrollRecords: {

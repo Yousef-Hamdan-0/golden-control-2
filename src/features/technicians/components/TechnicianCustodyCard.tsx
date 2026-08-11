@@ -134,7 +134,10 @@ export function TechnicianCustodyCard({ technician }: { technician: User }) {
                 walletMovements.map((movement) => (
                   <tr key={movement.id} className="border-t border-border">
                     <td className="px-4 py-3 font-bold text-content" dir="ltr">
-                      {formatMoney(movement.amount, "SYP")}
+                      <span className="inline-flex items-center gap-1" dir="ltr">
+                        <span>ل.س</span>
+                        <span>{formatMoney(movement.amount, "SYP").replace(" ل.س", "")}</span>
+                      </span>
                     </td>
                     <td className="px-4 py-3">
                       <Badge tone={MOVEMENT_TONE[movement.type]} dot>
