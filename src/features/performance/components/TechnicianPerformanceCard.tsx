@@ -130,10 +130,14 @@ export function TechnicianPerformanceCard({
                       </Badge>
                     </td>
                     <td className="px-4 py-3 text-content-muted">
-                      {formatDuration(order.maintenanceHours)}
+                      {order.status === "completed" || order.status === "incomplete"
+                        ? formatDuration(order.maintenanceHours)
+                        : "—"}
                     </td>
                     <td className="px-4 py-3 text-content-muted">
-                      {formatDuration(order.completionHours)}
+                      {order.status === "completed" || order.status === "incomplete"
+                        ? formatDuration(order.completionHours)
+                        : "—"}
                     </td>
                     <td className="px-4 py-3 text-content-muted" dir="ltr">
                       {localDisplayDateTime(order.startTime)}
