@@ -55,7 +55,8 @@ function numberValue(...values: unknown[]) {
     if (value === undefined || value === null || value === "") continue;
     const normalized =
       typeof value === "string" ? value.replace(/,/g, "").trim() : value;
-    const number = typeof normalized === "number" ? normalized : Number(normalized);
+    const number =
+      typeof normalized === "number" ? normalized : Number(normalized);
     if (Number.isFinite(number)) return number;
   }
   return 0;
@@ -117,16 +118,17 @@ function timelineOrder(
     record.created_at,
     "—",
   );
-  const endTime = status === "active"
-    ? null
-    : nullableString(
-        record.endTime,
-        record.end_time,
-        record.completedAt,
-        record.completed_at,
-        record.finishedAt,
-        record.finished_at,
-      );
+  const endTime =
+    status === "active"
+      ? null
+      : nullableString(
+          record.endTime,
+          record.end_time,
+          record.completedAt,
+          record.completed_at,
+          record.finishedAt,
+          record.finished_at,
+        );
   return {
     id: stringValue(
       record.requestNumber,
@@ -176,7 +178,12 @@ function technicianFromDashboard(
     id: technician.userNumber || "غير محدد",
     name: technician.technicianName || "فني غير محدد",
     orders: technician.timeline.map((item, index) =>
-      timelineOrder(item, index, technician.activeCount, technician.completedCount),
+      timelineOrder(
+        item,
+        index,
+        technician.activeCount,
+        technician.completedCount,
+      ),
     ),
     summary: {
       totalOrders,
@@ -184,7 +191,7 @@ function technicianFromDashboard(
       incompleteOrders: technician.incompletedCount,
       returnedOrders: technician.pulltocenterCount,
       activeOrders: technician.activeCount,
-      revenueSyp: technician.paymentsSyp || technician.sales,
+      revenueSyp: technician.paymentsSyp,
       revenueUsd: technician.paymentsUsd,
     },
   };
