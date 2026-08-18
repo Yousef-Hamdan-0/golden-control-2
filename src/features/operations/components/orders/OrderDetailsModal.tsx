@@ -27,7 +27,7 @@ import {
 } from "../../utils/invoice";
 import { isRepairDecisionStatus, canCreateInvoiceForOrder, getOrderDevices, formatDeviceName, getOrderAudioRecords, getOrderStatusHistory } from "../../utils/order";
 import { DetailItem } from "../shared/DetailItem";
-import { InvoiceDetailsModal } from "../invoices/InvoiceDetailsModal";
+import { ManagedInvoiceDetailsModal } from "../invoices/ManagedInvoiceDetailsModal";
 import { InvoiceFormModal } from "../invoices/InvoiceFormModal";
 
 export function OrderDetailsModal({
@@ -290,9 +290,8 @@ export function OrderDetailsModal({
       </Modal>
 
       {showInvoiceDetails && activeInvoice ? (
-        <InvoiceDetailsModal
+        <ManagedInvoiceDetailsModal
           invoice={activeInvoice}
-          order={order}
           onClose={() => setShowInvoiceDetails(false)}
         />
       ) : null}

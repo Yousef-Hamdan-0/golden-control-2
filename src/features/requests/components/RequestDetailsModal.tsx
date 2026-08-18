@@ -12,13 +12,11 @@ import { Icon } from "@/lib/icons";
 import { useRole } from "@/features/auth/hooks/use-role";
 import type { Invoice, InvoicePayment } from "@/features/operations/types";
 import { createInvoiceDraftFromRequest } from "@/features/operations/utils/invoice";
-import { InvoiceDetailsModal } from "@/features/operations/components/invoices/InvoiceDetailsModal";
+import { ManagedInvoiceDetailsModal } from "@/features/operations/components/invoices/ManagedInvoiceDetailsModal";
 import { InvoiceFormModal } from "@/features/operations/components/invoices/InvoiceFormModal";
 import { AddPaymentModal } from "@/features/operations/components/invoices/AddPaymentModal";
 import {
   useInvoiceMutations,
-  useInvoicePaymentsQuery,
-  useInvoiceQuery,
 } from "@/features/invoices/hooks/use-invoices";
 import { RequestCustomerSection } from "@/features/requests/components/RequestCustomerSection";
 import { RequestDevicesSection } from "@/features/requests/components/RequestDevicesSection";
@@ -96,12 +94,6 @@ export function RequestDetailsModal({
     () => (request ? createInvoiceDraftFromRequest(request) : null),
     [request],
   );
-  const invoiceDetailQuery = useInvoiceQuery(viewingInvoice?.id ?? null);
-  const invoicePaymentsQuery = useInvoicePaymentsQuery(viewingInvoice?.id ?? null);
-  const activeViewingInvoice = invoiceDetailQuery.data ?? viewingInvoice;
-  const activeViewingInvoiceWithPayments = activeViewingInvoice
-    ? { ...activeViewingInvoice, payments: invoicePaymentsQuery.data ?? activeViewingInvoice.payments }
-    : null;
 
   function showCreateInvoice() {
     if (!request || !invoiceDraft) return;
@@ -271,15 +263,13 @@ export function RequestDetailsModal({
           dollarExchangeRate={dollarExchangeRate}
         />
       ) : null}
-      {activeViewingInvoiceWithPayments ? (
-        <InvoiceDetailsModal
-          invoice={activeViewingInvoiceWithPayments}
+      {viewingInvoice ? (
+        <ManagedInvoiceDetailsModal
+          invoice={viewingInvoice}
           onClose={() => setViewingInvoice(null)}
-          onAddPayment={
-            canAddPayment(activeViewingInvoiceWithPayments)
-              ? () => setPaymentInvoice(activeViewingInvoiceWithPayments)
-              : undefined
-          }
+          onAddPayment={(invoice) => {
+            if (canAddPayment(invoice)) setPaymentInvoice(invoice);
+          }}
         />
       ) : null}
       {paymentInvoice ? (

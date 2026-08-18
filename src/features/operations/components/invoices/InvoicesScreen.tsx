@@ -22,22 +22,18 @@ import { getApiErrorMessage } from "@/helpers/api.helper";
 import { isUuid } from "@/models/invoices/invoice.model";
 import {
   useInvoiceMutations,
-  useInvoicePaymentsQuery,
-  useInvoiceQuery,
   useInvoicesAllQuery,
   useInvoicesQuery,
 } from "@/features/invoices/hooks/use-invoices";
 import { useDollarExchangeRate } from "@/features/settings/hooks/use-settings";
 import { useRole } from "@/features/auth/hooks/use-role";
-import { ConfirmToast } from "@/components/ui/ConfirmToast";
-import { useInventoryAllPartsQuery } from "@/features/inventory/hooks/use-inventory";
 import { typeLabel, currencyLabel, remaining } from "../../utils/invoice";
 import { SectionTitle } from "../shared/SectionTitle";
 import { KpiCards } from "../shared/KpiCards";
 import { FilterCard } from "../shared/FilterCard";
 import { DateFilterModal } from "../shared/DateFilterModal";
 import { EmptyState } from "../shared/EmptyState";
-import { InvoiceDetailsModal } from "./InvoiceDetailsModal";
+import { ManagedInvoiceDetailsModal } from "./ManagedInvoiceDetailsModal";
 import { InvoiceFormModal } from "./InvoiceFormModal";
 import { AddPaymentModal } from "./AddPaymentModal";
 
@@ -72,9 +68,8 @@ export function InvoicesScreen() {
   const [viewingInvoice, setViewingInvoice] = useState<Invoice | null>(null);
   const [paymentInvoice, setPaymentInvoice] = useState<Invoice | null>(null);
   const [page, setPage] = useState(1);
-  const [refundInvoice, setRefundInvoice] = useState<Invoice | null>(null);
   const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
-  const { update, recordPayment, refund } = useInvoiceMutations();
+  const { update, recordPayment } = useInvoiceMutations();
   const { role } = useRole();
   const isAdmin = role === "admin";
   const dollarExchangeRate = useDollarExchangeRate();
@@ -107,28 +102,6 @@ export function InvoicesScreen() {
   // single page rendered in the table below.
   const kpiInvoicesQuery = useInvoicesAllQuery(baseListParams);
   const kpiInvoices = kpiInvoicesQuery.data ?? EMPTY_INVOICES;
-  const detailQuery = useInvoiceQuery(viewingInvoice?.id ?? null);
-  const paymentsQuery = useInvoicePaymentsQuery(viewingInvoice?.id ?? null);
-  const activeViewingInvoice = detailQuery.data ?? viewingInvoice;
-  const partsQuery = useInventoryAllPartsQuery();
-  const partNameById = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const part of partsQuery.data ?? []) map.set(part.id, part.name);
-    return map;
-  }, [partsQuery.data]);
-  const activeViewingInvoiceWithPayments = activeViewingInvoice
-    ? {
-        ...activeViewingInvoice,
-        payments: paymentsQuery.data ?? activeViewingInvoice.payments,
-        // The backend returns `sparePartName` as null (the name is not sent on
-        // create), so resolve the real name from the spare-part inventory. This
-        // feeds the on-screen table, the printed invoice and the PDF alike.
-        parts: activeViewingInvoice.parts.map((part) => ({
-          ...part,
-          name: (part.sparePartId ? partNameById.get(part.sparePartId) : undefined) || part.name,
-        })),
-      }
-    : null;
 
   useEffect(() => {
     setType(invoiceTypeFromParam(typeParam));
@@ -170,18 +143,6 @@ export function InvoicesScreen() {
   const currentPage = activeListQuery.data?.page ?? page;
   const visibleInvoices = invoices;
   const tableTotal = activeListQuery.data?.total ?? 0;
-
-  function confirmRefund() {
-    if (!refundInvoice) return;
-    const displayNumber = invoiceDisplayNumber(refundInvoice);
-    refund.mutate(refundInvoice.id, {
-      onSuccess: () => {
-        setRefundInvoice(null);
-        toast.success("تم إرجاع الفاتورة", `تم إرجاع الفاتورة ${displayNumber} بنجاح.`);
-      },
-      onError: (error) => toast.error("تعذر إرجاع الفاتورة", getApiErrorMessage(error)),
-    });
-  }
 
   function savePayment(payment: InvoicePayment, convertedAmount: number) {
     if (!paymentInvoice) return;
@@ -287,23 +248,11 @@ export function InvoicesScreen() {
           onClose={() => setShowDateFilter(false)}
         />
       ) : null}
-      {activeViewingInvoiceWithPayments ? (
-        <InvoiceDetailsModal
-          invoice={activeViewingInvoiceWithPayments}
+      {viewingInvoice ? (
+        <ManagedInvoiceDetailsModal
+          invoice={viewingInvoice}
           onClose={() => setViewingInvoice(null)}
-          onAddPayment={() => setPaymentInvoice(activeViewingInvoiceWithPayments)}
-          onReturnInvoice={isAdmin ? (invoice) => setRefundInvoice(invoice) : undefined}
-        />
-      ) : null}
-      {refundInvoice ? (
-        <ConfirmToast
-          title="تأكيد إرجاع الفاتورة"
-          message={`هل تريد إرجاع الفاتورة ${invoiceDisplayNumber(refundInvoice)}؟`}
-          confirmLabel="إرجاع الفاتورة"
-          tone="danger"
-          isLoading={refund.isPending}
-          onCancel={() => setRefundInvoice(null)}
-          onConfirm={confirmRefund}
+          onAddPayment={setPaymentInvoice}
         />
       ) : null}
       {paymentInvoice ? (
